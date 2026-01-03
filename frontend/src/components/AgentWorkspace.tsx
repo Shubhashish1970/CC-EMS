@@ -201,8 +201,9 @@ const AgentWorkspace: React.FC = () => {
           }
           
           // Convert taskId to string if it's an object (taskId is guaranteed to be non-null after check above)
-          const taskIdNonNull = taskId; // TypeScript guard
-          const taskIdString = typeof taskIdNonNull === 'object' && taskIdNonNull.toString ? taskIdNonNull.toString() : String(taskIdNonNull);
+          const taskIdString = typeof taskId === 'object' && taskId !== null && 'toString' in taskId && typeof taskId.toString === 'function' 
+            ? taskId.toString() 
+            : String(taskId);
           
           // Ensure crops and products are arrays
           const activityCrops = Array.isArray(activity.crops) 
