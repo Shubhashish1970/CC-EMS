@@ -71,7 +71,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
     const fetchFullTask = async () => {
       setIsLoading(true);
       try {
-        const response = await tasksAPI.getTaskById(task._id);
+        const response = await tasksAPI.getTaskById(task._id) as any;
         if (response.success && response.data?.task) {
           setFullTask(response.data.task);
         }

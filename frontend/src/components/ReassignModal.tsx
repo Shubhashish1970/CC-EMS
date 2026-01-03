@@ -45,7 +45,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
         setIsLoading(true);
         setError(null);
         try {
-          const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true });
+          const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true }) as any;
           if (response.success && response.data?.users) {
             const allAgents = response.data.users;
             // Filter agents by language capability
@@ -81,7 +81,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await tasksAPI.reassignTask(task._id, selectedAgentId);
+      const response = await tasksAPI.reassignTask(task._id, selectedAgentId) as any;
       if (response.success) {
         setSuccess(true);
         setTimeout(() => {

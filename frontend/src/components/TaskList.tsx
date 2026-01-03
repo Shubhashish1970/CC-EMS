@@ -60,7 +60,7 @@ const TaskList: React.FC = () => {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true });
+        const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true }) as any;
         if (response.success && response.data?.users) {
           setAgents(response.data.users);
         }

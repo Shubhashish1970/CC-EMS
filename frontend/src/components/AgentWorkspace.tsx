@@ -195,13 +195,14 @@ const AgentWorkspace: React.FC = () => {
           console.log('fetchActiveTask: Activity crops type:', typeof activity?.crops);
           console.log('fetchActiveTask: Activity crops is array:', Array.isArray(activity?.crops));
           
-          if (!farmer || !activity) {
-            console.error('fetchActiveTask: ❌ Missing farmer or activity');
+          if (!farmer || !activity || !taskId) {
+            console.error('fetchActiveTask: ❌ Missing farmer, activity, or taskId');
             throw new Error('Task data is incomplete. Please try again.');
           }
           
-          // Convert taskId to string if it's an object
-          const taskIdString = typeof taskId === 'object' && taskId.toString ? taskId.toString() : String(taskId);
+          // Convert taskId to string if it's an object (taskId is guaranteed to be non-null after check above)
+          const taskIdNonNull = taskId; // TypeScript guard
+          const taskIdString = typeof taskIdNonNull === 'object' && taskIdNonNull.toString ? taskIdNonNull.toString() : String(taskIdNonNull);
           
           // Ensure crops and products are arrays
           const activityCrops = Array.isArray(activity.crops) 
