@@ -1,63 +1,84 @@
-# Backend Deployment - Setup Complete ✅
+# Backend Deployment - Google Cloud Run Setup ✅
 
 ## What's Been Created
 
-I've set up complete deployment configuration for your backend API. Here's what's ready:
+I've set up complete deployment configuration for your backend API on Google Cloud Run. Here's what's ready:
 
 ### 📦 Deployment Files Created
 
-1. **`backend/Dockerfile`** - Container configuration for deployment
+1. **`backend/Dockerfile`** - Container configuration for Cloud Run
 2. **`backend/.dockerignore`** - Files to exclude from Docker build
-3. **`backend/DEPLOYMENT.md`** - Comprehensive deployment guide
-4. **`backend/QUICK_DEPLOY.md`** - Quick start guide (recommended)
-5. **`backend/railway.json`** - Railway platform configuration
-6. **`backend/render.yaml`** - Render platform configuration
-7. **`backend/.github/workflows/deploy-backend.yml`** - GitHub Actions workflow (optional)
+3. **`backend/DEPLOYMENT.md`** - Comprehensive Cloud Run deployment guide
+4. **`backend/QUICK_DEPLOY.md`** - Quick start guide for Cloud Run
+5. **`backend/.github/workflows/deploy-backend.yml`** - GitHub Actions workflow for CI/CD (optional)
 
-### 🎯 Next Steps
+### 🎯 Deployment Platform: Google Cloud Run
 
-#### Option A: Railway (Fastest - Recommended)
-
-1. **Go to Railway**: https://railway.app
-2. **Sign up** with GitHub
-3. **Create New Project** → "Deploy from GitHub repo"
-4. **Select your repository** and set root directory to `backend`
-5. **Add Environment Variables**:
-   ```
-   MONGODB_URI=your-mongodb-connection-string
-   JWT_SECRET=your-super-secret-jwt-key-min-32-characters
-   NODE_ENV=production
-   CORS_ORIGIN=https://cc-ems-dev.web.app,https://cc-ems-dev.firebaseapp.com
-   ENABLE_CRON=true
-   FFA_API_URL=http://localhost:4000/api
-   ```
-6. **Get Domain**: Railway provides a default domain, or add custom domain `api-dev.cc-ems.com`
-
-#### Option B: Render
-
-1. **Go to Render**: https://render.com
-2. **Create Web Service** from GitHub repo
-3. **Set root directory** to `backend`
-4. **Set environment** to `Docker`
-5. **Add same environment variables** as above
-6. **Configure custom domain**: `api-dev.cc-ems.com`
+**Why Cloud Run?**
+- ✅ Serverless containerized deployment
+- ✅ Auto-scaling (0 to N instances based on traffic)
+- ✅ Pay-per-use pricing (cost-effective for 25-30 agents)
+- ✅ Integrated with Firebase ecosystem
+- ✅ Built-in HTTPS and load balancing
+- ✅ Custom domain support
+- ✅ No server management required
 
 ### 📋 Required Information
 
 Before deploying, you'll need:
 
-1. **MongoDB Atlas Connection String**
+1. **Google Cloud Platform Account**
+   - Sign up at [cloud.google.com](https://cloud.google.com)
+   - Enable billing (required for Cloud Run)
+   - Create a project
+
+2. **MongoDB Atlas Connection String**
    - Format: `mongodb+srv://username:password@cluster.mongodb.net/Kweka_Call_Centre`
    - Database name: `Kweka_Call_Centre`
    - Make sure IP whitelist allows all IPs (`0.0.0.0/0`) for testing
 
-2. **JWT Secret**
+3. **JWT Secret**
    - Generate a strong random string (minimum 32 characters)
    - Example: Use `openssl rand -base64 32` or any secure random generator
 
-3. **Domain Configuration** (if using custom domain)
+4. **Domain Configuration** (if using custom domain)
    - Domain: `api-dev.cc-ems.com`
-   - Update DNS records as instructed by your deployment platform
+   - Update DNS records as instructed by Cloud Run
+
+### 🚀 Quick Start
+
+1. **Install Google Cloud SDK**
+   ```bash
+   brew install google-cloud-sdk  # macOS
+   ```
+
+2. **Authenticate and Set Project**
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+3. **Enable APIs**
+   ```bash
+   gcloud services enable cloudbuild.googleapis.com
+   gcloud services enable run.googleapis.com
+   ```
+
+4. **Build and Deploy**
+   ```bash
+   cd backend
+   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/cc-ems-backend
+   
+   gcloud run deploy cc-ems-backend \
+     --image gcr.io/YOUR_PROJECT_ID/cc-ems-backend \
+     --platform managed \
+     --region us-central1 \
+     --allow-unauthenticated \
+     --port 8080 \
+     --set-env-vars MONGODB_URI=...,JWT_SECRET=...,CORS_ORIGIN=...
+   ```
+
+See `backend/QUICK_DEPLOY.md` for detailed steps.
 
 ### ✅ Verification Steps
 
@@ -98,14 +119,14 @@ After deployment, verify:
 
 - **Quick Start**: See `backend/QUICK_DEPLOY.md`
 - **Full Guide**: See `backend/DEPLOYMENT.md`
-- **Environment Variables**: See `backend/.env.example` (if created)
+- **Cloud Run Docs**: https://cloud.google.com/run/docs
 
 ### 🆘 Troubleshooting
 
 **Backend won't start?**
 - Check all environment variables are set correctly
 - Verify MongoDB connection string
-- Check deployment platform logs
+- Check Cloud Run logs: `gcloud run services logs read cc-ems-backend --region us-central1`
 
 **CORS errors?**
 - Verify `CORS_ORIGIN` includes: `https://cc-ems-dev.web.app,https://cc-ems-dev.firebaseapp.com`
@@ -116,9 +137,13 @@ After deployment, verify:
 - Check connection string format
 - Verify database name: `Kweka_Call_Centre`
 
+**Container build failed?**
+- Check Dockerfile syntax
+- Verify all dependencies in package.json
+- Review build logs in Cloud Build console
+
 ---
 
 ## 🎉 Ready to Deploy!
 
-All configuration files are ready. Choose your deployment platform and follow the steps above. Railway is recommended for the fastest setup.
-
+All configuration files are ready. Follow the steps in `backend/QUICK_DEPLOY.md` to deploy to Google Cloud Run.

@@ -77,3 +77,4 @@ const migrateToProperCase = async () => {
 
 migrateToProperCase();
 
+

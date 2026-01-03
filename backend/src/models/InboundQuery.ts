@@ -72,3 +72,4 @@ InboundQuerySchema.index({ escalationLevel: 1 });
 
 export const InboundQuery = mongoose.model<IInboundQuery>('InboundQuery', InboundQuerySchema);
 
+

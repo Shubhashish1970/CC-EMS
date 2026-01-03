@@ -43,3 +43,4 @@ export const calculateSampleSize = (total: number, percentage: number): number =
   return Math.max(1, Math.min(sampleSize, total)); // Ensure at least 1, at most total
 };
 
+

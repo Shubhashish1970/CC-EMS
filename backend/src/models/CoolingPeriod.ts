@@ -52,3 +52,4 @@ CoolingPeriodSchema.pre('save', function (next) {
 
 export const CoolingPeriod = mongoose.model<ICoolingPeriod>('CoolingPeriod', CoolingPeriodSchema);
 
+

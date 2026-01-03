@@ -33,13 +33,13 @@ COPY --from=builder /app/dist ./dist
 # Create logs directory
 RUN mkdir -p logs
 
-# Expose port
-EXPOSE 5000
+# Expose port (Cloud Run uses PORT env var, defaults to 8080)
+EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+# Health check (Cloud Run provides its own health checks)
+# HEALTHCHECK removed - Cloud Run handles health checks automatically
 
 # Start the application
 CMD ["node", "dist/server.js"]
+
 

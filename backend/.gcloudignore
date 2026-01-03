@@ -1,0 +1,23 @@
+# Exclude unnecessary files but keep package-lock.json
+node_modules/
+dist/
+logs/
+*.log
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+coverage/
+.nyc_output/
+
+# Explicitly include package-lock.json (needed for npm ci)
+!package-lock.json
+

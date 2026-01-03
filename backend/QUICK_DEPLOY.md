@@ -1,64 +1,103 @@
-# Quick Backend Deployment Guide
+# Quick Backend Deployment Guide - Google Cloud Run
 
-## 🚀 Fastest Option: Railway (Recommended)
+## 🚀 Prerequisites
 
-### Step 1: Create Railway Account
-1. Go to [railway.app](https://railway.app)
-2. Sign up with GitHub
+1. **Google Cloud Platform Account**
+   - Sign up at [cloud.google.com](https://cloud.google.com)
+   - Enable billing (required for Cloud Run)
 
-### Step 2: Deploy
-1. Click "New Project" → "Deploy from GitHub repo"
-2. Select your repository
-3. **Important**: Set root directory to `backend`
-4. Railway will auto-detect the Dockerfile
+2. **Install Google Cloud SDK**
+   ```bash
+   # macOS
+   brew install google-cloud-sdk
+   
+   # Or download from: https://cloud.google.com/sdk/docs/install
+   ```
 
-### Step 3: Set Environment Variables
-Go to your project → Variables → Add:
+3. **Authenticate**
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
 
-```
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/Kweka_Call_Centre?retryWrites=true&w=majority
-JWT_SECRET=your-super-secret-jwt-key-min-32-characters-long
-NODE_ENV=production
-CORS_ORIGIN=https://cc-ems-dev.web.app,https://cc-ems-dev.firebaseapp.com
-ENABLE_CRON=true
-FFA_API_URL=http://localhost:4000/api
-```
+## 📦 Step 1: Enable Required APIs
 
-### Step 4: Get Domain
-1. Go to Settings → Networking
-2. Railway provides: `your-app.railway.app`
-3. Or add custom domain: `api-dev.cc-ems.com`
-
-### Step 5: Verify
 ```bash
-curl https://your-domain.railway.app/api/health
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable run.googleapis.com
+```
+
+## 🏗️ Step 2: Build Docker Image
+
+```bash
+cd backend
+
+# Build and push to Google Container Registry
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/cc-ems-backend
+```
+
+## 🚀 Step 3: Deploy to Cloud Run
+
+```bash
+gcloud run deploy cc-ems-backend \
+  --image gcr.io/YOUR_PROJECT_ID/cc-ems-backend \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --port 8080 \
+  --memory 512Mi \
+  --cpu 1 \
+  --set-env-vars MONGODB_URI=your-mongodb-uri,JWT_SECRET=your-jwt-secret,NODE_ENV=production,CORS_ORIGIN=https://cc-ems-dev.web.app,https://cc-ems-dev.firebaseapp.com,ENABLE_CRON=true
+```
+
+**Replace:**
+- `YOUR_PROJECT_ID` with your GCP project ID
+- `your-mongodb-uri` with your MongoDB Atlas connection string
+- `your-jwt-secret` with a strong random string (min 32 characters)
+
+## 🌐 Step 4: Configure Custom Domain (Optional)
+
+```bash
+gcloud run domain-mappings create \
+  --service cc-ems-backend \
+  --domain api-dev.cc-ems.com \
+  --region us-central1
+```
+
+Then update your DNS records as instructed by Cloud Run.
+
+## ✅ Step 5: Verify Deployment
+
+```bash
+# Get service URL
+gcloud run services describe cc-ems-backend --region us-central1 --format 'value(status.url)'
+
+# Test health endpoint
+curl https://YOUR_SERVICE_URL/api/health
+```
+
+Should return:
+```json
+{
+  "success": true,
+  "message": "EMS Call Centre API is running"
+}
 ```
 
 ---
 
-## 🔧 Alternative: Render
+## 📋 Required Environment Variables
 
-### Step 1: Create Render Account
-1. Go to [render.com](https://render.com)
-2. Sign up
-
-### Step 2: Create Web Service
-1. New → Web Service
-2. Connect GitHub repo
-3. Settings:
-   - **Name**: `cc-ems-backend`
-   - **Root Directory**: `backend`
-   - **Environment**: `Docker`
-   - **Build Command**: (auto-detected)
-   - **Start Command**: (auto-detected)
-
-### Step 3: Environment Variables
-Add the same variables as Railway (see above)
-
-### Step 4: Custom Domain
-1. Settings → Custom Domains
-2. Add: `api-dev.cc-ems.com`
-3. Update DNS as instructed
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MONGODB_URI` | ✅ | MongoDB connection string |
+| `JWT_SECRET` | ✅ | JWT secret (min 32 chars) |
+| `CORS_ORIGIN` | ⚠️ | Frontend domains (comma-separated) |
+| `NODE_ENV` | ⚠️ | Set to `production` |
+| `ENABLE_CRON` | ⚠️ | Set to `true` for cron jobs |
+| `FFA_API_URL` | ⚠️ | FFA API endpoint |
+| `PORT` | ❌ | Auto-set to 8080 by Cloud Run |
+| `JWT_EXPIRES_IN` | ❌ | Default: `7d` |
 
 ---
 
@@ -78,7 +117,7 @@ Add the same variables as Railway (see above)
 **Backend not starting?**
 - Check all environment variables are set
 - Verify MongoDB connection string
-- Check logs in deployment platform
+- Check logs: `gcloud run services logs read cc-ems-backend --region us-central1`
 
 **CORS errors?**
 - Verify `CORS_ORIGIN` includes frontend domain
@@ -89,20 +128,10 @@ Add the same variables as Railway (see above)
 - Verify connection string format
 - Check database name: `Kweka_Call_Centre`
 
----
-
-## 📝 Required Environment Variables Summary
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MONGODB_URI` | ✅ | MongoDB connection string |
-| `JWT_SECRET` | ✅ | JWT secret (min 32 chars) |
-| `CORS_ORIGIN` | ⚠️ | Frontend domains (comma-separated) |
-| `NODE_ENV` | ⚠️ | Set to `production` |
-| `ENABLE_CRON` | ⚠️ | Set to `true` for cron jobs |
-| `FFA_API_URL` | ⚠️ | FFA API endpoint |
-| `PORT` | ❌ | Auto-set by platform |
-| `JWT_EXPIRES_IN` | ❌ | Default: `7d` |
+**Container build failed?**
+- Check Dockerfile syntax
+- Verify all dependencies in package.json
+- Review build logs in Cloud Build console
 
 ---
 
@@ -110,7 +139,7 @@ Add the same variables as Railway (see above)
 
 1. **Update Frontend API URL**
    - Update GitHub Secret: `VITE_API_URL_DEV`
-   - Set to: `https://api-dev.cc-ems.com/api` (or your Railway domain)
+   - Set to: `https://api-dev.cc-ems.com/api` (or your Cloud Run URL)
    - Redeploy frontend
 
 2. **Test Login**
@@ -118,6 +147,13 @@ Add the same variables as Railway (see above)
    - Try logging in with test credentials
 
 3. **Monitor Logs**
-   - Check deployment platform logs
-   - Look for any errors or warnings
+   - View logs: `gcloud run services logs tail cc-ems-backend --region us-central1`
+   - Or use Cloud Console: Cloud Run → Select service → Logs
 
+---
+
+## 📚 More Information
+
+- **Full Deployment Guide**: See `backend/DEPLOYMENT.md`
+- **Cloud Run Docs**: https://cloud.google.com/run/docs
+- **Dockerfile**: Already configured in `backend/Dockerfile`
