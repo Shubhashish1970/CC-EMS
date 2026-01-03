@@ -1,0 +1,34 @@
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { IUser } from '../models/User.js';
+
+const JWT_SECRET: string = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '7d';
+
+export interface JWTPayload {
+  userId: string;
+  email: string;
+  role: string;
+}
+
+export const generateToken = (user: IUser): string => {
+  const payload: JWTPayload = {
+    userId: user._id.toString(),
+    email: user.email,
+    role: user.role,
+  };
+
+  const options: SignOptions = {
+    expiresIn: JWT_EXPIRES_IN,
+  } as SignOptions;
+
+  return jwt.sign(payload, JWT_SECRET, options);
+};
+
+export const verifyToken = (token: string): JWTPayload => {
+  try {
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  } catch (error) {
+    throw new Error('Invalid or expired token');
+  }
+};
+

@@ -1,0 +1,7 @@
+{
+  "description": "NACL EMS Call Centre Management System - Guided workflow for agricultural data capture and farmer feedback validation.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "name": "NACL EMS Workspace"
+}

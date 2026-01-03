@@ -1,0 +1,387 @@
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { tasksAPI, usersAPI } from '../services/api';
+import { ArrowLeft, User as UserIcon, Phone, MapPin, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import Button from './shared/Button';
+import ReassignModal from './ReassignModal';
+
+interface Task {
+  _id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+  scheduledDate: string;
+  farmerId: {
+    name: string;
+    mobileNumber: string;
+    location: string;
+    preferredLanguage: string;
+    photoUrl?: string;
+    territory?: string;
+  };
+  activityId: {
+    type: string;
+    date: string;
+    officerName: string;
+    location: string;
+    territory: string;
+    crops?: string[];
+    products?: string[];
+  };
+  assignedAgentId: {
+    _id: string;
+    name: string;
+    email: string;
+    employeeId: string;
+  };
+  callLog?: {
+    timestamp: string;
+    callStatus: string;
+    didAttend?: boolean | null;
+    didRecall?: boolean | null;
+    cropsDiscussed?: string[];
+    productsDiscussed?: string[];
+    hasPurchased?: boolean | null;
+    willingToPurchase?: boolean | null;
+    nonPurchaseReason?: string;
+    agentObservations?: string;
+  };
+  interactionHistory?: Array<{
+    timestamp: string;
+    status: string;
+    notes?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TaskDetailProps {
+  task: Task;
+  onBack: () => void;
+  onTaskUpdated: () => void;
+}
+
+const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) => {
+  const { user } = useAuth();
+  const [fullTask, setFullTask] = useState<Task | null>(task);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch full task details
+  React.useEffect(() => {
+    const fetchFullTask = async () => {
+      setIsLoading(true);
+      try {
+        const response = await tasksAPI.getTaskById(task._id);
+        if (response.success && response.data?.task) {
+          setFullTask(response.data.task);
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to load task details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFullTask();
+  }, [task._id]);
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
+      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'In Progress' },
+      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
+      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Not Reachable' },
+      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: 'Invalid Number' },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const Icon = config.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${config.color}`}>
+        <Icon size={14} className={status === 'in_progress' ? 'animate-spin' : ''} />
+        {config.label}
+      </span>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const canReassign = user && (user.role === 'team_lead' || user.role === 'mis_admin');
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f1f5f1] p-6 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin mx-auto mb-4 text-green-700" size={32} />
+          <p className="text-sm text-slate-600 font-medium">Loading task details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#f1f5f1] p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
+            <AlertCircle className="mx-auto mb-4 text-red-500" size={32} />
+            <p className="text-sm text-red-600 font-medium mb-4">{error}</p>
+            <Button variant="secondary" onClick={onBack}>
+              <ArrowLeft size={16} /> Go Back
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!fullTask) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f1f5f1] p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft size={16} /> Back to List
+            </Button>
+            {canReassign && (
+              <Button variant="secondary" size="sm" onClick={() => setShowReassignModal(true)}>
+                Reassign Task
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-start gap-4">
+            {/* Farmer Avatar */}
+            <div className="flex-shrink-0">
+              {fullTask.farmerId.photoUrl ? (
+                <img
+                  src={fullTask.farmerId.photoUrl}
+                  alt={fullTask.farmerId.name}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/images/farmer-default-logo.png';
+                  }}
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
+                  <UserIcon className="text-slate-400" size={32} />
+                </div>
+              )}
+            </div>
+
+            {/* Farmer Info */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-black text-slate-900">{fullTask.farmerId.name}</h1>
+                {getStatusBadge(fullTask.status)}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600 mb-4">
+                <div className="flex items-center gap-2">
+                  <Phone size={16} className="text-slate-400" />
+                  <span className="font-medium">{fullTask.farmerId.mobileNumber}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin size={16} className="text-slate-400" />
+                  <span>{fullTask.farmerId.location}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <UserIcon size={16} className="text-slate-400" />
+                  <span>Language: {fullTask.farmerId.preferredLanguage}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-slate-400" />
+                  <span>Scheduled: {formatDate(fullTask.scheduledDate)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Details */}
+        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-black text-slate-900 mb-4">Activity Details</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Activity Type</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.type}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date</p>
+              <p className="text-sm font-medium text-slate-700">{formatDate(fullTask.activityId.date)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Field Officer</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.officerName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Location</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.location}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Territory</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.territory}</p>
+            </div>
+            {fullTask.activityId.crops && fullTask.activityId.crops.length > 0 && (
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Crops Discussed</p>
+                <div className="flex flex-wrap gap-2">
+                  {fullTask.activityId.crops.map((crop, idx) => (
+                    <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-200">
+                      {crop}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {fullTask.activityId.products && fullTask.activityId.products.length > 0 && (
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Products Discussed</p>
+                <div className="flex flex-wrap gap-2">
+                  {fullTask.activityId.products.map((product, idx) => (
+                    <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium border border-blue-200">
+                      {product}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Assigned Agent */}
+        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-black text-slate-900 mb-4">Assigned Agent</h2>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
+              <UserIcon className="text-slate-400" size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-900">{fullTask.assignedAgentId.name}</p>
+              <p className="text-xs text-slate-600">{fullTask.assignedAgentId.email}</p>
+              <p className="text-xs text-slate-500">ID: {fullTask.assignedAgentId.employeeId}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Call Log */}
+        {fullTask.callLog && (
+          <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-black text-slate-900 mb-4">Call Interaction</h2>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Status</p>
+                <p className="text-sm font-medium text-slate-700">{fullTask.callLog.callStatus}</p>
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Date & Time</p>
+                <p className="text-sm font-medium text-slate-700">{formatDateTime(fullTask.callLog.timestamp)}</p>
+              </div>
+              {fullTask.callLog.didAttend !== null && fullTask.callLog.didAttend !== undefined && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Did Attend Meeting</p>
+                  <p className="text-sm font-medium text-slate-700">{fullTask.callLog.didAttend ? 'Yes' : 'No'}</p>
+                </div>
+              )}
+              {fullTask.callLog.didRecall !== null && fullTask.callLog.didRecall !== undefined && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Did Recall Content</p>
+                  <p className="text-sm font-medium text-slate-700">{fullTask.callLog.didRecall ? 'Yes' : 'No'}</p>
+                </div>
+              )}
+              {fullTask.callLog.cropsDiscussed && fullTask.callLog.cropsDiscussed.length > 0 && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Crops Discussed</p>
+                  <div className="flex flex-wrap gap-2">
+                    {fullTask.callLog.cropsDiscussed.map((crop, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-200">
+                        {crop}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {fullTask.callLog.productsDiscussed && fullTask.callLog.productsDiscussed.length > 0 && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Products Discussed</p>
+                  <div className="flex flex-wrap gap-2">
+                    {fullTask.callLog.productsDiscussed.map((product, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium border border-blue-200">
+                        {product}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {fullTask.callLog.agentObservations && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agent Observations</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{fullTask.callLog.agentObservations}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Interaction History */}
+        {fullTask.interactionHistory && fullTask.interactionHistory.length > 0 && (
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-black text-slate-900 mb-4">Interaction History</h2>
+            <div className="space-y-3">
+              {fullTask.interactionHistory.map((history, idx) => (
+                <div key={idx} className="flex items-start gap-3 pb-3 border-b border-slate-100 last:border-0">
+                  <Clock size={16} className="text-slate-400 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-slate-900">{getStatusBadge(history.status)}</span>
+                      <span className="text-xs text-slate-500">{formatDateTime(history.timestamp)}</span>
+                    </div>
+                    {history.notes && (
+                      <p className="text-xs text-slate-600">{history.notes}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Reassign Modal */}
+        {showReassignModal && (
+          <ReassignModal
+            isOpen={showReassignModal}
+            onClose={() => setShowReassignModal(false)}
+            task={fullTask}
+            onReassigned={() => {
+              setShowReassignModal(false);
+              onTaskUpdated();
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TaskDetail;
