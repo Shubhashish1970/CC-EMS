@@ -49,29 +49,48 @@ jobs:
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Verify Artifact Registry Repository
+        run: |
+          echo "Checking if Artifact Registry repository exists..."
+          if gcloud artifacts repositories describe cc-ems-repo \
+            --location=${{ env.REGION }} \
+            --format="value(name)" 2>/dev/null; then
+            echo "✅ Repository exists"
+          else
+            echo "⚠️ Repository doesn't exist. Creating it..."
+            gcloud artifacts repositories create cc-ems-repo \
+              --repository-format=docker \
+              --location=${{ env.REGION }} \
+              --description="Docker repository for CC EMS backend"
+          fi
+
       - name: Build and Push Docker Image
         run: |
           cd backend
           echo "🔨 Building Docker image..."
           echo "Repository: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }}"
           
-          # Submit build and capture output
-          if gcloud builds submit \
+          # Submit build with explicit logging
+          BUILD_OUTPUT=$(gcloud builds submit \
             --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
-            --timeout=20m; then
-            echo "✅ Build completed successfully"
-          else
+            --timeout=20m 2>&1) || {
             echo "❌ Build failed"
+            echo "$BUILD_OUTPUT"
             echo ""
-            echo "Checking recent builds..."
-            gcloud builds list --limit=5 --format="table(id,status,createTime,logUrl)" --region=${{ env.REGION }} || true
-            echo ""
-            echo "If you see permission errors, ensure the service account has:"
-            echo "- Cloud Build Editor role"
-            echo "- Artifact Registry Writer role"
+            echo "Fetching latest build details..."
+            LATEST_BUILD=$(gcloud builds list --limit=1 --format="value(id)" --region=${{ env.REGION }})
+            if [ -n "$LATEST_BUILD" ]; then
+              echo "Build ID: $LATEST_BUILD"
+              echo "Build status:"
+              gcloud builds describe "$LATEST_BUILD" --region=${{ env.REGION }} --format="value(status)" || true
+              echo ""
+              echo "View full logs at:"
+              echo "https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$LATEST_BUILD?project=${{ secrets.GCP_PROJECT_ID }}"
+            fi
             exit 1
-          fi
+          }
+          echo "✅ Build completed successfully"
 
       - name: Deploy to Cloud Run
         run: |
