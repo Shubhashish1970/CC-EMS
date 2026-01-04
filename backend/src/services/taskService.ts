@@ -128,7 +128,21 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
 
     if (status) {
       query.status = status;
+      logger.info('Filtering team tasks by status', { 
+        teamLeadId, 
+        status, 
+        statusType: typeof status,
+        queryStatus: query.status 
+      });
     }
+
+    logger.info('Team tasks query', { 
+      teamLeadId, 
+      agentIdsCount: agentIds.length, 
+      query, 
+      page, 
+      limit 
+    });
 
     const tasks = await CallTask.find(query)
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
