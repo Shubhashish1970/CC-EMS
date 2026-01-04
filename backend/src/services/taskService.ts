@@ -257,6 +257,13 @@ export const updateTaskStatus = async (
   notes?: string
 ): Promise<ICallTask> => {
   try {
+    // Validate taskId is a valid MongoDB ObjectId format
+    // This prevents "bulk" or other invalid strings from being passed to findById
+    if (!taskId || !/^[0-9a-fA-F]{24}$/.test(taskId)) {
+      logger.error('Invalid taskId provided to updateTaskStatus', { taskId, status });
+      throw new Error(`Invalid task ID format: ${taskId}`);
+    }
+
     const task = await CallTask.findById(taskId);
     if (!task) {
       throw new Error('Task not found');
