@@ -110,6 +110,8 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # Deploy service (--set-env-vars for new service, --update-env-vars for existing)
+          # Using --set-env-vars with comma-separated format for first deployment
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --platform managed \
@@ -118,11 +120,7 @@ jobs:
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
-            --set-env-vars MONGODB_URI="${{ secrets.MONGODB_URI }}" \
-            --set-env-vars JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --set-env-vars NODE_ENV=production \
-            --set-env-vars CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
-            --set-env-vars ENABLE_CRON=true \
+            --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
             --project ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Get Service URL
