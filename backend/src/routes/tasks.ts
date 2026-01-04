@@ -19,9 +19,13 @@ const router = express.Router();
 router.use(authenticate);
 
 // Middleware to log route matching for debugging
-router.use((req, res, next) => {
+router.use((req: Request, res: Response, next: NextFunction) => {
   if (req.path.includes('/bulk/')) {
-    logger.info('Route matched (bulk):', { method: req.method, path: req.path, originalUrl: req.originalUrl });
+    logger.info('Route matched (bulk):', { 
+      method: req.method, 
+      path: req.path, 
+      originalUrl: req.originalUrl || req.url 
+    });
   }
   next();
 });
