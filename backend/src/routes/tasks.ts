@@ -358,6 +358,13 @@ router.put(
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Log that we're in the bulk route handler
+      logger.info('Bulk status update route matched', {
+        path: req.path,
+        method: req.method,
+        body: { taskIds: req.body.taskIds?.length, status: req.body.status },
+      });
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
