@@ -451,6 +451,14 @@ router.put(
       }
 
       const taskId = req.params.id;
+      
+      // Prevent "bulk" from being treated as an ID
+      if (taskId === 'bulk') {
+        const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations');
+        error.statusCode = 400;
+        throw error;
+      }
+      
       const { status, notes } = req.body;
 
       const task = await updateTaskStatus(taskId, status, notes);
