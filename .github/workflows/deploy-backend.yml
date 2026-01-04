@@ -110,8 +110,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          # Deploy service (--set-env-vars for new service, --update-env-vars for existing)
-          # Using --set-env-vars with comma-separated format for first deployment
+          # Deploy service first without env vars (to avoid special character issues)
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --platform managed \
@@ -120,8 +119,19 @@ jobs:
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
-            --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
-            --project ${{ secrets.GCP_PROJECT_ID }}
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --quiet
+          
+          # Update env vars separately (handles special characters better)
+          gcloud run services update ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --update-env-vars MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            --update-env-vars JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --update-env-vars NODE_ENV=production \
+            --update-env-vars CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
+            --update-env-vars ENABLE_CRON=true \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --quiet
 
       - name: Get Service URL
         id: get-url
