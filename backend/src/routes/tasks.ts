@@ -155,8 +155,15 @@ router.get(
       const teamLeadId = authReq.user._id.toString();
       const { status, page, limit } = req.query;
 
+      logger.info('📥 GET /api/tasks/team - Request received', {
+        teamLeadId,
+        queryParams: { status, page, limit },
+        statusType: typeof status,
+        statusValue: status,
+      });
+
       const result = await getTeamTasks(teamLeadId, {
-        status: status as TaskStatus,
+        status: status ? (status as string).trim() as TaskStatus : undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });

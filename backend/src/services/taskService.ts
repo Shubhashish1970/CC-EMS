@@ -126,22 +126,32 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
       assignedAgentId: { $in: agentIds },
     };
 
-    if (status) {
-      query.status = status;
-      logger.info('Filtering team tasks by status', { 
+    // CRITICAL: Apply status filter if provided (check for truthy AND not empty string)
+    if (status && status.trim() !== '') {
+      query.status = status.trim();
+      logger.info('✅ Filtering team tasks by status', { 
         teamLeadId, 
         status, 
         statusType: typeof status,
+        statusTrimmed: status.trim(),
         queryStatus: query.status 
+      });
+    } else {
+      logger.info('⚠️ No status filter applied', { 
+        teamLeadId, 
+        status, 
+        statusType: typeof status,
+        filters 
       });
     }
 
-    logger.info('Team tasks query', { 
+    logger.info('🔍 Team tasks query being executed', { 
       teamLeadId, 
       agentIdsCount: agentIds.length, 
-      query, 
+      query: JSON.stringify(query), 
       page, 
-      limit 
+      limit,
+      skip
     });
 
     const tasks = await CallTask.find(query)
