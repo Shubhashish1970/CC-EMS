@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgentWorkspace from './components/AgentWorkspace';
 import TaskList from './components/TaskList';
@@ -25,9 +26,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <ProtectedRoute>
-        <AppContent />
-      </ProtectedRoute>
+      <ToastProvider>
+        <ProtectedRoute>
+          <AppContent />
+        </ProtectedRoute>
+      </ToastProvider>
     </AuthProvider>
   );
 };

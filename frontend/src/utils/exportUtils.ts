@@ -42,9 +42,11 @@ export const formatTaskForExport = (task: any): ExportableTask => {
 };
 
 // Export to CSV
-export const exportToCSV = (tasks: ExportableTask[], filename: string = 'tasks') => {
+export const exportToCSV = (tasks: ExportableTask[], filename: string = 'tasks', onError?: (message: string) => void) => {
   if (tasks.length === 0) {
-    alert('No tasks to export');
+    if (onError) {
+      onError('No tasks to export');
+    }
     return;
   }
 
@@ -118,9 +120,11 @@ export const exportToCSV = (tasks: ExportableTask[], filename: string = 'tasks')
 };
 
 // Export to JSON (for Excel import)
-export const exportToJSON = (tasks: ExportableTask[], filename: string = 'tasks') => {
+export const exportToJSON = (tasks: ExportableTask[], filename: string = 'tasks', onError?: (message: string) => void) => {
   if (tasks.length === 0) {
-    alert('No tasks to export');
+    if (onError) {
+      onError('No tasks to export');
+    }
     return;
   }
 
@@ -137,9 +141,11 @@ export const exportToJSON = (tasks: ExportableTask[], filename: string = 'tasks'
 };
 
 // Simple PDF export using browser print (for basic PDF generation)
-export const exportToPDF = (tasks: ExportableTask[], filename: string = 'tasks') => {
+export const exportToPDF = (tasks: ExportableTask[], filename: string = 'tasks', onError?: (message: string) => void) => {
   if (tasks.length === 0) {
-    alert('No tasks to export');
+    if (onError) {
+      onError('No tasks to export');
+    }
     return;
   }
 

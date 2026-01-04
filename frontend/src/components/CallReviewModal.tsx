@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, ArrowLeft, CheckCircle, Phone } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import Button from './shared/Button';
 
 interface CallReviewModalProps {
@@ -33,6 +34,8 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
   callDuration,
   farmerName,
 }) => {
+  const { showWarning } = useToast();
+  
   if (!isOpen) return null;
 
   const formatDuration = (seconds: number) => {
@@ -58,14 +61,14 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
   const handleSubmit = async () => {
     // Validate required fields
     if (!formData.callStatus) {
-      alert('Please select call status');
+      showWarning('Please select call status');
       return;
     }
 
     // Only validate detailed fields for Connected calls
     if (formData.callStatus === 'Connected') {
       if (formData.didAttend === null || formData.didRecall === null) {
-        alert('Please answer all required questions for connected calls');
+        showWarning('Please answer all required questions for connected calls');
         return;
       }
     }

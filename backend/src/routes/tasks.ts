@@ -293,77 +293,7 @@ router.post(
   }
 );
 
-// @route   PUT /api/tasks/:id/reassign
-// @desc    Reassign task to another agent (Team Lead/Admin)
-// @access  Private (Team Lead, MIS Admin)
-router.put(
-  '/:id/reassign',
-  requirePermission('tasks.reassign'),
-  [
-    body('agentId').isMongoId().withMessage('Valid agent ID is required'),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: { message: 'Validation failed', errors: errors.array() },
-        });
-      }
-
-      const taskId = req.params.id;
-      const { agentId } = req.body;
-
-      const task = await assignTaskToAgent(taskId, agentId);
-
-      res.json({
-        success: true,
-        message: 'Task reassigned successfully',
-        data: { task },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// @route   PUT /api/tasks/:id/status
-// @desc    Update task status
-// @access  Private (Team Lead, MIS Admin)
-router.put(
-  '/:id/status',
-  requirePermission('tasks.reassign'),
-  [
-    body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
-    body('notes').optional().isString(),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: { message: 'Validation failed', errors: errors.array() },
-        });
-      }
-
-      const taskId = req.params.id;
-      const { status, notes } = req.body;
-
-      const task = await updateTaskStatus(taskId, status, notes);
-
-      res.json({
-        success: true,
-        message: 'Task status updated successfully',
-        data: { task },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
+// IMPORTANT: Bulk routes must come BEFORE parameterized routes (/:id/*) to avoid route conflicts
 // @route   PUT /api/tasks/bulk/reassign
 // @desc    Bulk reassign tasks to an agent
 // @access  Private (Team Lead, MIS Admin)
@@ -458,6 +388,77 @@ router.put(
           results,
           errors: errors_list,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   PUT /api/tasks/:id/reassign
+// @desc    Reassign task to another agent (Team Lead/Admin)
+// @access  Private (Team Lead, MIS Admin)
+router.put(
+  '/:id/reassign',
+  requirePermission('tasks.reassign'),
+  [
+    body('agentId').isMongoId().withMessage('Valid agent ID is required'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const taskId = req.params.id;
+      const { agentId } = req.body;
+
+      const task = await assignTaskToAgent(taskId, agentId);
+
+      res.json({
+        success: true,
+        message: 'Task reassigned successfully',
+        data: { task },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   PUT /api/tasks/:id/status
+// @desc    Update task status
+// @access  Private (Team Lead, MIS Admin)
+router.put(
+  '/:id/status',
+  requirePermission('tasks.reassign'),
+  [
+    body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
+    body('notes').optional().isString(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const taskId = req.params.id;
+      const { status, notes } = req.body;
+
+      const task = await updateTaskStatus(taskId, status, notes);
+
+      res.json({
+        success: true,
+        message: 'Task status updated successfully',
+        data: { task },
       });
     } catch (error) {
       next(error);

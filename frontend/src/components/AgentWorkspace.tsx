@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { tasksAPI } from '../services/api';
 import {
   Phone, User, CheckCircle, Zap, LogOut, Globe, Loader2, Database,
@@ -40,6 +41,7 @@ interface TaskData {
 
 const AgentWorkspace: React.FC = () => {
   const { user, logout } = useAuth();
+  const { showError, showWarning } = useToast();
   const [callDuration, setCallDuration] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -339,7 +341,7 @@ const AgentWorkspace: React.FC = () => {
       await handleLoadTasks();
     } catch (error) {
       console.error('Error submitting interaction:', error);
-      alert('Failed to submit interaction. Please try again.');
+      showError('Failed to submit interaction. Please try again.');
       throw error; // Re-throw to let modal handle it
     } finally {
       setIsSubmitting(false);
@@ -351,7 +353,7 @@ const AgentWorkspace: React.FC = () => {
     
     // Check if call status is selected
     if (!formData.callStatus) {
-      alert('Please select call status before finishing the call');
+      showWarning('Please select call status before finishing the call');
       return;
     }
     

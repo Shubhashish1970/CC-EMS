@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
 import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
 import Button from './shared/Button';
@@ -43,6 +44,7 @@ interface Pagination {
 
 const TaskList: React.FC = () => {
   const { user } = useAuth();
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -224,10 +226,14 @@ const TaskList: React.FC = () => {
         setShowBulkActions(false);
         setShowBulkReassignModal(false);
         fetchTasks(currentPage);
-        alert(`Successfully reassigned ${response.data.successful} task(s)`);
+        if (response.data.failed > 0) {
+          showWarning(`Reassigned ${response.data.successful} task(s), ${response.data.failed} failed`);
+        } else {
+          showSuccess(`Successfully reassigned ${response.data.successful} task(s)`);
+        }
       }
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Failed to reassign tasks'}`);
+      showError(err.message || 'Failed to reassign tasks');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -243,10 +249,14 @@ const TaskList: React.FC = () => {
         setShowBulkActions(false);
         setShowBulkStatusModal(false);
         fetchTasks(currentPage);
-        alert(`Successfully updated status for ${response.data.successful} task(s)`);
+        if (response.data.failed > 0) {
+          showWarning(`Updated status for ${response.data.successful} task(s), ${response.data.failed} failed`);
+        } else {
+          showSuccess(`Successfully updated status for ${response.data.successful} task(s)`);
+        }
       }
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Failed to update task status'}`);
+      showError(err.message || 'Failed to update task status');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -255,12 +265,18 @@ const TaskList: React.FC = () => {
   // Export functions
   const handleExportCSV = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToCSV(tasksToExport, 'tasks');
+    exportToCSV(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    if (tasksToExport.length > 0) {
+      showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
+    }
   };
 
   const handleExportPDF = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToPDF(tasksToExport, 'tasks');
+    exportToPDF(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    if (tasksToExport.length > 0) {
+      showInfo('Opening print dialog for PDF export');
+    }
   };
 
   if (selectedTask) {

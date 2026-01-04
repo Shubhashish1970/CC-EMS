@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
 import { ArrowLeft, User as UserIcon, Phone, MapPin, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Button from './shared/Button';
@@ -61,6 +62,7 @@ interface TaskDetailProps {
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [fullTask, setFullTask] = useState<Task | null>(task);
   const [isLoading, setIsLoading] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -132,12 +134,17 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
       const response = await tasksAPI.updateTaskStatus(fullTask._id, newStatus, notes) as any;
       if (response.success) {
         setShowStatusModal(false);
+        showSuccess('Task status updated successfully');
         onTaskUpdated();
       } else {
-        setError('Failed to update task status');
+        const errorMsg = 'Failed to update task status';
+        setError(errorMsg);
+        showError(errorMsg);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to update task status');
+      const errorMsg = err.message || 'Failed to update task status';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setIsUpdatingStatus(false);
     }
