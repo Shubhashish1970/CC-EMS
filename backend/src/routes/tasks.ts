@@ -442,21 +442,33 @@ router.put(
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const taskId = req.params.id;
+      
+      // CRITICAL: Prevent "bulk" from being treated as an ID - check BEFORE validation
+      if (taskId === 'bulk' || taskId.toLowerCase() === 'bulk') {
+        logger.error('Route conflict detected: /:id/status matched "bulk" instead of /bulk/status', {
+          path: req.path,
+          method: req.method,
+          params: req.params,
+        });
+        const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Validate taskId is a valid MongoDB ObjectId format
+      if (!/^[0-9a-fA-F]{24}$/.test(taskId)) {
+        const error: AppError = new Error('Invalid task ID format');
+        error.statusCode = 400;
+        throw error;
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
           error: { message: 'Validation failed', errors: errors.array() },
         });
-      }
-
-      const taskId = req.params.id;
-      
-      // Prevent "bulk" from being treated as an ID
-      if (taskId === 'bulk') {
-        const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations');
-        error.statusCode = 400;
-        throw error;
       }
       
       const { status, notes } = req.body;
