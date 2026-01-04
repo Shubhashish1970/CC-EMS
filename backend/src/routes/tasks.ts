@@ -406,10 +406,45 @@ router.put(
       }
 
       const { taskIds, status, notes } = req.body;
+      
+      // CRITICAL: Validate taskIds is an array and not empty
+      if (!Array.isArray(taskIds) || taskIds.length === 0) {
+        logger.error('Invalid taskIds in request body', { taskIds, body: req.body });
+        return res.status(400).json({
+          success: false,
+          error: { message: 'taskIds must be a non-empty array' },
+        });
+      }
+
+      // CRITICAL: Filter out any invalid IDs (including 'bulk' if it somehow got in)
+      const validTaskIds = taskIds.filter((id: string) => {
+        if (typeof id !== 'string' || id === 'bulk' || id.toLowerCase() === 'bulk') {
+          logger.warn('Filtering out invalid taskId from bulk update', { invalidId: id, allTaskIds: taskIds });
+          return false;
+        }
+        return /^[0-9a-fA-F]{24}$/.test(id);
+      });
+
+      if (validTaskIds.length === 0) {
+        logger.error('No valid taskIds after filtering', { originalTaskIds: taskIds });
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No valid task IDs provided' },
+        });
+      }
+
+      if (validTaskIds.length !== taskIds.length) {
+        logger.warn('Some invalid taskIds were filtered out', { 
+          original: taskIds.length, 
+          valid: validTaskIds.length,
+          invalid: taskIds.filter((id: string) => !validTaskIds.includes(id))
+        });
+      }
+
       const results = [];
       const errors_list: any[] = [];
 
-      for (const taskId of taskIds) {
+      for (const taskId of validTaskIds) {
         try {
           const task = await updateTaskStatus(taskId, status, notes);
           results.push(task);
