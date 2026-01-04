@@ -70,27 +70,43 @@ jobs:
           echo "🔨 Building Docker image..."
           echo "Repository: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }}"
           
-          # Submit build with explicit logging
-          BUILD_OUTPUT=$(gcloud builds submit \
+          # Submit build and capture exit code
+          set +e
+          gcloud builds submit \
             --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
-            --timeout=20m 2>&1) || {
-            echo "❌ Build failed"
-            echo "$BUILD_OUTPUT"
+            --timeout=20m
+          BUILD_EXIT_CODE=$?
+          set -e
+          
+          # Check build status regardless of gcloud exit code
+          LATEST_BUILD=$(gcloud builds list --limit=1 --format="value(id)" --region=${{ env.REGION }} --sort-by=~createTime)
+          if [ -n "$LATEST_BUILD" ]; then
+            BUILD_STATUS=$(gcloud builds describe "$LATEST_BUILD" --region=${{ env.REGION }} --format="value(status)" 2>/dev/null || echo "UNKNOWN")
+            echo "Build ID: $LATEST_BUILD"
+            echo "Build status: $BUILD_STATUS"
             echo ""
-            echo "Fetching latest build details..."
-            LATEST_BUILD=$(gcloud builds list --limit=1 --format="value(id)" --region=${{ env.REGION }})
-            if [ -n "$LATEST_BUILD" ]; then
-              echo "Build ID: $LATEST_BUILD"
-              echo "Build status:"
-              gcloud builds describe "$LATEST_BUILD" --region=${{ env.REGION }} --format="value(status)" || true
-              echo ""
-              echo "View full logs at:"
-              echo "https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$LATEST_BUILD?project=${{ secrets.GCP_PROJECT_ID }}"
+            echo "View full logs at:"
+            echo "https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$LATEST_BUILD?project=${{ secrets.GCP_PROJECT_ID }}"
+            
+            # If build actually succeeded, continue even if gcloud command had issues
+            if [ "$BUILD_STATUS" = "SUCCESS" ]; then
+              echo "✅ Build completed successfully (status: SUCCESS)"
+              exit 0
+            else
+              echo "❌ Build failed with status: $BUILD_STATUS"
+              exit 1
             fi
-            exit 1
-          }
-          echo "✅ Build completed successfully"
+          else
+            # If we can't get build status and gcloud failed, exit with error
+            if [ $BUILD_EXIT_CODE -ne 0 ]; then
+              echo "❌ Build failed and could not retrieve build status"
+              exit 1
+            else
+              echo "✅ Build command completed"
+              exit 0
+            fi
+          fi
 
       - name: Deploy to Cloud Run
         run: |
