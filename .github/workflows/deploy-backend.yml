@@ -52,7 +52,26 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           cd backend
-          gcloud builds submit --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} --region=${{ env.REGION }}
+          echo "🔨 Building Docker image..."
+          echo "Repository: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }}"
+          
+          # Submit build and capture output
+          if gcloud builds submit \
+            --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --timeout=20m; then
+            echo "✅ Build completed successfully"
+          else
+            echo "❌ Build failed"
+            echo ""
+            echo "Checking recent builds..."
+            gcloud builds list --limit=5 --format="table(id,status,createTime,logUrl)" --region=${{ env.REGION }} || true
+            echo ""
+            echo "If you see permission errors, ensure the service account has:"
+            echo "- Cloud Build Editor role"
+            echo "- Artifact Registry Writer role"
+            exit 1
+          fi
 
       - name: Deploy to Cloud Run
         run: |
