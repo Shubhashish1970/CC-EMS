@@ -363,6 +363,7 @@ router.put(
 // @route   PUT /api/tasks/bulk/status
 // @desc    Bulk update task status
 // @access  Private (Team Lead, MIS Admin)
+// CRITICAL: This route MUST match /tasks/bulk/status exactly
 router.put(
   '/bulk/status',
   requirePermission('tasks.reassign'),
@@ -374,9 +375,24 @@ router.put(
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // CRITICAL: Explicitly verify we're in the correct route handler
+      const path = req.path || req.url;
+      if (!path.includes('/bulk/status')) {
+        logger.error('Bulk status route handler called but path does not match!', {
+          path,
+          originalUrl: req.originalUrl,
+          url: req.url,
+          method: req.method,
+        });
+        const error: AppError = new Error('Internal route matching error');
+        error.statusCode = 500;
+        throw error;
+      }
+
       // Log that we're in the bulk route handler
-      logger.info('Bulk status update route matched', {
+      logger.info('✅ Bulk status update route matched correctly', {
         path: req.path,
+        originalUrl: req.originalUrl,
         method: req.method,
         body: { taskIds: req.body.taskIds?.length, status: req.body.status },
       });
