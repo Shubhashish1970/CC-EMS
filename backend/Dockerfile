@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (ensure package-lock.json is included)
+COPY package.json package-lock.json ./
 COPY tsconfig.json ./
 
 # Install dependencies
