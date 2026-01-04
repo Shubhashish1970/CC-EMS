@@ -305,7 +305,11 @@ router.post(
   }
 );
 
-// IMPORTANT: Bulk routes must come BEFORE parameterized routes (/:id/*) to avoid route conflicts
+// ============================================================================
+// CRITICAL: Bulk routes MUST be defined BEFORE parameterized routes (/:id/*)
+// Express matches routes in order, so /bulk/status must come before /:id/status
+// ============================================================================
+
 // @route   PUT /api/tasks/bulk/reassign
 // @desc    Bulk reassign tasks to an agent
 // @access  Private (Team Lead, MIS Admin)
