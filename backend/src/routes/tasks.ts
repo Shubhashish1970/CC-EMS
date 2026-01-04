@@ -504,35 +504,50 @@ router.put(
   }
 );
 
-// @route   PUT /api/tasks/:id/status
-// @desc    Update task status
-// @access  Private (Team Lead, MIS Admin)
-router.put(
-  '/:id/status',
-  requirePermission('tasks.reassign'),
-  [
-    body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
-    body('notes').optional().isString(),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const taskId = req.params.id;
-      const originalPath = req.originalUrl || req.path;
-      
-      // CRITICAL: Prevent "bulk" from being treated as an ID - check BEFORE validation
-      // Check both the param and the original URL path
-      if (taskId === 'bulk' || taskId.toLowerCase() === 'bulk' || originalPath.includes('/bulk/')) {
-        logger.error('Route conflict detected: /:id/status matched "bulk" instead of /bulk/status', {
-          path: req.path,
-          originalUrl: originalPath,
-          method: req.method,
-          params: req.params,
-          body: req.body,
-        });
-        const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations');
-        error.statusCode = 400;
-        throw error;
-      }
+    // @route   PUT /api/tasks/:id/status
+    // @desc    Update task status
+    // @access  Private (Team Lead, MIS Admin)
+    router.put(
+      '/:id/status',
+      requirePermission('tasks.reassign'),
+      // CRITICAL: Add param validation middleware BEFORE route handler
+      (req: Request, res: Response, next: NextFunction) => {
+        const taskId = req.params.id;
+        // EXPLICITLY reject 'bulk' at the middleware level - before ANY other code runs
+        if (taskId === 'bulk' || taskId?.toLowerCase() === 'bulk') {
+          logger.error('❌ MIDDLEWARE REJECTION: /:id/status matched "bulk" - this should not happen!', {
+            path: req.path,
+            originalUrl: req.originalUrl,
+            method: req.method,
+            params: req.params,
+            url: req.url,
+          });
+          const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations. Route matching error detected.');
+          error.statusCode = 400;
+          return next(error);
+        }
+        next();
+      },
+      [
+        body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
+        body('notes').optional().isString(),
+      ],
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const taskId = req.params.id;
+          
+          // Double-check (defense in depth)
+          if (taskId === 'bulk' || taskId?.toLowerCase() === 'bulk') {
+            logger.error('❌ DOUBLE-CHECK FAILED: taskId is still "bulk" after middleware!', {
+              path: req.path,
+              originalUrl: req.originalUrl,
+              method: req.method,
+              params: req.params,
+            });
+            const error: AppError = new Error('Invalid route: Use /bulk/status for bulk operations');
+            error.statusCode = 400;
+            throw error;
+          }
 
       // Validate taskId is a valid MongoDB ObjectId format
       if (!/^[0-9a-fA-F]{24}$/.test(taskId)) {
