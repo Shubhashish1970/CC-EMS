@@ -550,8 +550,9 @@ router.put(
           }
 
       // Validate taskId is a valid MongoDB ObjectId format
+      const originalUrl = req.originalUrl || req.path;
       if (!/^[0-9a-fA-F]{24}$/.test(taskId)) {
-        logger.warn('Invalid task ID format received', { taskId, path: req.path, originalUrl: originalPath });
+        logger.warn('Invalid task ID format received', { taskId, path: req.path, originalUrl: originalUrl });
         const error: AppError = new Error('Invalid task ID format');
         error.statusCode = 400;
         throw error;
@@ -560,7 +561,7 @@ router.put(
       logger.info('Single task status update route matched', {
         taskId,
         path: req.path,
-        originalUrl: originalPath,
+        originalUrl: originalUrl,
         method: req.method,
       });
 
