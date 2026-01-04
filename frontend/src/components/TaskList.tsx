@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
 import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
+import { exportToCSV, exportToPDF, formatTaskForExport } from '../utils/exportUtils';
+import ReassignModal from './ReassignModal';
 
 interface Task {
   _id: string;
@@ -55,6 +57,13 @@ const TaskList: React.FC = () => {
   const [agents, setAgents] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'scheduledDate' | 'status' | 'farmerName' | 'agentName'>('scheduledDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
+  const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   // Fetch agents for filter dropdown
   useEffect(() => {
@@ -151,6 +160,109 @@ const TaskList: React.FC = () => {
     return true;
   });
 
+  // Sort tasks
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortBy) {
+      case 'scheduledDate':
+        aValue = new Date(a.scheduledDate).getTime();
+        bValue = new Date(b.scheduledDate).getTime();
+        break;
+      case 'status':
+        aValue = a.status;
+        bValue = b.status;
+        break;
+      case 'farmerName':
+        aValue = a.farmerId.name.toLowerCase();
+        bValue = b.farmerId.name.toLowerCase();
+        break;
+      case 'agentName':
+        aValue = a.assignedAgentId.name.toLowerCase();
+        bValue = b.assignedAgentId.name.toLowerCase();
+        break;
+      default:
+        return 0;
+    }
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Toggle task selection
+  const toggleTaskSelection = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTasks(newSelected);
+    setShowBulkActions(newSelected.size > 0);
+  };
+
+  // Select all visible tasks
+  const toggleSelectAll = () => {
+    if (selectedTasks.size === sortedTasks.length) {
+      setSelectedTasks(new Set());
+      setShowBulkActions(false);
+    } else {
+      setSelectedTasks(new Set(sortedTasks.map(t => t._id)));
+      setShowBulkActions(true);
+    }
+  };
+
+  // Bulk reassign
+  const handleBulkReassign = async (agentId: string) => {
+    setIsBulkProcessing(true);
+    try {
+      const response = await tasksAPI.bulkReassignTasks(Array.from(selectedTasks), agentId) as any;
+      if (response.success) {
+        setSelectedTasks(new Set());
+        setShowBulkActions(false);
+        setShowBulkReassignModal(false);
+        fetchTasks(currentPage);
+        alert(`Successfully reassigned ${response.data.successful} task(s)`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Failed to reassign tasks'}`);
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // Bulk status update
+  const handleBulkStatusUpdate = async (status: string, notes?: string) => {
+    setIsBulkProcessing(true);
+    try {
+      const response = await tasksAPI.bulkUpdateStatus(Array.from(selectedTasks), status, notes) as any;
+      if (response.success) {
+        setSelectedTasks(new Set());
+        setShowBulkActions(false);
+        setShowBulkStatusModal(false);
+        fetchTasks(currentPage);
+        alert(`Successfully updated status for ${response.data.successful} task(s)`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Failed to update task status'}`);
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // Export functions
+  const handleExportCSV = () => {
+    const tasksToExport = sortedTasks.map(formatTaskForExport);
+    exportToCSV(tasksToExport, 'tasks');
+  };
+
+  const handleExportPDF = () => {
+    const tasksToExport = sortedTasks.map(formatTaskForExport);
+    exportToPDF(tasksToExport, 'tasks');
+  };
+
   if (selectedTask) {
     return (
       <TaskDetail
@@ -177,6 +289,29 @@ const TaskList: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mr-2">
+                  Sort
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="scheduledDate">Scheduled Date</option>
+                  <option value="status">Status</option>
+                  <option value="farmerName">Farmer Name</option>
+                  <option value="agentName">Agent Name</option>
+                </select>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  <ArrowUpDown size={14} />
+                </Button>
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
@@ -184,6 +319,24 @@ const TaskList: React.FC = () => {
               >
                 <Filter size={16} />
                 Filters
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={sortedTasks.length === 0}
+              >
+                <Download size={16} />
+                Export CSV
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={sortedTasks.length === 0}
+              >
+                <Download size={16} />
+                Export PDF
               </Button>
               <Button
                 variant="secondary"
@@ -294,15 +447,79 @@ const TaskList: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Bulk Actions Toolbar */}
+            {showBulkActions && (
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-bold text-green-900">
+                    {selectedTasks.size} task{selectedTasks.size !== 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBulkReassignModal(true)}
+                    disabled={isBulkProcessing}
+                  >
+                    Reassign Selected
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBulkStatusModal(true)}
+                    disabled={isBulkProcessing}
+                  >
+                    Update Status
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedTasks(new Set());
+                    setShowBulkActions(false);
+                  }}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-3 mb-6">
-              {filteredTasks.map((task) => (
+              {/* Select All Checkbox */}
+              <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
+                    onChange={toggleSelectAll}
+                    className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                  />
+                  <span className="text-sm font-bold text-slate-700">
+                    Select All ({sortedTasks.length} tasks)
+                  </span>
+                </label>
+              </div>
+
+              {sortedTasks.map((task) => (
                 <div
                   key={task._id}
-                  onClick={() => setSelectedTask(task)}
-                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  className={`bg-white rounded-2xl p-5 border shadow-sm transition-all ${
+                    selectedTasks.has(task._id)
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-slate-200 hover:shadow-md cursor-pointer'
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4 flex-1">
+                      {/* Checkbox */}
+                      <div className="flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.has(task._id)}
+                          onChange={() => toggleTaskSelection(task._id)}
+                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                        />
+                      </div>
                       {/* Farmer Avatar */}
                       <div className="flex-shrink-0">
                         {task.farmerId.photoUrl ? (
@@ -323,7 +540,10 @@ const TaskList: React.FC = () => {
                       </div>
 
                       {/* Task Info */}
-                      <div className="flex-1 min-w-0">
+                      <div
+                        className="flex-1 min-w-0"
+                        onClick={() => setSelectedTask(task)}
+                      >
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-base font-black text-slate-900 truncate">{task.farmerId.name}</h3>
                           {getStatusBadge(task.status)}
@@ -392,8 +612,100 @@ const TaskList: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Bulk Reassign Modal */}
+            {showBulkReassignModal && (
+              <ReassignModal
+                isOpen={showBulkReassignModal}
+                onClose={() => setShowBulkReassignModal(false)}
+                task={null as any}
+                onReassigned={handleBulkReassign}
+                isBulkMode={true}
+                selectedTaskIds={Array.from(selectedTasks)}
+              />
+            )}
+
+            {/* Bulk Status Update Modal */}
+            {showBulkStatusModal && (
+              <BulkStatusModal
+                isOpen={showBulkStatusModal}
+                onClose={() => setShowBulkStatusModal(false)}
+                onUpdate={handleBulkStatusUpdate}
+                selectedCount={selectedTasks.size}
+                isProcessing={isBulkProcessing}
+              />
+            )}
           </>
         )}
+      </div>
+    </div>
+  );
+};
+
+// Bulk Status Modal Component
+interface BulkStatusModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdate: (status: string, notes?: string) => void;
+  selectedCount: number;
+  isProcessing: boolean;
+}
+
+const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUpdate, selectedCount, isProcessing }) => {
+  const [status, setStatus] = useState<string>('pending');
+  const [notes, setNotes] = useState<string>('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onUpdate(status, notes || undefined);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-3xl p-6 max-w-md w-full mx-4 border border-slate-200 shadow-xl">
+        <h2 className="text-xl font-black text-slate-900 mb-4">Update Status for {selectedCount} Task(s)</h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+              New Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="not_reachable">Not Reachable</option>
+              <option value="invalid_number">Invalid Number</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Add notes about this status change..."
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 mt-6">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isProcessing}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={isProcessing}>
+            {isProcessing ? 'Updating...' : 'Update Status'}
+          </Button>
+        </div>
       </div>
     </div>
   );

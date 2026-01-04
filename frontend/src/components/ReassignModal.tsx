@@ -26,11 +26,13 @@ interface Agent {
 interface ReassignModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: Task;
-  onReassigned: () => void;
+  task: Task | null;
+  onReassigned: ((agentId: string) => void | Promise<void>) | (() => void);
+  isBulkMode?: boolean;
+  selectedTaskIds?: string[];
 }
 
-const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, onReassigned }) => {
+const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, onReassigned, isBulkMode = false, selectedTaskIds = [] }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +42,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
 
   // Fetch agents with matching language capability
   useEffect(() => {
-    if (isOpen && task) {
+    if (isOpen) {
       const fetchAgents = async () => {
         setIsLoading(true);
         setError(null);
@@ -48,18 +50,27 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
           const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true }) as any;
           if (response.success && response.data?.users) {
             const allAgents = response.data.users;
-            // Filter agents by language capability
-            const capableAgents = allAgents.filter((agent: Agent) =>
-              agent.languageCapabilities && agent.languageCapabilities.includes(task.farmerId.preferredLanguage)
-            );
-            setAgents(capableAgents);
             
-            // Pre-select current agent if they have the language capability
-            const currentAgent = capableAgents.find((a: Agent) => a._id === task.assignedAgentId._id);
-            if (currentAgent) {
-              setSelectedAgentId(currentAgent._id);
-            } else if (capableAgents.length > 0) {
-              setSelectedAgentId(capableAgents[0]._id);
+            if (isBulkMode) {
+              // In bulk mode, show all agents (language matching will be handled by backend)
+              setAgents(allAgents);
+              if (allAgents.length > 0) {
+                setSelectedAgentId(allAgents[0]._id);
+              }
+            } else if (task) {
+              // Filter agents by language capability for single task
+              const capableAgents = allAgents.filter((agent: Agent) =>
+                agent.languageCapabilities && agent.languageCapabilities.includes(task.farmerId.preferredLanguage)
+              );
+              setAgents(capableAgents);
+              
+              // Pre-select current agent if they have the language capability
+              const currentAgent = capableAgents.find((a: Agent) => a._id === task.assignedAgentId._id);
+              if (currentAgent) {
+                setSelectedAgentId(currentAgent._id);
+              } else if (capableAgents.length > 0) {
+                setSelectedAgentId(capableAgents[0]._id);
+              }
             }
           }
         } catch (err: any) {
@@ -70,7 +81,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
       };
       fetchAgents();
     }
-  }, [isOpen, task]);
+  }, [isOpen, task, isBulkMode]);
 
   const handleReassign = async () => {
     if (!selectedAgentId) {
@@ -81,14 +92,28 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await tasksAPI.reassignTask(task._id, selectedAgentId) as any;
-      if (response.success) {
+      if (isBulkMode && selectedTaskIds.length > 0) {
+        // Bulk reassign
+        if (typeof onReassigned === 'function' && onReassigned.length === 1) {
+          await (onReassigned as (agentId: string) => void | Promise<void>)(selectedAgentId);
+        }
         setSuccess(true);
         setTimeout(() => {
-          onReassigned();
+          handleClose();
         }, 1500);
-      } else {
-        setError('Failed to reassign task');
+      } else if (task) {
+        // Single task reassign
+        const response = await tasksAPI.reassignTask(task._id, selectedAgentId) as any;
+        if (response.success) {
+          setSuccess(true);
+          setTimeout(() => {
+            if (typeof onReassigned === 'function' && onReassigned.length === 0) {
+              (onReassigned as () => void)();
+            }
+          }, 1500);
+        } else {
+          setError('Failed to reassign task');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to reassign task');
@@ -107,18 +132,31 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Reassign Task" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title={isBulkMode ? `Reassign ${selectedTaskIds.length} Tasks` : "Reassign Task"} size="md">
       <div className="space-y-6">
         {/* Current Assignment Info */}
-        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Current Assignment</p>
-          <p className="text-sm font-medium text-slate-700">
-            {task.assignedAgentId.name}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Farmer Language: <span className="font-medium">{task.farmerId.preferredLanguage}</span>
-          </p>
-        </div>
+        {!isBulkMode && task && (
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Current Assignment</p>
+            <p className="text-sm font-medium text-slate-700">
+              {task.assignedAgentId.name}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Farmer Language: <span className="font-medium">{task.farmerId.preferredLanguage}</span>
+            </p>
+          </div>
+        )}
+
+        {isBulkMode && (
+          <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+            <p className="text-sm font-medium text-blue-900">
+              You are about to reassign <strong>{selectedTaskIds.length} task(s)</strong> to a new agent.
+            </p>
+            <p className="text-xs text-blue-700 mt-2">
+              Note: Language matching will be validated by the system. Tasks may be skipped if the selected agent doesn't have the required language capabilities.
+            </p>
+          </div>
+        )}
 
         {/* Agent Selection */}
         {isLoading ? (
@@ -130,7 +168,10 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
           <div className="text-center py-8">
             <AlertCircle className="mx-auto mb-4 text-orange-500" size={32} />
             <p className="text-sm text-orange-600 font-medium mb-2">
-              No agents available with language capability: {task.farmerId.preferredLanguage}
+              {isBulkMode 
+                ? 'No active agents available'
+                : `No agents available with language capability: ${task?.farmerId.preferredLanguage}`
+              }
             </p>
             <p className="text-xs text-slate-500">
               Please assign language capabilities to agents first.
@@ -204,7 +245,7 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
             disabled={!selectedAgentId || isSubmitting || isLoading || agents.length === 0}
             loading={isSubmitting}
           >
-            Reassign Task
+            {isBulkMode ? `Reassign ${selectedTaskIds.length} Tasks` : 'Reassign Task'}
           </Button>
         </div>
       </div>

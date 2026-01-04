@@ -364,5 +364,106 @@ router.put(
   }
 );
 
+// @route   PUT /api/tasks/bulk/reassign
+// @desc    Bulk reassign tasks to an agent
+// @access  Private (Team Lead, MIS Admin)
+router.put(
+  '/bulk/reassign',
+  requirePermission('tasks.reassign'),
+  [
+    body('taskIds').isArray().withMessage('taskIds must be an array'),
+    body('taskIds.*').isMongoId().withMessage('Each task ID must be valid'),
+    body('agentId').isMongoId().withMessage('Valid agent ID is required'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { taskIds, agentId } = req.body;
+      const results = [];
+      const errors_list: any[] = [];
+
+      for (const taskId of taskIds) {
+        try {
+          const task = await assignTaskToAgent(taskId, agentId);
+          results.push(task);
+        } catch (err: any) {
+          errors_list.push({ taskId, error: err.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Reassigned ${results.length} of ${taskIds.length} tasks`,
+        data: {
+          successful: results.length,
+          failed: errors_list.length,
+          results,
+          errors: errors_list,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   PUT /api/tasks/bulk/status
+// @desc    Bulk update task status
+// @access  Private (Team Lead, MIS Admin)
+router.put(
+  '/bulk/status',
+  requirePermission('tasks.reassign'),
+  [
+    body('taskIds').isArray().withMessage('taskIds must be an array'),
+    body('taskIds.*').isMongoId().withMessage('Each task ID must be valid'),
+    body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
+    body('notes').optional().isString(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { taskIds, status, notes } = req.body;
+      const results = [];
+      const errors_list: any[] = [];
+
+      for (const taskId of taskIds) {
+        try {
+          const task = await updateTaskStatus(taskId, status, notes);
+          results.push(task);
+        } catch (err: any) {
+          errors_list.push({ taskId, error: err.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Updated status for ${results.length} of ${taskIds.length} tasks`,
+        data: {
+          successful: results.length,
+          failed: errors_list.length,
+          results,
+          errors: errors_list,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;
 

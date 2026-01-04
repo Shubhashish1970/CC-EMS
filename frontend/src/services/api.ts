@@ -162,6 +162,20 @@ export const tasksAPI = {
       body: JSON.stringify({ status, notes }),
     });
   },
+
+  bulkReassignTasks: async (taskIds: string[], agentId: string) => {
+    return apiRequest('/tasks/bulk/reassign', {
+      method: 'PUT',
+      body: JSON.stringify({ taskIds, agentId }),
+    });
+  },
+
+  bulkUpdateStatus: async (taskIds: string[], status: string, notes?: string) => {
+    return apiRequest('/tasks/bulk/status', {
+      method: 'PUT',
+      body: JSON.stringify({ taskIds, status, notes }),
+    });
+  },
 };
 
 // Users API (for MIS Admin)

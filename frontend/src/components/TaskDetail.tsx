@@ -64,7 +64,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
   const [fullTask, setFullTask] = useState<Task | null>(task);
   const [isLoading, setIsLoading] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Fetch full task details
   React.useEffect(() => {
@@ -122,6 +124,24 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
   };
 
   const canReassign = user && (user.role === 'team_lead' || user.role === 'mis_admin');
+  const canChangeStatus = user && (user.role === 'team_lead' || user.role === 'mis_admin');
+
+  const handleStatusUpdate = async (newStatus: string, notes?: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      const response = await tasksAPI.updateTaskStatus(fullTask._id, newStatus, notes) as any;
+      if (response.success) {
+        setShowStatusModal(false);
+        onTaskUpdated();
+      } else {
+        setError('Failed to update task status');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update task status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -163,11 +183,18 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
             <Button variant="ghost" size="sm" onClick={onBack}>
               <ArrowLeft size={16} /> Back to List
             </Button>
-            {canReassign && (
-              <Button variant="secondary" size="sm" onClick={() => setShowReassignModal(true)}>
-                Reassign Task
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {canChangeStatus && (
+                <Button variant="secondary" size="sm" onClick={() => setShowStatusModal(true)}>
+                  Change Status
+                </Button>
+              )}
+              {canReassign && (
+                <Button variant="secondary" size="sm" onClick={() => setShowReassignModal(true)}>
+                  Reassign Task
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex items-start gap-4">
@@ -379,6 +406,86 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
             }}
           />
         )}
+
+        {/* Status Change Modal */}
+        {showStatusModal && (
+          <StatusChangeModal
+            isOpen={showStatusModal}
+            onClose={() => setShowStatusModal(false)}
+            currentStatus={fullTask.status}
+            onUpdate={handleStatusUpdate}
+            isProcessing={isUpdatingStatus}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Status Change Modal Component
+interface StatusChangeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentStatus: string;
+  onUpdate: (status: string, notes?: string) => void;
+  isProcessing: boolean;
+}
+
+const StatusChangeModal: React.FC<StatusChangeModalProps> = ({ isOpen, onClose, currentStatus, onUpdate, isProcessing }) => {
+  const [status, setStatus] = useState<string>(currentStatus);
+  const [notes, setNotes] = useState<string>('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onUpdate(status, notes || undefined);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-3xl p-6 max-w-md w-full mx-4 border border-slate-200 shadow-xl">
+        <h2 className="text-xl font-black text-slate-900 mb-4">Change Task Status</h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+              New Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="not_reachable">Not Reachable</option>
+              <option value="invalid_number">Invalid Number</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Add notes about this status change..."
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 mt-6">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isProcessing}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={isProcessing}>
+            {isProcessing ? 'Updating...' : 'Update Status'}
+          </Button>
+        </div>
       </div>
     </div>
   );
