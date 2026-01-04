@@ -7,6 +7,7 @@ import logger from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Load environment variables
+// Automated deployment test - verifying GitHub Secrets configuration
 dotenv.config();
 
 const app: Express = express();
