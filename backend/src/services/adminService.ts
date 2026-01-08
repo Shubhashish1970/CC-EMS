@@ -218,12 +218,36 @@ export const getActivitiesWithSampling = async (filters?: {
     for (const activity of activities) {
       if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
         for (const farmerId of activity.farmerIds) {
-          const farmerIdStr = (farmerId as any)?._id?.toString() || (farmerId as any)?.toString();
+          // Handle different formats: ObjectId, populated object, or string
+          let farmerIdStr: string | null = null;
+          if (mongoose.Types.ObjectId.isValid(farmerId)) {
+            if (typeof farmerId === 'string') {
+              farmerIdStr = farmerId;
+            } else if (farmerId instanceof mongoose.Types.ObjectId) {
+              farmerIdStr = farmerId.toString();
+            } else if ((farmerId as any)?._id) {
+              farmerIdStr = (farmerId as any)._id.toString();
+            } else if ((farmerId as any)?.toString) {
+              farmerIdStr = (farmerId as any).toString();
+            }
+          }
           if (farmerIdStr && mongoose.Types.ObjectId.isValid(farmerIdStr)) {
             allFarmerIds.add(farmerIdStr);
           }
         }
       }
+    }
+    
+    logger.info(`Collected ${allFarmerIds.size} unique farmer IDs from ${activities.length} activities`);
+    
+    // Log sample of farmer IDs for debugging
+    if (allFarmerIds.size === 0 && activities.length > 0) {
+      logger.warn('No farmer IDs found in activities. Sample activity:', {
+        activityId: activities[0]._id,
+        farmerIds: activities[0].farmerIds,
+        farmerIdsType: Array.isArray(activities[0].farmerIds) ? 'array' : typeof activities[0].farmerIds,
+        farmerIdsLength: Array.isArray(activities[0].farmerIds) ? activities[0].farmerIds.length : 'N/A',
+      });
     }
 
     // Batch fetch all farmers for all activities (optimized for large datasets)
@@ -237,6 +261,13 @@ export const getActivitiesWithSampling = async (filters?: {
 
       for (const farmer of farmers) {
         farmersMap.set(farmer._id.toString(), farmer);
+      }
+      
+      logger.info(`Fetched ${farmers.length} farmer documents out of ${allFarmerIds.size} requested`);
+      
+      if (farmers.length < allFarmerIds.size) {
+        const missingCount = allFarmerIds.size - farmers.length;
+        logger.warn(`${missingCount} farmer documents not found in database - will include with minimal data`);
       }
     }
 
@@ -321,31 +352,54 @@ export const getActivitiesWithSampling = async (filters?: {
 
       if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
         for (const farmerRef of activity.farmerIds) {
-          // Extract farmer ID from reference
-          const farmerId = (farmerRef as any)?._id?.toString() || (farmerRef as any)?.toString();
-          if (!farmerId || !mongoose.Types.ObjectId.isValid(farmerId)) continue;
+          // Extract farmer ID from reference - handle different formats
+          let farmerId: string | null = null;
+          if (mongoose.Types.ObjectId.isValid(farmerRef)) {
+            if (typeof farmerRef === 'string') {
+              farmerId = farmerRef;
+            } else if (farmerRef instanceof mongoose.Types.ObjectId) {
+              farmerId = farmerRef.toString();
+            } else if ((farmerRef as any)?._id) {
+              farmerId = (farmerRef as any)._id.toString();
+            } else if ((farmerRef as any)?.toString) {
+              farmerId = (farmerRef as any).toString();
+            }
+          }
+          
+          if (!farmerId || !mongoose.Types.ObjectId.isValid(farmerId)) {
+            logger.warn(`Invalid farmer ID in activity ${activityId}: ${farmerRef}`);
+            continue;
+          }
 
           // Get farmer data from batch-fetched map
           const farmerData = farmersMap.get(farmerId);
-          if (!farmerData) continue; // Skip if farmer not found (shouldn't happen, but defensive)
-
+          
+          // If farmer not found, still include in list but with minimal data
+          // This ensures all farmers in the activity are visible even if farmer documents don't exist yet
           const farmerTask = activityFarmerMap.get(farmerId);
 
           farmersList.push({
             farmerId: farmerId,
-            name: farmerData.name || 'Unknown',
-            mobileNumber: farmerData.mobileNumber || 'Unknown',
-            preferredLanguage: farmerData.preferredLanguage || 'Unknown',
-            location: farmerData.location || 'Unknown',
-            photoUrl: farmerData.photoUrl,
+            name: farmerData?.name || 'Unknown',
+            mobileNumber: farmerData?.mobileNumber || 'Unknown',
+            preferredLanguage: farmerData?.preferredLanguage || 'Unknown',
+            location: farmerData?.location || 'Unknown',
+            photoUrl: farmerData?.photoUrl,
             isSampled: !!farmerTask,
             taskId: farmerTask?.taskId,
             assignedAgentId: farmerTask?.assignedAgentId,
             assignedAgentName: farmerTask?.assignedAgentName,
             taskStatus: farmerTask?.taskStatus,
           });
+          
+          // Log warning if farmer data not found but still include in list
+          if (!farmerData) {
+            logger.warn(`Farmer data not found for ID: ${farmerId} in activity ${activityId} - including with minimal data`);
+          }
         }
       }
+      
+      logger.info(`Activity ${activityId}: ${farmersList.length} farmers processed (activity has ${activity.farmerIds?.length || 0} farmer IDs)`);
 
       result.push({
         activity: activity.toObject(),
