@@ -138,13 +138,17 @@ jobs:
             echo "ℹ️ Service does not exist, will create..."
           fi
           
+          # Create temporary env file to avoid special character issues
+          ENV_FILE=$(mktemp)
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> "$ENV_FILE"
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> "$ENV_FILE"
+          echo "NODE_ENV=production" >> "$ENV_FILE"
+          echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> "$ENV_FILE"
+          echo "ENABLE_CRON=true" >> "$ENV_FILE"
+          
           # Use gcloud run deploy - it works for both create and update
-          # For existing services, it preserves existing settings and only updates what's specified
-          # For new services, it creates with all specified settings
           echo "📦 Deploying service..."
           
-          # Build the command - use deploy which handles both create and update
-          # For existing services, only specify what needs to be updated
           if [ "$SERVICE_EXISTS" = "false" ]; then
             # New service - set all configuration
             echo "🆕 Creating new service..."
@@ -156,21 +160,23 @@ jobs:
               --port 8080 \
               --memory 512Mi \
               --cpu 1 \
-              --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           else
-            # Existing service - only update image and env vars
-            # Don't specify --allow-unauthenticated, --port, --memory, --cpu to preserve existing settings
+            # Existing service - update image and env vars using file
             echo "🔄 Updating existing service..."
             gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
-              --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --update-env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           fi
+          
+          # Clean up temp file
+          rm -f "$ENV_FILE"
           
           # Check deployment status
           DEPLOY_EXIT_CODE=$?
