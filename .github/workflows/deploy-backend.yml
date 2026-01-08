@@ -143,8 +143,11 @@ jobs:
           # For new services, it creates with all specified settings
           echo "📦 Deploying service..."
           
+          # Build the command - use deploy which handles both create and update
+          # For existing services, only specify what needs to be updated
           if [ "$SERVICE_EXISTS" = "false" ]; then
             # New service - set all configuration
+            echo "🆕 Creating new service..."
             gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
@@ -157,12 +160,14 @@ jobs:
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           else
-            # Existing service - update image and env vars, preserve other settings
+            # Existing service - only update image and env vars
+            # Don't specify --allow-unauthenticated, --port, --memory, --cpu to preserve existing settings
+            echo "🔄 Updating existing service..."
             gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
-              --update-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           fi
