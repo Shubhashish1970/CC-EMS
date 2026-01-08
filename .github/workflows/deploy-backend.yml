@@ -110,7 +110,10 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          # Deploy service first (without env vars to avoid special character parsing issues)
+          echo "🚀 Deploying to Cloud Run..."
+          
+          # Always use deploy command (it works for both create and update)
+          # Deploy with all configuration in one command
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --platform managed \
@@ -119,16 +122,11 @@ jobs:
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
+            --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
             --project ${{ secrets.GCP_PROJECT_ID }} \
             --quiet
           
-          # Update env vars using --update-env-vars with comma-separated format
-          # Note: Quotes around values handle special characters within each value
-          gcloud run services update ${{ env.SERVICE_NAME }} \
-            --region ${{ env.REGION }} \
-            --update-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
-            --project ${{ secrets.GCP_PROJECT_ID }} \
-            --quiet
+          echo "✅ Deployment completed successfully"
 
       - name: Get Service URL
         id: get-url
