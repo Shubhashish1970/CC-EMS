@@ -160,7 +160,7 @@ jobs:
               --port 8080 \
               --memory 512Mi \
               --cpu 1 \
-              --env-vars-file "$ENV_FILE" \
+              --set-env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           else
