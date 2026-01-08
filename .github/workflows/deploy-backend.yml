@@ -112,21 +112,71 @@ jobs:
         run: |
           echo "🚀 Deploying to Cloud Run..."
           
-          # Always use deploy command (it works for both create and update)
-          # Deploy with all configuration in one command
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
-            --platform managed \
-            --region ${{ env.REGION }} \
-            --allow-unauthenticated \
-            --port 8080 \
-            --memory 512Mi \
-            --cpu 1 \
-            --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
-            --project ${{ secrets.GCP_PROJECT_ID }} \
-            --quiet
+          # Verify required secrets are set (fail fast if missing)
+          if [ -z "${{ secrets.MONGODB_URI }}" ]; then
+            echo "❌ Error: MONGODB_URI secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.JWT_SECRET }}" ]; then
+            echo "❌ Error: JWT_SECRET secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.CORS_ORIGIN }}" ]; then
+            echo "❌ Error: CORS_ORIGIN secret is not set"
+            exit 1
+          fi
           
-          echo "✅ Deployment completed successfully"
+          # Check if service exists
+          if gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --quiet 2>/dev/null; then
+            echo "ℹ️ Service exists, updating..."
+            SERVICE_EXISTS=true
+          else
+            echo "ℹ️ Service does not exist, creating new service..."
+            SERVICE_EXISTS=false
+          fi
+          
+          # Deploy service - use appropriate command based on existence
+          if [ "$SERVICE_EXISTS" = "true" ]; then
+            # Update existing service - preserve existing settings, only update env vars and image
+            echo "🔄 Updating existing service..."
+            gcloud run services update ${{ env.SERVICE_NAME }} \
+              --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
+              --region ${{ env.REGION }} \
+              --update-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --quiet
+          else
+            # Create new service
+            echo "🆕 Creating new service..."
+            gcloud run deploy ${{ env.SERVICE_NAME }} \
+              --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
+              --platform managed \
+              --region ${{ env.REGION }} \
+              --allow-unauthenticated \
+              --port 8080 \
+              --memory 512Mi \
+              --cpu 1 \
+              --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --quiet
+          fi
+          
+          # Verify deployment succeeded
+          DEPLOY_EXIT_CODE=$?
+          if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
+            echo "✅ Deployment completed successfully"
+          else
+            echo "❌ Deployment failed with exit code: $DEPLOY_EXIT_CODE"
+            echo "Checking service status..."
+            gcloud run services describe ${{ env.SERVICE_NAME }} \
+              --region ${{ env.REGION }} \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --format="value(status.conditions)" 2>/dev/null || echo "Could not retrieve service status"
+            exit $DEPLOY_EXIT_CODE
+          fi
 
       - name: Get Service URL
         id: get-url
