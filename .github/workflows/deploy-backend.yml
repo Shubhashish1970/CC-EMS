@@ -126,31 +126,25 @@ jobs:
             exit 1
           fi
           
-          # Check if service exists
+          # Check if service exists to determine initial settings
+          SERVICE_EXISTS=false
           if gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
             --project ${{ secrets.GCP_PROJECT_ID }} \
             --quiet 2>/dev/null; then
-            echo "ℹ️ Service exists, updating..."
+            echo "ℹ️ Service exists, will update..."
             SERVICE_EXISTS=true
           else
-            echo "ℹ️ Service does not exist, creating new service..."
-            SERVICE_EXISTS=false
+            echo "ℹ️ Service does not exist, will create..."
           fi
           
-          # Deploy service - use appropriate command based on existence
-          if [ "$SERVICE_EXISTS" = "true" ]; then
-            # Update existing service - preserve existing settings, only update env vars and image
-            echo "🔄 Updating existing service..."
-            gcloud run services update ${{ env.SERVICE_NAME }} \
-              --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
-              --region ${{ env.REGION }} \
-              --update-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
-              --project ${{ secrets.GCP_PROJECT_ID }} \
-              --quiet
-          else
-            # Create new service
-            echo "🆕 Creating new service..."
+          # Use gcloud run deploy - it works for both create and update
+          # For existing services, it preserves existing settings and only updates what's specified
+          # For new services, it creates with all specified settings
+          echo "📦 Deploying service..."
+          
+          if [ "$SERVICE_EXISTS" = "false" ]; then
+            # New service - set all configuration
             gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
@@ -162,19 +156,35 @@ jobs:
               --set-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
+          else
+            # Existing service - update image and env vars, preserve other settings
+            gcloud run deploy ${{ env.SERVICE_NAME }} \
+              --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
+              --platform managed \
+              --region ${{ env.REGION }} \
+              --update-env-vars "MONGODB_URI=${{ secrets.MONGODB_URI }},JWT_SECRET=${{ secrets.JWT_SECRET }},NODE_ENV=production,CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},ENABLE_CRON=true" \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --quiet
           fi
           
-          # Verify deployment succeeded
+          # Check deployment status
           DEPLOY_EXIT_CODE=$?
           if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
             echo "✅ Deployment completed successfully"
           else
             echo "❌ Deployment failed with exit code: $DEPLOY_EXIT_CODE"
-            echo "Checking service status..."
-            gcloud run services describe ${{ env.SERVICE_NAME }} \
+            echo "Attempting to get more information..."
+            
+            # Try to get service details for debugging
+            if gcloud run services describe ${{ env.SERVICE_NAME }} \
               --region ${{ env.REGION }} \
               --project ${{ secrets.GCP_PROJECT_ID }} \
-              --format="value(status.conditions)" 2>/dev/null || echo "Could not retrieve service status"
+              --format="yaml(status)" 2>/dev/null; then
+              echo "Service exists but deployment failed"
+            else
+              echo "Service does not exist after deployment attempt"
+            fi
+            
             exit $DEPLOY_EXIT_CODE
           fi
 
