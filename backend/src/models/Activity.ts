@@ -76,11 +76,16 @@ const ActivitySchema = new Schema<IActivity>(
   }
 );
 
-// Indexes
+// Indexes - Optimized for 2-3 years of data (600 people × 4-5 activities/day = ~2.7M activities/3 years)
 ActivitySchema.index({ activityId: 1 }, { unique: true });
-ActivitySchema.index({ date: -1 });
-ActivitySchema.index({ territory: 1 });
-ActivitySchema.index({ officerId: 1 });
+ActivitySchema.index({ date: -1 }); // For date range queries and sorting by date
+ActivitySchema.index({ territory: 1 }); // For territory filtering
+ActivitySchema.index({ officerId: 1 }); // For officer filtering
+ActivitySchema.index({ type: 1 }); // For activity type filtering
+ActivitySchema.index({ type: 1, date: -1 }); // Compound: type + date for common query pattern
+ActivitySchema.index({ territory: 1, date: -1 }); // Compound: territory + date for filtering
+ActivitySchema.index({ syncedAt: -1 }); // For sync monitoring
+ActivitySchema.index({ farmerIds: 1 }); // For farmer lookup in activities
 
 export const Activity = mongoose.model<IActivity>('Activity', ActivitySchema);
 

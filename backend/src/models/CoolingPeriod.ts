@@ -36,9 +36,11 @@ const CoolingPeriodSchema = new Schema<ICoolingPeriod>(
   }
 );
 
-// Indexes
-CoolingPeriodSchema.index({ farmerId: 1 }, { unique: true });
-CoolingPeriodSchema.index({ expiresAt: 1 });
+// Indexes - Optimized for 2-3 years of data (~6M+ cooling periods over 3 years)
+CoolingPeriodSchema.index({ farmerId: 1 }, { unique: true }); // Unique: one cooling period per farmer
+CoolingPeriodSchema.index({ expiresAt: 1 }); // For expiry queries and cleanup
+CoolingPeriodSchema.index({ farmerId: 1, expiresAt: 1 }); // Compound: farmer + expiry for eligibility checks
+// Note: TTL index not used - we manually check expiry in queries for better control
 
 // Auto-calculate expiresAt before save
 CoolingPeriodSchema.pre('save', function (next) {

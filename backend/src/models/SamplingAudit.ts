@@ -47,9 +47,10 @@ const SamplingAuditSchema = new Schema<ISamplingAudit>(
   }
 );
 
-// Indexes
-SamplingAuditSchema.index({ activityId: 1 });
-SamplingAuditSchema.index({ createdAt: -1 });
+// Indexes - Optimized for 2-3 years of data (~2.7M audits over 3 years)
+SamplingAuditSchema.index({ activityId: 1 }, { unique: true }); // Unique: one audit per activity
+SamplingAuditSchema.index({ createdAt: -1 }); // For audit history and date range queries
+SamplingAuditSchema.index({ activityId: 1, createdAt: -1 }); // Compound: activity + date
 
 export const SamplingAudit = mongoose.model<ISamplingAudit>('SamplingAudit', SamplingAuditSchema);
 

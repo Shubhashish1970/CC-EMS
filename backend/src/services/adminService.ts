@@ -29,6 +29,19 @@ export interface ActivitySamplingStatus {
     not_reachable: number;
     invalid_number: number;
   };
+  farmers: Array<{
+    farmerId: string;
+    name: string;
+    mobileNumber: string;
+    preferredLanguage: string;
+    location: string;
+    photoUrl?: string;
+    isSampled: boolean;
+    taskId?: string;
+    assignedAgentId?: string;
+    assignedAgentName?: string;
+    taskStatus?: TaskStatus;
+  }>;
 }
 
 export interface AgentQueueSummary {
@@ -154,21 +167,77 @@ export const getActivitiesWithSampling = async (filters?: {
       samplingAudits.map((audit) => [audit.activityId.toString(), audit])
     );
 
-    // Get all tasks for these activities
+    // Get all tasks for these activities (with indexes for performance)
     const tasks = await CallTask.find({
       activityId: { $in: activityIds },
     })
       .populate('assignedAgentId', 'name email employeeId')
-      .populate('farmerId', 'name mobileNumber preferredLanguage location');
+      .populate('farmerId', 'name mobileNumber preferredLanguage location photoUrl')
+      .lean(); // Use lean() for better performance with large datasets
 
-    // Group tasks by activityId
+    // Group tasks by activityId and create farmer-to-task mapping
     const tasksByActivity = new Map<string, typeof tasks>();
+    // Create a map of activityId -> Map<farmerId -> task info> for quick lookup
+    const farmerTaskMapByActivity = new Map<string, Map<string, {
+      taskId: string;
+      assignedAgentId: string;
+      assignedAgentName: string;
+      taskStatus: TaskStatus;
+    }>>();
+
     for (const task of tasks) {
-      const activityId = task.activityId.toString();
+      const activityId = (task.activityId as any)?._id?.toString() || (task.activityId as any)?.toString();
+      if (!activityId) continue;
+
       if (!tasksByActivity.has(activityId)) {
         tasksByActivity.set(activityId, []);
       }
       tasksByActivity.get(activityId)!.push(task);
+
+      // Initialize farmer task map for this activity if needed
+      if (!farmerTaskMapByActivity.has(activityId)) {
+        farmerTaskMapByActivity.set(activityId, new Map());
+      }
+
+      // Map farmer to task for quick lookup
+      const farmerId = (task.farmerId as any)?._id?.toString() || (task.farmerId as any)?.toString();
+      if (farmerId) {
+        const agent = task.assignedAgentId as any;
+        const activityFarmerMap = farmerTaskMapByActivity.get(activityId)!;
+        activityFarmerMap.set(farmerId, {
+          taskId: task._id.toString(),
+          assignedAgentId: agent?._id?.toString() || agent?.toString() || '',
+          assignedAgentName: agent?.name || 'Unknown',
+          taskStatus: task.status,
+        });
+      }
+    }
+
+    // Collect all farmer IDs across all activities for batch fetching
+    const allFarmerIds = new Set<string>();
+    for (const activity of activities) {
+      if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
+        for (const farmerId of activity.farmerIds) {
+          const farmerIdStr = (farmerId as any)?._id?.toString() || (farmerId as any)?.toString();
+          if (farmerIdStr && mongoose.Types.ObjectId.isValid(farmerIdStr)) {
+            allFarmerIds.add(farmerIdStr);
+          }
+        }
+      }
+    }
+
+    // Batch fetch all farmers for all activities (optimized for large datasets)
+    const farmersMap = new Map<string, any>();
+    if (allFarmerIds.size > 0) {
+      const farmers = await Farmer.find({
+        _id: { $in: Array.from(allFarmerIds).map(id => new mongoose.Types.ObjectId(id)) },
+      })
+        .select('name mobileNumber preferredLanguage location photoUrl')
+        .lean();
+
+      for (const farmer of farmers) {
+        farmersMap.set(farmer._id.toString(), farmer);
+      }
     }
 
     // Build result array
@@ -218,8 +287,8 @@ export const getActivitiesWithSampling = async (filters?: {
 
         // Group by agent
         const agent = task.assignedAgentId as any;
-        if (agent && agent._id) {
-          const agentId = agent._id.toString();
+        if (agent && (agent._id || agent)) {
+          const agentId = agent._id?.toString() || agent.toString();
           if (!agentMap.has(agentId)) {
             agentMap.set(agentId, {
               agentId,
@@ -229,6 +298,52 @@ export const getActivitiesWithSampling = async (filters?: {
             });
           }
           agentMap.get(agentId)!.tasksCount++;
+        }
+      }
+
+      // Build farmers list for this activity with sampling status
+      const farmersList: Array<{
+        farmerId: string;
+        name: string;
+        mobileNumber: string;
+        preferredLanguage: string;
+        location: string;
+        photoUrl?: string;
+        isSampled: boolean;
+        taskId?: string;
+        assignedAgentId?: string;
+        assignedAgentName?: string;
+        taskStatus?: TaskStatus;
+      }> = [];
+
+      // Get farmer task map for this activity
+      const activityFarmerMap = farmerTaskMapByActivity.get(activityId) || new Map();
+
+      if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
+        for (const farmerRef of activity.farmerIds) {
+          // Extract farmer ID from reference
+          const farmerId = (farmerRef as any)?._id?.toString() || (farmerRef as any)?.toString();
+          if (!farmerId || !mongoose.Types.ObjectId.isValid(farmerId)) continue;
+
+          // Get farmer data from batch-fetched map
+          const farmerData = farmersMap.get(farmerId);
+          if (!farmerData) continue; // Skip if farmer not found (shouldn't happen, but defensive)
+
+          const farmerTask = activityFarmerMap.get(farmerId);
+
+          farmersList.push({
+            farmerId: farmerId,
+            name: farmerData.name || 'Unknown',
+            mobileNumber: farmerData.mobileNumber || 'Unknown',
+            preferredLanguage: farmerData.preferredLanguage || 'Unknown',
+            location: farmerData.location || 'Unknown',
+            photoUrl: farmerData.photoUrl,
+            isSampled: !!farmerTask,
+            taskId: farmerTask?.taskId,
+            assignedAgentId: farmerTask?.assignedAgentId,
+            assignedAgentName: farmerTask?.assignedAgentName,
+            taskStatus: farmerTask?.taskStatus,
+          });
         }
       }
 
@@ -246,6 +361,7 @@ export const getActivitiesWithSampling = async (filters?: {
         tasksCount: activityTasks.length,
         assignedAgents: Array.from(agentMap.values()),
         statusBreakdown,
+        farmers: farmersList,
       });
     }
 
