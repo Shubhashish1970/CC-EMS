@@ -82,7 +82,17 @@ const ActivitySamplingView: React.FC = () => {
       }) as any;
 
       if (response.success && response.data) {
-        setActivities(response.data.activities || []);
+        const activitiesData = response.data.activities || [];
+        console.log('Activities received:', activitiesData.length);
+        if (activitiesData.length > 0) {
+          console.log('Sample activity:', {
+            id: activitiesData[0].activity?._id,
+            farmersArray: activitiesData[0].farmers,
+            farmersCount: activitiesData[0].farmers?.length || 0,
+            totalFarmers: activitiesData[0].activity?.farmerIds?.length || 0,
+          });
+        }
+        setActivities(activitiesData);
         setPagination(response.data.pagination || { page: 1, limit: 50, total: 0, pages: 1 });
       }
     } catch (err: any) {
@@ -401,7 +411,7 @@ const ActivitySamplingView: React.FC = () => {
                         )}
 
                         {/* Farmers List */}
-                        {item.farmers && item.farmers.length > 0 && (
+                        {item.farmers && item.farmers.length > 0 ? (
                           <div>
                             <h4 className="text-sm font-black text-slate-700 mb-3">
                               Farmers ({item.farmers.length})
@@ -493,6 +503,20 @@ const ActivitySamplingView: React.FC = () => {
                                 </div>
                               ))}
                             </div>
+                          </div>
+                        ) : (
+                          // Show message if no farmers or farmers array missing
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <p className="text-sm text-amber-700 font-medium">
+                              {item.activity.farmerIds && item.activity.farmerIds.length > 0
+                                ? `This activity has ${item.activity.farmerIds.length} farmers, but farmer details are not available.`
+                                : 'No farmers are associated with this activity.'}
+                            </p>
+                            {item.activity.farmerIds && item.activity.farmerIds.length > 0 && (
+                              <p className="text-xs text-amber-600 mt-1">
+                                Farmers may need to be synced from FFA or farmer documents may not exist in the database.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>

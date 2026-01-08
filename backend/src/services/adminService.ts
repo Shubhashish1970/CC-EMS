@@ -350,37 +350,54 @@ export const getActivitiesWithSampling = async (filters?: {
       // Get farmer task map for this activity
       const activityFarmerMap = farmerTaskMapByActivity.get(activityId) || new Map();
 
-      if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
+      if (activity.farmerIds && Array.isArray(activity.farmerIds) && activity.farmerIds.length > 0) {
+        logger.debug(`Processing ${activity.farmerIds.length} farmer IDs for activity ${activityId}`);
+        
         for (const farmerRef of activity.farmerIds) {
           // Extract farmer ID from reference - handle different formats
           let farmerId: string | null = null;
-          if (mongoose.Types.ObjectId.isValid(farmerRef)) {
-            if (typeof farmerRef === 'string') {
-              farmerId = farmerRef;
-            } else if (farmerRef instanceof mongoose.Types.ObjectId) {
-              farmerId = farmerRef.toString();
-            } else if ((farmerRef as any)?._id) {
-              farmerId = (farmerRef as any)._id.toString();
-            } else if ((farmerRef as any)?.toString) {
-              farmerId = (farmerRef as any).toString();
+          
+          // Try different methods to extract farmer ID
+          if (typeof farmerRef === 'string' && mongoose.Types.ObjectId.isValid(farmerRef)) {
+            farmerId = farmerRef;
+          } else if (farmerRef instanceof mongoose.Types.ObjectId) {
+            farmerId = farmerRef.toString();
+          } else if ((farmerRef as any)?._id) {
+            // Populated farmer object
+            const id = (farmerRef as any)._id;
+            farmerId = id instanceof mongoose.Types.ObjectId ? id.toString() : String(id);
+          } else if ((farmerRef as any)?.toString && mongoose.Types.ObjectId.isValid((farmerRef as any).toString())) {
+            farmerId = (farmerRef as any).toString();
+          } else if (mongoose.Types.ObjectId.isValid(farmerRef)) {
+            // Try to convert directly
+            try {
+              const objId = new mongoose.Types.ObjectId(farmerRef);
+              farmerId = objId.toString();
+            } catch (e) {
+              logger.warn(`Could not convert farmer ID in activity ${activityId}:`, farmerRef);
             }
           }
           
           if (!farmerId || !mongoose.Types.ObjectId.isValid(farmerId)) {
-            logger.warn(`Invalid farmer ID in activity ${activityId}: ${farmerRef}`);
+            logger.warn(`Invalid farmer ID in activity ${activityId}:`, {
+              farmerRef,
+              type: typeof farmerRef,
+              isObjectId: farmerRef instanceof mongoose.Types.ObjectId,
+            });
             continue;
           }
 
           // Get farmer data from batch-fetched map
           const farmerData = farmersMap.get(farmerId);
           
-          // If farmer not found, still include in list but with minimal data
-          // This ensures all farmers in the activity are visible even if farmer documents don't exist yet
+          // Get task info if this farmer was sampled
           const farmerTask = activityFarmerMap.get(farmerId);
 
+          // Always include farmer in list, even if document doesn't exist
+          // This ensures all farmers in the activity are visible
           farmersList.push({
             farmerId: farmerId,
-            name: farmerData?.name || 'Unknown',
+            name: farmerData?.name || 'Unknown Farmer',
             mobileNumber: farmerData?.mobileNumber || 'Unknown',
             preferredLanguage: farmerData?.preferredLanguage || 'Unknown',
             location: farmerData?.location || 'Unknown',
@@ -392,17 +409,28 @@ export const getActivitiesWithSampling = async (filters?: {
             taskStatus: farmerTask?.taskStatus,
           });
           
-          // Log warning if farmer data not found but still include in list
+          // Log warning if farmer data not found
           if (!farmerData) {
-            logger.warn(`Farmer data not found for ID: ${farmerId} in activity ${activityId} - including with minimal data`);
+            logger.debug(`Farmer document not found for ID: ${farmerId} in activity ${activityId} - including with minimal data`);
           }
         }
+      } else {
+        logger.debug(`Activity ${activityId} has no farmerIds or empty array`);
       }
       
       logger.info(`Activity ${activityId}: ${farmersList.length} farmers processed (activity has ${activity.farmerIds?.length || 0} farmer IDs)`);
+      
+      // Convert activity to object and ensure farmerIds are preserved
+      const activityObj = activity.toObject();
+      
+      // Ensure farmers array is always included (even if empty)
+      // This helps frontend debug and display proper messages
+      const farmersArray = farmersList || [];
+      
+      logger.debug(`Activity ${activityId} response: ${farmersArray.length} farmers in array, ${activityObj.farmerIds?.length || 0} farmerIds in activity`);
 
       result.push({
-        activity: activity.toObject(),
+        activity: activityObj,
         samplingStatus: status,
         samplingAudit: audit
           ? {
@@ -415,7 +443,7 @@ export const getActivitiesWithSampling = async (filters?: {
         tasksCount: activityTasks.length,
         assignedAgents: Array.from(agentMap.values()),
         statusBreakdown,
-        farmers: farmersList,
+        farmers: farmersArray, // Always include farmers array (may be empty)
       });
     }
 
