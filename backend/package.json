@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "type-check": "tsc --noEmit",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
-    "create:test-task": "tsx src/scripts/createTestTask.ts"
+    "create:test-task": "tsx src/scripts/createTestTask.ts",
+    "test:admin": "tsx src/scripts/testAdminService.ts"
   },
   "dependencies": {
     "express": "^4.18.2",

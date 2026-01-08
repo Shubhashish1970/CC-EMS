@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, TrendingUp, AlertTriangle } from 'lucide-react';
 import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
-import { exportToCSV, exportToPDF, formatTaskForExport } from '../utils/exportUtils';
+import { exportToCSV, exportToPDF, exportToExcel, formatTaskForExport } from '../utils/exportUtils';
 import ReassignModal from './ReassignModal';
 
 interface Task {
@@ -149,6 +149,66 @@ const TaskList: React.FC = () => {
     return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  // Calculate task statistics
+  const calculateStatistics = () => {
+    const stats = {
+      total: filteredTasks.length,
+      pending: 0,
+      in_progress: 0,
+      completed: 0,
+      not_reachable: 0,
+      invalid_number: 0,
+      overdue: 0,
+      dueToday: 0,
+      dueSoon: 0,
+      onTime: 0,
+    };
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    filteredTasks.forEach(task => {
+      // Status counts
+      stats[task.status as keyof typeof stats]++;
+
+      // Priority based on scheduled date
+      const scheduledDate = new Date(task.scheduledDate);
+      if (scheduledDate < today && (task.status === 'pending' || task.status === 'in_progress')) {
+        stats.overdue++;
+      } else if (scheduledDate >= today && scheduledDate < tomorrow) {
+        stats.dueToday++;
+      } else if (scheduledDate >= tomorrow && scheduledDate < nextWeek) {
+        stats.dueSoon++;
+      } else {
+        stats.onTime++;
+      }
+    });
+
+    return stats;
+  };
+
+  // Get priority indicator for a task
+  const getTaskPriority = (task: Task) => {
+    const scheduledDate = new Date(task.scheduledDate);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    if (scheduledDate < today && (task.status === 'pending' || task.status === 'in_progress')) {
+      return { level: 'overdue', color: 'bg-red-100 text-red-800 border-red-300', icon: AlertTriangle, label: 'Overdue' };
+    } else if (scheduledDate >= today && scheduledDate < new Date(today.getTime() + 24 * 60 * 60 * 1000)) {
+      return { level: 'due-today', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: Clock, label: 'Due Today' };
+    } else if (scheduledDate >= new Date(today.getTime() + 24 * 60 * 60 * 1000) && scheduledDate < new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)) {
+      return { level: 'due-soon', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock, label: 'Due Soon' };
+    }
+    return { level: 'on-time', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle, label: 'On Time' };
+  };
+
+  const statistics = calculateStatistics();
+
   const filteredTasks = tasks.filter(task => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -279,6 +339,14 @@ const TaskList: React.FC = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    const tasksToExport = sortedTasks.map(formatTaskForExport);
+    exportToExcel(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    if (tasksToExport.length > 0) {
+      showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
+    }
+  };
+
   if (selectedTask) {
     return (
       <TaskDetail
@@ -353,6 +421,15 @@ const TaskList: React.FC = () => {
               >
                 <Download size={16} />
                 Export PDF
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={sortedTasks.length === 0}
+              >
+                <Download size={16} />
+                Export Excel
               </Button>
               <Button
                 variant="secondary"
@@ -442,6 +519,62 @@ const TaskList: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Statistics Dashboard */}
+        {!isLoading && filteredTasks.length > 0 && (
+          <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="text-green-700" size={20} />
+              <h2 className="text-lg font-black text-slate-900">Task Statistics</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Tasks</p>
+                <p className="text-2xl font-black text-slate-900">{statistics.total}</p>
+              </div>
+              <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Pending</p>
+                <p className="text-2xl font-black text-yellow-800">{statistics.pending}</p>
+              </div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-2xl font-black text-blue-800">{statistics.in_progress}</p>
+              </div>
+              <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-2xl font-black text-green-800">{statistics.completed}</p>
+              </div>
+              <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
+                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Overdue</p>
+                <p className="text-2xl font-black text-red-800">{statistics.overdue}</p>
+              </div>
+              <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
+                <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Due Today</p>
+                <p className="text-2xl font-black text-orange-800">{statistics.dueToday}</p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-xs font-medium text-slate-600">Overdue: {statistics.overdue}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <span className="text-xs font-medium text-slate-600">Due Today: {statistics.dueToday}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span className="text-xs font-medium text-slate-600">Due Soon: {statistics.dueSoon}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-xs font-medium text-slate-600">On Time: {statistics.onTime}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tasks List */}
         {isLoading ? (
@@ -563,6 +696,16 @@ const TaskList: React.FC = () => {
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-base font-black text-slate-900 truncate">{task.farmerId.name}</h3>
                           {getStatusBadge(task.status)}
+                          {(() => {
+                            const priority = getTaskPriority(task);
+                            const PriorityIcon = priority.icon;
+                            return (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
+                                <PriorityIcon size={12} />
+                                {priority.label}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">

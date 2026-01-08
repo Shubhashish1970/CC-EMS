@@ -140,6 +140,106 @@ export const exportToJSON = (tasks: ExportableTask[], filename: string = 'tasks'
   URL.revokeObjectURL(url);
 };
 
+// Export to Excel (XLSX format using XML)
+export const exportToExcel = (tasks: ExportableTask[], filename: string = 'tasks', onError?: (message: string) => void) => {
+  if (tasks.length === 0) {
+    if (onError) {
+      onError('No tasks to export');
+    }
+    return;
+  }
+
+  // Excel XML format (works with Excel and Google Sheets)
+  const headers = [
+    'Task ID',
+    'Status',
+    'Scheduled Date',
+    'Farmer Name',
+    'Farmer Mobile',
+    'Farmer Location',
+    'Farmer Language',
+    'Agent Name',
+    'Agent Email',
+    'Activity Type',
+    'Activity Date',
+    'Activity Officer',
+    'Activity Location',
+    'Activity Territory',
+    'Created At',
+    'Updated At',
+  ];
+
+  const escapeXml = (value: string): string => {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
+
+  const formatDateForExcel = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const rows = tasks.map(task => [
+    task._id,
+    task.status,
+    formatDateForExcel(task.scheduledDate),
+    task.farmerName,
+    task.farmerMobile,
+    task.farmerLocation,
+    task.farmerLanguage,
+    task.agentName,
+    task.agentEmail,
+    task.activityType,
+    formatDateForExcel(task.activityDate),
+    task.activityOfficer,
+    task.activityLocation,
+    task.activityTerritory,
+    formatDateForExcel(task.createdAt),
+    formatDateForExcel(task.updatedAt),
+  ]);
+
+  // Generate Excel XML
+  const excelXml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Worksheet ss:Name="Tasks">
+  <Table>
+   <Row>
+    ${headers.map(h => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join('')}
+   </Row>
+   ${rows.map(row => `
+   <Row>
+    ${row.map(cell => `<Cell><Data ss:Type="String">${escapeXml(String(cell))}</Data></Cell>`).join('')}
+   </Row>`).join('')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  const blob = new Blob([excelXml], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 // Simple PDF export using browser print (for basic PDF generation)
 export const exportToPDF = (tasks: ExportableTask[], filename: string = 'tasks', onError?: (message: string) => void) => {
   if (tasks.length === 0) {

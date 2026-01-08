@@ -4,6 +4,7 @@ import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgentWorkspace from './components/AgentWorkspace';
 import TaskList from './components/TaskList';
+import AdminDashboardContainer from './components/AdminDashboard/AdminDashboardContainer';
 
 // Component that routes based on user role
 const AppContent: React.FC = () => {
@@ -14,8 +15,13 @@ const AppContent: React.FC = () => {
     return <AgentWorkspace />;
   }
 
-  // Team Leads and MIS Admins see Task Management
-  if (user?.role === 'team_lead' || user?.role === 'mis_admin') {
+  // MIS Admin sees Admin Dashboard
+  if (user?.role === 'mis_admin') {
+    return <AdminDashboardContainer />;
+  }
+
+  // Team Leads see Task Management
+  if (user?.role === 'team_lead') {
     return <TaskList />;
   }
 

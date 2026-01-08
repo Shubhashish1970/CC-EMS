@@ -226,3 +226,44 @@ export const masterDataAPI = {
     }>('/master-data/products', { method: 'GET' });
   },
 };
+
+// Admin API
+export const adminAPI = {
+  getActivitiesWithSampling: async (filters?: {
+    activityType?: string;
+    territory?: string;
+    samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.samplingStatus) params.append('samplingStatus', filters.samplingStatus);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+
+    const query = params.toString();
+    return apiRequest(`/admin/activities-sampling${query ? `?${query}` : ''}`);
+  },
+
+  getAgentQueues: async (filters?: {
+    agentId?: string;
+    isActive?: boolean;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.agentId) params.append('agentId', filters.agentId);
+    if (filters?.isActive !== undefined) params.append('isActive', String(filters.isActive));
+
+    const query = params.toString();
+    return apiRequest(`/admin/agent-queues${query ? `?${query}` : ''}`);
+  },
+
+  getAgentQueue: async (agentId: string) => {
+    return apiRequest(`/admin/agent-queues/${agentId}`);
+  },
+};
