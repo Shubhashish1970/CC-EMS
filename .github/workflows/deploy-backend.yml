@@ -138,6 +138,33 @@ jobs:
             echo "ℹ️ Service does not exist, will create..."
           fi
           
+          # Get Mock FFA API URL if it exists
+          MOCK_FFA_API_URL=""
+          if gcloud run services describe mock-ffa-api \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --quiet 2>/dev/null; then
+            MOCK_FFA_API_URL=$(gcloud run services describe mock-ffa-api \
+              --region ${{ env.REGION }} \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --format 'value(status.url)')
+            echo "✅ Found Mock FFA API at: $MOCK_FFA_API_URL"
+          else
+            echo "⚠️ Mock FFA API not found. Using default or secret value."
+          fi
+          
+          # Use FFA_API_URL from secret if set, otherwise use deployed mock FFA API URL
+          FFA_API_URL_VALUE="${MOCK_FFA_API_URL}/api"
+          if [ -n "${{ secrets.FFA_API_URL }}" ]; then
+            FFA_API_URL_VALUE="${{ secrets.FFA_API_URL }}"
+            echo "✅ Using FFA_API_URL from GitHub secret"
+          elif [ -n "$MOCK_FFA_API_URL" ]; then
+            echo "✅ Using deployed Mock FFA API URL: $FFA_API_URL_VALUE"
+          else
+            FFA_API_URL_VALUE="http://localhost:4000/api"
+            echo "⚠️ Using default FFA_API_URL: $FFA_API_URL_VALUE"
+          fi
+          
           # Create temporary env file to avoid special character issues
           ENV_FILE=$(mktemp)
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> "$ENV_FILE"
@@ -145,6 +172,7 @@ jobs:
           echo "NODE_ENV=production" >> "$ENV_FILE"
           echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> "$ENV_FILE"
           echo "ENABLE_CRON=true" >> "$ENV_FILE"
+          echo "FFA_API_URL=$FFA_API_URL_VALUE" >> "$ENV_FILE"
           
           # Use gcloud run deploy - it works for both create and update
           echo "📦 Deploying service..."

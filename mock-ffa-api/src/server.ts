@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 
 const app: Express = express();
+// Cloud Run uses PORT 8080, local development uses 4000
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
