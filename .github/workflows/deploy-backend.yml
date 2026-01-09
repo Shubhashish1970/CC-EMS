@@ -237,7 +237,24 @@ jobs:
           if [ "$SERVICE_EXISTS" = "false" ]; then
             # New service - set all configuration
             echo "🆕 Creating new service..."
-            echo "📋 Deployment command: gcloud run deploy with --set-env-vars-file"
+            echo "📋 Deployment command: gcloud run deploy with --set-env-vars"
+            
+            # Read env file and convert to KEY=VALUE format for --set-env-vars
+            ENV_VARS_ARGS=""
+            while IFS='=' read -r key value; do
+              # Skip empty lines and comments
+              [[ -z "$key" || "$key" =~ ^# ]] && continue
+              # Remove quotes from value if present
+              value=$(echo "$value" | sed 's/^"//;s/"$//')
+              # Append to args
+              if [ -z "$ENV_VARS_ARGS" ]; then
+                ENV_VARS_ARGS="$key=$value"
+              else
+                ENV_VARS_ARGS="$ENV_VARS_ARGS,$key=$value"
+              fi
+            done < "$ENV_FILE"
+            
+            echo "📋 Environment variables formatted: $(echo $ENV_VARS_ARGS | sed 's/[^,]*=[^,]*/VAR=***/g')"
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
@@ -247,7 +264,7 @@ jobs:
               --port 8080 \
               --memory 512Mi \
               --cpu 1 \
-              --set-env-vars-file "$ENV_FILE" \
+              --set-env-vars "$ENV_VARS_ARGS" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               2>&1) || {
               echo "❌ Deployment command failed"
@@ -257,16 +274,33 @@ jobs:
             }
             echo "$DEPLOY_OUTPUT"
           else
-            # Existing service - update image and env vars using file
-            # Use --set-env-vars-file to replace all env vars (more reliable than --update-env-vars-file)
+            # Existing service - update image and env vars
+            # Read env file and convert to KEY=VALUE format for --update-env-vars
             echo "🔄 Updating existing service..."
-            echo "📋 Deployment command: gcloud run deploy with --set-env-vars-file"
+            echo "📋 Deployment command: gcloud run deploy with --update-env-vars"
+            
+            # Read env file and format as KEY=VALUE pairs
+            ENV_VARS_ARGS=""
+            while IFS='=' read -r key value; do
+              # Skip empty lines and comments
+              [[ -z "$key" || "$key" =~ ^# ]] && continue
+              # Remove quotes from value if present
+              value=$(echo "$value" | sed 's/^"//;s/"$//')
+              # Append to args
+              if [ -z "$ENV_VARS_ARGS" ]; then
+                ENV_VARS_ARGS="$key=$value"
+              else
+                ENV_VARS_ARGS="$ENV_VARS_ARGS,$key=$value"
+              fi
+            done < "$ENV_FILE"
+            
+            echo "📋 Environment variables formatted: $(echo $ENV_VARS_ARGS | sed 's/[^,]*=[^,]*/VAR=***/g')"
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
-              --set-env-vars-file "$ENV_FILE" \
+              --update-env-vars "$ENV_VARS_ARGS" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               2>&1) || {
               echo "❌ Deployment command failed"
