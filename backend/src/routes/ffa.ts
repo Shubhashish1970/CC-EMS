@@ -19,17 +19,29 @@ router.post(
   requirePermission('config.ffa'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      logger.info('Manual FFA sync triggered');
+      logger.info('Manual FFA sync triggered', {
+        userId: (req as any).user?.id,
+        userEmail: (req as any).user?.email,
+      });
       
       const result = await syncFFAData();
 
       res.json({
         success: true,
-        message: 'FFA sync completed',
+        message: `FFA sync completed: ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}`,
         data: result,
       });
     } catch (error) {
-      next(error);
+      logger.error('FFA sync endpoint error:', error);
+      // Provide more detailed error information
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during FFA sync';
+      const statusCode = errorMessage.includes('Cannot connect') || errorMessage.includes('timeout') ? 503 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        message: `FFA sync failed: ${errorMessage}`,
+        error: errorMessage,
+      });
     }
   }
 );
