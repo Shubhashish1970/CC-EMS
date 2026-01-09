@@ -148,21 +148,30 @@ jobs:
               --region ${{ env.REGION }} \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --format 'value(status.url)')
-            echo "✅ Found Mock FFA API at: $MOCK_FFA_API_URL"
+            if [ -n "$MOCK_FFA_API_URL" ]; then
+              echo "✅ Found Mock FFA API at: $MOCK_FFA_API_URL"
+            fi
           else
             echo "⚠️ Mock FFA API not found. Using default or secret value."
           fi
           
           # Use FFA_API_URL from secret if set, otherwise use deployed mock FFA API URL
-          FFA_API_URL_VALUE="${MOCK_FFA_API_URL}/api"
+          FFA_API_URL_VALUE=""
           if [ -n "${{ secrets.FFA_API_URL }}" ]; then
             FFA_API_URL_VALUE="${{ secrets.FFA_API_URL }}"
-            echo "✅ Using FFA_API_URL from GitHub secret"
+            echo "✅ Using FFA_API_URL from GitHub secret: $FFA_API_URL_VALUE"
           elif [ -n "$MOCK_FFA_API_URL" ]; then
+            FFA_API_URL_VALUE="${MOCK_FFA_API_URL}/api"
             echo "✅ Using deployed Mock FFA API URL: $FFA_API_URL_VALUE"
           else
             FFA_API_URL_VALUE="http://localhost:4000/api"
             echo "⚠️ Using default FFA_API_URL: $FFA_API_URL_VALUE"
+          fi
+          
+          # Validate FFA_API_URL_VALUE is set
+          if [ -z "$FFA_API_URL_VALUE" ]; then
+            echo "❌ Error: FFA_API_URL_VALUE is empty"
+            exit 1
           fi
           
           # Create temporary env file to avoid special character issues
@@ -173,6 +182,10 @@ jobs:
           echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> "$ENV_FILE"
           echo "ENABLE_CRON=true" >> "$ENV_FILE"
           echo "FFA_API_URL=$FFA_API_URL_VALUE" >> "$ENV_FILE"
+          
+          # Verify env file was created correctly
+          echo "📋 Environment variables to be set:"
+          cat "$ENV_FILE"
           
           # Use gcloud run deploy - it works for both create and update
           echo "📦 Deploying service..."
