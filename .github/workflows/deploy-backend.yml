@@ -231,7 +231,9 @@ EOF
             exit 1
           fi
           
-          echo "✅ Environment file created successfully with $ENV_FILE_LINES lines"
+          echo "✅ Environment file created successfully with $ENV_FILE_LINES lines (YAML format)"
+          echo "📋 Environment file preview (first 3 lines):"
+          head -3 "$ENV_FILE" | sed 's/: ".*/: "***"/'
           
           # Use gcloud run deploy - it works for both create and update
           echo "📦 Deploying service..."
