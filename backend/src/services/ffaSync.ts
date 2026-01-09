@@ -29,12 +29,6 @@ interface FFAFarmer {
 
 const FFA_API_URL = process.env.FFA_API_URL || 'http://localhost:4000/api';
 
-// Check if fetch is available (Node.js 18+ has it built-in)
-if (typeof fetch === 'undefined') {
-  logger.error('fetch API is not available. This requires Node.js 18+ or a fetch polyfill.');
-  throw new Error('fetch API is not available. Please upgrade to Node.js 18+ or add a fetch polyfill.');
-}
-
 /**
  * Fetch activities from FFA API with timeout and better error handling
  */
@@ -42,6 +36,13 @@ const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
   // Validate FFA_API_URL is set
   if (!process.env.FFA_API_URL) {
     logger.warn('FFA_API_URL environment variable is not set, using default: http://localhost:4000/api');
+  }
+
+  // Check if fetch is available (Node.js 18+ has it built-in)
+  if (typeof fetch === 'undefined') {
+    const errorMsg = 'fetch API is not available. This requires Node.js 18+ or a fetch polyfill.';
+    logger.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const url = `${FFA_API_URL}/activities?limit=100`;
