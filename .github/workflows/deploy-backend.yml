@@ -206,12 +206,13 @@ jobs:
               --quiet
           else
             # Existing service - update image and env vars using file
+            # Use --set-env-vars-file to replace all env vars (more reliable than --update-env-vars-file)
             echo "🔄 Updating existing service..."
             gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
-              --update-env-vars-file "$ENV_FILE" \
+              --set-env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           fi
