@@ -217,13 +217,25 @@ jobs:
               --quiet
           fi
           
+          # Capture exit code before cleanup
+          DEPLOY_EXIT_CODE=$?
+          
           # Clean up temp file
           rm -f "$ENV_FILE"
           
           # Check deployment status
-          DEPLOY_EXIT_CODE=$?
           if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
             echo "✅ Deployment completed successfully"
+            
+            # Get and display service URL
+            SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+              --region ${{ env.REGION }} \
+              --project ${{ secrets.GCP_PROJECT_ID }} \
+              --format 'value(status.url)' 2>/dev/null || echo "Unable to get service URL")
+            
+            if [ -n "$SERVICE_URL" ] && [ "$SERVICE_URL" != "Unable to get service URL" ]; then
+              echo "🔗 Service URL: $SERVICE_URL"
+            fi
           else
             echo "❌ Deployment failed with exit code: $DEPLOY_EXIT_CODE"
             echo "Attempting to get more information..."
@@ -232,10 +244,15 @@ jobs:
             if gcloud run services describe ${{ env.SERVICE_NAME }} \
               --region ${{ env.REGION }} \
               --project ${{ secrets.GCP_PROJECT_ID }} \
-              --format="yaml(status)" 2>/dev/null; then
-              echo "Service exists but deployment failed"
+              --quiet 2>/dev/null; then
+              echo "ℹ️ Service exists but deployment failed"
+              echo "📋 Current service environment variables:"
+              gcloud run services describe ${{ env.SERVICE_NAME }} \
+                --region ${{ env.REGION }} \
+                --project ${{ secrets.GCP_PROJECT_ID }} \
+                --format 'value(spec.template.spec.containers[0].env)' 2>/dev/null || echo "Unable to get env vars"
             else
-              echo "Service does not exist after deployment attempt"
+              echo "ℹ️ Service does not exist after deployment attempt"
             fi
             
             exit $DEPLOY_EXIT_CODE
