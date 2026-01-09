@@ -2,6 +2,7 @@ import { Activity, IActivity } from '../models/Activity.js';
 import { Farmer, IFarmer } from '../models/Farmer.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
+import axios, { AxiosError } from 'axios';
 
 interface FFAActivity {
   activityId: string;
@@ -38,54 +39,26 @@ const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
     logger.warn('FFA_API_URL environment variable is not set, using default: http://localhost:4000/api');
   }
 
-  // Check if fetch is available (Node.js 18+ has it built-in)
-  if (typeof fetch === 'undefined') {
-    const errorMsg = 'fetch API is not available. This requires Node.js 18+ or a fetch polyfill.';
-    logger.error(errorMsg);
-    throw new Error(errorMsg);
-  }
-
   const url = `${FFA_API_URL}/activities?limit=100`;
   logger.info(`Fetching activities from FFA API: ${url}`);
 
   try {
-    // Create AbortController for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      clearTimeout(timeoutId);
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error('FFA API request timed out after 30 seconds');
-      }
-      if (fetchError.code === 'ECONNREFUSED' || fetchError.code === 'ENOTFOUND') {
-        throw new Error(`Cannot connect to FFA API at ${FFA_API_URL}. Please check if the FFA API is running and FFA_API_URL is configured correctly.`);
-      }
-      throw new Error(`Network error connecting to FFA API: ${fetchError.message}`);
-    }
+    // Use axios with timeout and proper error handling
+    const response = await axios.get(url, {
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (status) => status < 500, // Don't throw for 4xx errors, we'll handle them
+    });
     
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      logger.error(`FFA API returned error status ${response.status}: ${errorText}`);
-      throw new Error(`FFA API error (${response.status}): ${response.statusText}. ${errorText}`);
+    // Check if response is successful (2xx)
+    if (response.status >= 400) {
+      logger.error(`FFA API returned error status ${response.status}:`, response.data);
+      throw new Error(`FFA API error (${response.status}): ${response.statusText || 'Unknown error'}`);
     }
 
-    let data: any;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      logger.error('Failed to parse FFA API response as JSON');
-      throw new Error('FFA API returned invalid JSON response');
-    }
+    const data = response.data;
     
     if (!data || typeof data !== 'object') {
       throw new Error('FFA API returned invalid response format');
@@ -104,13 +77,35 @@ const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
     logger.info(`Successfully fetched ${data.data.activities.length} activities from FFA API`);
     return data.data.activities;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    let errorMessage = 'Unknown error';
+    
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND') {
+        errorMessage = `Cannot connect to FFA API at ${FFA_API_URL}. Please check if the FFA API is running and FFA_API_URL is configured correctly.`;
+      } else if (axiosError.code === 'ETIMEDOUT' || axiosError.message.includes('timeout')) {
+        errorMessage = 'FFA API request timed out after 30 seconds';
+      } else if (axiosError.response) {
+        errorMessage = `FFA API error (${axiosError.response.status}): ${axiosError.response.statusText}`;
+      } else {
+        errorMessage = `Network error connecting to FFA API: ${axiosError.message}`;
+      }
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
     logger.error('Error fetching activities from FFA API:', {
       error: errorMessage,
       url,
       ffaApiUrl: FFA_API_URL,
+      axiosError: axios.isAxiosError(error) ? {
+        code: (error as AxiosError).code,
+        message: (error as AxiosError).message,
+        status: (error as AxiosError).response?.status,
+      } : undefined,
     });
-    throw error;
+    
+    throw new Error(errorMessage);
   }
 };
 
