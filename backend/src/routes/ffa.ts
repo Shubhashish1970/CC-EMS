@@ -19,9 +19,12 @@ router.post(
   requirePermission('config.ffa'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
       logger.info('Manual FFA sync triggered', {
         userId: (req as any).user?.id,
         userEmail: (req as any).user?.email,
+        ffaApiUrl: ffaApiUrl,
+        hasEnvVar: !!process.env.FFA_API_URL,
       });
       
       const result = await syncFFAData();
@@ -32,7 +35,15 @@ router.post(
         data: result,
       });
     } catch (error) {
-      logger.error('FFA sync endpoint error:', error);
+      const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
+      logger.error('FFA sync endpoint error:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        ffaApiUrl: ffaApiUrl,
+        hasEnvVar: !!process.env.FFA_API_URL,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      
       // Provide more detailed error information
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during FFA sync';
       const statusCode = errorMessage.includes('Cannot connect') || errorMessage.includes('timeout') ? 503 : 500;
@@ -41,6 +52,10 @@ router.post(
         success: false,
         message: `FFA sync failed: ${errorMessage}`,
         error: errorMessage,
+        details: {
+          ffaApiUrl: ffaApiUrl,
+          hasEnvVar: !!process.env.FFA_API_URL,
+        },
       });
     }
   }
