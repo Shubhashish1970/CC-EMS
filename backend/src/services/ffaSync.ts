@@ -40,7 +40,11 @@ const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
   }
 
   const url = `${FFA_API_URL}/activities?limit=100`;
-  logger.info(`Fetching activities from FFA API: ${url}`);
+  logger.info(`Fetching activities from FFA API: ${url}`, {
+    ffaApiUrl: FFA_API_URL,
+    fullUrl: url,
+    hasEnvVar: !!process.env.FFA_API_URL,
+  });
 
   try {
     // Use axios with timeout and proper error handling
@@ -78,31 +82,51 @@ const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
     return data.data.activities;
   } catch (error) {
     let errorMessage = 'Unknown error';
+    let errorDetails: any = {};
     
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
+      errorDetails = {
+        code: axiosError.code,
+        message: axiosError.message,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        responseData: axiosError.response?.data,
+        config: {
+          url: axiosError.config?.url,
+          method: axiosError.config?.method,
+          timeout: axiosError.config?.timeout,
+        },
+      };
+      
       if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND') {
         errorMessage = `Cannot connect to FFA API at ${FFA_API_URL}. Please check if the FFA API is running and FFA_API_URL is configured correctly.`;
       } else if (axiosError.code === 'ETIMEDOUT' || axiosError.message.includes('timeout')) {
         errorMessage = 'FFA API request timed out after 30 seconds';
       } else if (axiosError.response) {
-        errorMessage = `FFA API error (${axiosError.response.status}): ${axiosError.response.statusText}`;
+        errorMessage = `FFA API error (${axiosError.response.status}): ${axiosError.response.statusText || 'Unknown error'}`;
+        if (axiosError.response.data) {
+          errorMessage += ` - ${JSON.stringify(axiosError.response.data)}`;
+        }
       } else {
         errorMessage = `Network error connecting to FFA API: ${axiosError.message}`;
       }
     } else if (error instanceof Error) {
       errorMessage = error.message;
+      errorDetails = {
+        name: error.name,
+        stack: error.stack,
+      };
+    } else {
+      errorDetails = { rawError: error };
     }
     
     logger.error('Error fetching activities from FFA API:', {
       error: errorMessage,
       url,
       ffaApiUrl: FFA_API_URL,
-      axiosError: axios.isAxiosError(error) ? {
-        code: (error as AxiosError).code,
-        message: (error as AxiosError).message,
-        status: (error as AxiosError).response?.status,
-      } : undefined,
+      envVarSet: !!process.env.FFA_API_URL,
+      errorDetails,
     });
     
     throw new Error(errorMessage);

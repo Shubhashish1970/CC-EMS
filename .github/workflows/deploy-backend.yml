@@ -240,10 +240,16 @@ jobs:
             echo "📋 Deployment command: gcloud run deploy with --set-env-vars"
             
             # Read env file and convert to KEY=VALUE format for --set-env-vars
+            # Use a more robust method that handles values with = signs
             ENV_VARS_ARGS=""
-            while IFS='=' read -r key value; do
+            while IFS= read -r line || [ -n "$line" ]; do
               # Skip empty lines and comments
-              [[ -z "$key" || "$key" =~ ^# ]] && continue
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              # Split on first = only (to handle values with = signs)
+              key="${line%%=*}"
+              value="${line#*=}"
+              # Skip if no = found
+              [[ "$key" == "$line" ]] && continue
               # Remove quotes from value if present
               value=$(echo "$value" | sed 's/^"//;s/"$//')
               # Append to args
@@ -280,10 +286,16 @@ jobs:
             echo "📋 Deployment command: gcloud run deploy with --update-env-vars"
             
             # Read env file and format as KEY=VALUE pairs
+            # Use a more robust method that handles values with = signs
             ENV_VARS_ARGS=""
-            while IFS='=' read -r key value; do
+            while IFS= read -r line || [ -n "$line" ]; do
               # Skip empty lines and comments
-              [[ -z "$key" || "$key" =~ ^# ]] && continue
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              # Split on first = only (to handle values with = signs)
+              key="${line%%=*}"
+              value="${line#*=}"
+              # Skip if no = found
+              [[ "$key" == "$line" ]] && continue
               # Remove quotes from value if present
               value=$(echo "$value" | sed 's/^"//;s/"$//')
               # Append to args
