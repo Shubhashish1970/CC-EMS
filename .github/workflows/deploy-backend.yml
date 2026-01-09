@@ -196,15 +196,17 @@ jobs:
           fi
           echo "✅ Final FFA_API_URL_VALUE: $FFA_API_URL_VALUE"
           
-          # Create temporary env file to avoid special character issues
-          echo "📝 Creating environment variables file..."
+          # Create temporary env file in YAML format (required by --env-vars-file)
+          echo "📝 Creating environment variables file in YAML format..."
           ENV_FILE=$(mktemp)
-          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> "$ENV_FILE"
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> "$ENV_FILE"
-          echo "NODE_ENV=production" >> "$ENV_FILE"
-          echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> "$ENV_FILE"
-          echo "ENABLE_CRON=true" >> "$ENV_FILE"
-          echo "FFA_API_URL=$FFA_API_URL_VALUE" >> "$ENV_FILE"
+          cat > "$ENV_FILE" <<EOF
+MONGODB_URI: "${{ secrets.MONGODB_URI }}"
+JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+NODE_ENV: "production"
+CORS_ORIGIN: "${{ secrets.CORS_ORIGIN }}"
+ENABLE_CRON: "true"
+FFA_API_URL: "$FFA_API_URL_VALUE"
+EOF
           
           # Verify env file was created correctly
           echo "📋 Environment variables to be set:"
