@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { adminAPI } from '../../services/api';
-import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2 } from 'lucide-react';
+import { adminAPI, ffaAPI } from '../../services/api';
+import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download } from 'lucide-react';
 import Button from '../shared/Button';
 
 interface ActivitySamplingStatus {
@@ -60,6 +60,8 @@ const ActivitySamplingView: React.FC = () => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ lastSyncAt: string | null; totalActivities: number; totalFarmers: number } | null>(null);
   const [filters, setFilters] = useState({
     activityType: '',
     territory: '',
@@ -106,7 +108,39 @@ const ActivitySamplingView: React.FC = () => {
 
   useEffect(() => {
     fetchActivities(1);
+    fetchSyncStatus();
   }, [filters.activityType, filters.territory, filters.samplingStatus, filters.dateFrom, filters.dateTo]);
+
+  const fetchSyncStatus = async () => {
+    try {
+      const response = await ffaAPI.getFFASyncStatus() as any;
+      if (response.success && response.data) {
+        setSyncStatus(response.data);
+      }
+    } catch (err) {
+      // Silently fail - sync status is not critical
+      console.error('Failed to fetch sync status:', err);
+    }
+  };
+
+  const handleSyncFFA = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await ffaAPI.syncFFAData() as any;
+      if (response.success) {
+        showSuccess(`FFA sync completed: ${response.data.activitiesSynced} activities, ${response.data.farmersSynced} farmers synced`);
+        // Refresh activities and sync status
+        await fetchActivities(pagination.page);
+        await fetchSyncStatus();
+      } else {
+        showError('FFA sync failed');
+      }
+    } catch (err: any) {
+      showError(err.message || 'Failed to sync FFA data');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const getSamplingStatusBadge = (status: 'sampled' | 'not_sampled' | 'partial') => {
     const config = {
@@ -140,6 +174,12 @@ const ActivitySamplingView: React.FC = () => {
           <div>
             <h2 className="text-xl font-black text-slate-900 mb-1">Activity Sampling</h2>
             <p className="text-sm text-slate-600">Monitor FFA activities and their sampling status</p>
+            {syncStatus && (
+              <p className="text-xs text-slate-500 mt-1">
+                Last sync: {syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'} • 
+                {syncStatus.totalActivities} activities • {syncStatus.totalFarmers} farmers
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -158,6 +198,15 @@ const ActivitySamplingView: React.FC = () => {
             >
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
               Refresh
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSyncFFA}
+              disabled={isSyncing}
+            >
+              <Download size={16} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Syncing...' : 'Sync FFA'}
             </Button>
           </div>
         </div>
@@ -414,7 +463,7 @@ const ActivitySamplingView: React.FC = () => {
                         {item.farmers && item.farmers.length > 0 ? (
                           <div>
                             <h4 className="text-sm font-black text-slate-700 mb-3">
-                              Farmers ({item.farmers.length})
+                              Farmers List ({item.farmers.length} of {item.activity.farmerIds?.length || 0})
                               <span className="ml-2 text-xs font-normal text-slate-500">
                                 ({item.farmers.filter(f => f.isSampled).length} sampled, {item.farmers.filter(f => !f.isSampled).length} not sampled)
                               </span>
@@ -507,16 +556,33 @@ const ActivitySamplingView: React.FC = () => {
                         ) : (
                           // Show message if no farmers or farmers array missing
                           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                            <p className="text-sm text-amber-700 font-medium">
-                              {item.activity.farmerIds && item.activity.farmerIds.length > 0
-                                ? `This activity has ${item.activity.farmerIds.length} farmers, but farmer details are not available.`
-                                : 'No farmers are associated with this activity.'}
-                            </p>
-                            {item.activity.farmerIds && item.activity.farmerIds.length > 0 && (
-                              <p className="text-xs text-amber-600 mt-1">
-                                Farmers may need to be synced from FFA or farmer documents may not exist in the database.
-                              </p>
-                            )}
+                            <div className="flex items-start gap-3">
+                              <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                              <div className="flex-1">
+                                <p className="text-sm text-amber-700 font-medium">
+                                  {item.activity.farmerIds && item.activity.farmerIds.length > 0
+                                    ? `This activity has ${item.activity.farmerIds.length} farmers, but farmer details are not available.`
+                                    : 'No farmers are associated with this activity.'}
+                                </p>
+                                {item.activity.farmerIds && item.activity.farmerIds.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs text-amber-600">
+                                      Farmers may need to be synced from FFA or farmer documents may not exist in the database.
+                                    </p>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={handleSyncFFA}
+                                      disabled={isSyncing}
+                                      className="mt-2"
+                                    >
+                                      <Download size={14} className={isSyncing ? 'animate-spin' : ''} />
+                                      {isSyncing ? 'Syncing...' : 'Sync FFA Data'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

@@ -415,13 +415,24 @@ export const getActivitiesWithSampling = async (filters?: {
           }
         }
       } else {
-        logger.debug(`Activity ${activityId} has no farmerIds or empty array`);
+        logger.warn(`Activity ${activityId} has no farmerIds or empty array. Activity data:`, {
+          hasFarmerIds: !!activity.farmerIds,
+          farmerIdsType: typeof activity.farmerIds,
+          farmerIdsIsArray: Array.isArray(activity.farmerIds),
+          farmerIdsLength: Array.isArray(activity.farmerIds) ? activity.farmerIds.length : 'N/A',
+        });
       }
       
       logger.info(`Activity ${activityId}: ${farmersList.length} farmers processed (activity has ${activity.farmerIds?.length || 0} farmer IDs)`);
       
       // Convert activity to object and ensure farmerIds are preserved
       const activityObj = activity.toObject();
+      
+      // Ensure farmerIds is always an array in the response (even if empty)
+      if (!activityObj.farmerIds || !Array.isArray(activityObj.farmerIds)) {
+        activityObj.farmerIds = [];
+        logger.warn(`Activity ${activityId}: farmerIds was not an array, setting to empty array`);
+      }
       
       // Ensure farmers array is always included (even if empty)
       // This helps frontend debug and display proper messages

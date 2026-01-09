@@ -267,3 +267,14 @@ export const adminAPI = {
     return apiRequest(`/admin/agent-queues/${agentId}`);
   },
 };
+
+// FFA Sync API
+export const ffaAPI = {
+  syncFFAData: async () => {
+    return apiRequest('/ffa/sync', { method: 'POST' });
+  },
+
+  getFFASyncStatus: async () => {
+    return apiRequest('/ffa/status');
+  },
+};
