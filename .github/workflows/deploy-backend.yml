@@ -110,23 +110,38 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          set -e  # Exit on error
+          set -x  # Debug mode - show all commands
+          
           echo "🚀 Deploying to Cloud Run..."
+          echo "📋 Deployment Configuration:"
+          echo "  - Service Name: ${{ env.SERVICE_NAME }}"
+          echo "  - Region: ${{ env.REGION }}"
+          echo "  - Project ID: ${{ secrets.GCP_PROJECT_ID }}"
+          echo "  - Image: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }}"
           
           # Verify required secrets are set (fail fast if missing)
+          echo "🔍 Verifying required secrets..."
           if [ -z "${{ secrets.MONGODB_URI }}" ]; then
             echo "❌ Error: MONGODB_URI secret is not set"
             exit 1
           fi
+          echo "  ✅ MONGODB_URI is set"
+          
           if [ -z "${{ secrets.JWT_SECRET }}" ]; then
             echo "❌ Error: JWT_SECRET secret is not set"
             exit 1
           fi
+          echo "  ✅ JWT_SECRET is set"
+          
           if [ -z "${{ secrets.CORS_ORIGIN }}" ]; then
             echo "❌ Error: CORS_ORIGIN secret is not set"
             exit 1
           fi
+          echo "  ✅ CORS_ORIGIN is set"
           
           # Check if service exists to determine initial settings
+          echo "🔍 Checking if service exists..."
           SERVICE_EXISTS=false
           if gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
@@ -139,28 +154,34 @@ jobs:
           fi
           
           # Get Mock FFA API URL if it exists
+          echo "🔍 Checking for Mock FFA API service..."
           MOCK_FFA_API_URL=""
-          if gcloud run services describe mock-ffa-api \
+          MOCK_FFA_API_CHECK_OUTPUT=$(gcloud run services describe mock-ffa-api \
             --region ${{ env.REGION }} \
             --project ${{ secrets.GCP_PROJECT_ID }} \
-            --quiet 2>/dev/null; then
+            --quiet 2>&1) || MOCK_FFA_API_CHECK_OUTPUT=""
+          
+          if [ -z "$MOCK_FFA_API_CHECK_OUTPUT" ] || echo "$MOCK_FFA_API_CHECK_OUTPUT" | grep -q "ERROR"; then
+            echo "⚠️ Mock FFA API not found or error checking: $MOCK_FFA_API_CHECK_OUTPUT"
+          else
             MOCK_FFA_API_URL=$(gcloud run services describe mock-ffa-api \
               --region ${{ env.REGION }} \
               --project ${{ secrets.GCP_PROJECT_ID }} \
-              --format 'value(status.url)')
-            if [ -n "$MOCK_FFA_API_URL" ]; then
+              --format 'value(status.url)' 2>&1)
+            if [ -n "$MOCK_FFA_API_URL" ] && [ "$MOCK_FFA_API_URL" != "null" ]; then
               echo "✅ Found Mock FFA API at: $MOCK_FFA_API_URL"
+            else
+              echo "⚠️ Mock FFA API exists but URL is empty or null"
             fi
-          else
-            echo "⚠️ Mock FFA API not found. Using default or secret value."
           fi
           
           # Use FFA_API_URL from secret if set, otherwise use deployed mock FFA API URL
+          echo "🔍 Determining FFA_API_URL value..."
           FFA_API_URL_VALUE=""
           if [ -n "${{ secrets.FFA_API_URL }}" ]; then
             FFA_API_URL_VALUE="${{ secrets.FFA_API_URL }}"
             echo "✅ Using FFA_API_URL from GitHub secret: $FFA_API_URL_VALUE"
-          elif [ -n "$MOCK_FFA_API_URL" ]; then
+          elif [ -n "$MOCK_FFA_API_URL" ] && [ "$MOCK_FFA_API_URL" != "null" ]; then
             FFA_API_URL_VALUE="${MOCK_FFA_API_URL}/api"
             echo "✅ Using deployed Mock FFA API URL: $FFA_API_URL_VALUE"
           else
@@ -170,11 +191,13 @@ jobs:
           
           # Validate FFA_API_URL_VALUE is set
           if [ -z "$FFA_API_URL_VALUE" ]; then
-            echo "❌ Error: FFA_API_URL_VALUE is empty"
+            echo "❌ Error: FFA_API_URL_VALUE is empty after all checks"
             exit 1
           fi
+          echo "✅ Final FFA_API_URL_VALUE: $FFA_API_URL_VALUE"
           
           # Create temporary env file to avoid special character issues
+          echo "📝 Creating environment variables file..."
           ENV_FILE=$(mktemp)
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> "$ENV_FILE"
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> "$ENV_FILE"
@@ -185,7 +208,28 @@ jobs:
           
           # Verify env file was created correctly
           echo "📋 Environment variables to be set:"
-          cat "$ENV_FILE"
+          echo "  - MONGODB_URI: [REDACTED - length: ${#MONGODB_URI}]"
+          echo "  - JWT_SECRET: [REDACTED - length: ${#JWT_SECRET}]"
+          echo "  - NODE_ENV: production"
+          echo "  - CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}"
+          echo "  - ENABLE_CRON: true"
+          echo "  - FFA_API_URL: $FFA_API_URL_VALUE"
+          
+          # Verify file exists and has content
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "❌ Error: Environment file was not created"
+            exit 1
+          fi
+          
+          ENV_FILE_LINES=$(wc -l < "$ENV_FILE" || echo "0")
+          if [ "$ENV_FILE_LINES" -lt 6 ]; then
+            echo "❌ Error: Environment file has insufficient lines (expected 6, got $ENV_FILE_LINES)"
+            echo "File contents:"
+            cat "$ENV_FILE"
+            exit 1
+          fi
+          
+          echo "✅ Environment file created successfully with $ENV_FILE_LINES lines"
           
           # Use gcloud run deploy - it works for both create and update
           echo "📦 Deploying service..."
@@ -193,7 +237,9 @@ jobs:
           if [ "$SERVICE_EXISTS" = "false" ]; then
             # New service - set all configuration
             echo "🆕 Creating new service..."
-            gcloud run deploy ${{ env.SERVICE_NAME }} \
+            echo "📋 Deployment command: gcloud run deploy with --set-env-vars-file"
+            
+            DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
@@ -203,60 +249,83 @@ jobs:
               --cpu 1 \
               --set-env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
-              --quiet
+              2>&1) || {
+              echo "❌ Deployment command failed"
+              echo "Command output:"
+              echo "$DEPLOY_OUTPUT"
+              exit 1
+            }
+            echo "$DEPLOY_OUTPUT"
           else
             # Existing service - update image and env vars using file
             # Use --set-env-vars-file to replace all env vars (more reliable than --update-env-vars-file)
             echo "🔄 Updating existing service..."
-            gcloud run deploy ${{ env.SERVICE_NAME }} \
+            echo "📋 Deployment command: gcloud run deploy with --set-env-vars-file"
+            
+            DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
               --set-env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
-              --quiet
+              2>&1) || {
+              echo "❌ Deployment command failed"
+              echo "Command output:"
+              echo "$DEPLOY_OUTPUT"
+              exit 1
+            }
+            echo "$DEPLOY_OUTPUT"
           fi
           
-          # Capture exit code before cleanup
-          DEPLOY_EXIT_CODE=$?
+          # Check if deployment was successful (gcloud command already exited if it failed)
+          echo "✅ Deployment command completed successfully"
           
           # Clean up temp file
           rm -f "$ENV_FILE"
+          echo "🧹 Cleaned up temporary files"
           
-          # Check deployment status
-          if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
-            echo "✅ Deployment completed successfully"
-            
-            # Get and display service URL
-            SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-              --region ${{ env.REGION }} \
-              --project ${{ secrets.GCP_PROJECT_ID }} \
-              --format 'value(status.url)' 2>/dev/null || echo "Unable to get service URL")
-            
-            if [ -n "$SERVICE_URL" ] && [ "$SERVICE_URL" != "Unable to get service URL" ]; then
-              echo "🔗 Service URL: $SERVICE_URL"
-            fi
+          # Verify deployment by checking service status
+          echo "🔍 Verifying deployment..."
+          sleep 5  # Wait a moment for service to update
+          
+          SERVICE_STATUS=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --format 'value(status.conditions[0].status)' 2>&1) || SERVICE_STATUS="ERROR"
+          
+          if [ "$SERVICE_STATUS" = "True" ] || [ "$SERVICE_STATUS" = "TRUE" ]; then
+            echo "✅ Service is healthy"
           else
-            echo "❌ Deployment failed with exit code: $DEPLOY_EXIT_CODE"
-            echo "Attempting to get more information..."
-            
-            # Try to get service details for debugging
-            if gcloud run services describe ${{ env.SERVICE_NAME }} \
-              --region ${{ env.REGION }} \
-              --project ${{ secrets.GCP_PROJECT_ID }} \
-              --quiet 2>/dev/null; then
-              echo "ℹ️ Service exists but deployment failed"
-              echo "📋 Current service environment variables:"
-              gcloud run services describe ${{ env.SERVICE_NAME }} \
-                --region ${{ env.REGION }} \
-                --project ${{ secrets.GCP_PROJECT_ID }} \
-                --format 'value(spec.template.spec.containers[0].env)' 2>/dev/null || echo "Unable to get env vars"
-            else
-              echo "ℹ️ Service does not exist after deployment attempt"
-            fi
-            
-            exit $DEPLOY_EXIT_CODE
+            echo "⚠️ Service status: $SERVICE_STATUS"
           fi
+          
+          # Get and display service URL
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --format 'value(status.url)' 2>&1)
+          
+          if [ -n "$SERVICE_URL" ] && [ "$SERVICE_URL" != "null" ] && ! echo "$SERVICE_URL" | grep -q "ERROR"; then
+            echo "🔗 Service URL: $SERVICE_URL"
+          else
+            echo "⚠️ Unable to get service URL: $SERVICE_URL"
+          fi
+          
+          # Display current environment variables for verification
+          echo "📋 Verifying environment variables..."
+          CURRENT_ENV=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --format 'value(spec.template.spec.containers[0].env)' 2>&1)
+          
+          if [ -n "$CURRENT_ENV" ] && ! echo "$CURRENT_ENV" | grep -q "ERROR"; then
+            echo "✅ Environment variables are set"
+            echo "  FFA_API_URL is configured: $(echo "$CURRENT_ENV" | grep -q "FFA_API_URL" && echo "Yes" || echo "No")"
+          else
+            echo "⚠️ Unable to verify environment variables: $CURRENT_ENV"
+          fi
+          
+          echo "🎉 Deployment process completed!"
 
       - name: Get Service URL
         id: get-url
