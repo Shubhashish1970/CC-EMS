@@ -249,9 +249,9 @@ EOF
               exit 1
             fi
             
-            echo "📋 Using environment file: $ENV_FILE"
+            echo "📋 Using environment file: $ENV_FILE (YAML format)"
             echo "📋 Environment variables (masked):"
-            sed 's/=.*/=***/' "$ENV_FILE" | head -10
+            sed 's/: ".*/: "***"/' "$ENV_FILE"
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
@@ -282,9 +282,9 @@ EOF
               exit 1
             fi
             
-            echo "📋 Using environment file: $ENV_FILE"
+            echo "📋 Using environment file: $ENV_FILE (YAML format)"
             echo "📋 Environment variables (masked):"
-            sed 's/=.*/=***/' "$ENV_FILE" | head -10
+            sed 's/: ".*/: "***"/' "$ENV_FILE"
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
