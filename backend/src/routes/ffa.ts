@@ -36,16 +36,26 @@ router.post(
       });
     } catch (error) {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Log detailed error information
       logger.error('FFA sync endpoint error:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        error: errorMessage,
+        stack: errorStack,
         ffaApiUrl: ffaApiUrl,
         hasEnvVar: !!process.env.FFA_API_URL,
         errorType: error instanceof Error ? error.constructor.name : typeof error,
+        fullError: error,
+      });
+      
+      // Also log as a separate error message for better visibility in Cloud Run logs
+      logger.error(`FFA sync failed: ${errorMessage}`, {
+        ffaApiUrl,
+        hasEnvVar: !!process.env.FFA_API_URL,
       });
       
       // Provide more detailed error information
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during FFA sync';
       const statusCode = errorMessage.includes('Cannot connect') || errorMessage.includes('timeout') ? 503 : 500;
       
       res.status(statusCode).json({
