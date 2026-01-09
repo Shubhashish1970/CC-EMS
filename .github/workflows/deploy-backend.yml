@@ -199,14 +199,14 @@ jobs:
           # Create temporary env file in YAML format (required by --env-vars-file)
           echo "📝 Creating environment variables file in YAML format..."
           ENV_FILE=$(mktemp)
-          cat > "$ENV_FILE" <<EOF
-MONGODB_URI: "${{ secrets.MONGODB_URI }}"
-JWT_SECRET: "${{ secrets.JWT_SECRET }}"
-NODE_ENV: "production"
-CORS_ORIGIN: "${{ secrets.CORS_ORIGIN }}"
-ENABLE_CRON: "true"
-FFA_API_URL: "$FFA_API_URL_VALUE"
-EOF
+          {
+            echo "MONGODB_URI: \"${{ secrets.MONGODB_URI }}\""
+            echo "JWT_SECRET: \"${{ secrets.JWT_SECRET }}\""
+            echo "NODE_ENV: \"production\""
+            echo "CORS_ORIGIN: \"${{ secrets.CORS_ORIGIN }}\""
+            echo "ENABLE_CRON: \"true\""
+            echo "FFA_API_URL: \"$FFA_API_URL_VALUE\""
+          } > "$ENV_FILE"
           
           # Verify env file was created correctly
           echo "📋 Environment variables to be set:"
