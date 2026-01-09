@@ -208,10 +208,8 @@ jobs:
           
           # Verify env file was created correctly
           echo "📋 Environment variables to be set:"
-          MONGODB_URI_LEN=${#MONGODB_URI}
-          JWT_SECRET_LEN=${#JWT_SECRET}
-          echo "  - MONGODB_URI: [REDACTED - length: $MONGODB_URI_LEN]"
-          echo "  - JWT_SECRET: [REDACTED - length: $JWT_SECRET_LEN]"
+          echo "  - MONGODB_URI: [REDACTED]"
+          echo "  - JWT_SECRET: [REDACTED]"
           echo "  - NODE_ENV: production"
           echo "  - CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}"
           echo "  - ENABLE_CRON: true"
