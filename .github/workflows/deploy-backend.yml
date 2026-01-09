@@ -237,30 +237,17 @@ jobs:
           if [ "$SERVICE_EXISTS" = "false" ]; then
             # New service - set all configuration
             echo "🆕 Creating new service..."
-            echo "📋 Deployment command: gcloud run deploy with --set-env-vars"
+            echo "📋 Deployment command: gcloud run deploy with --env-vars-file"
             
-            # Read env file and convert to KEY=VALUE format for --set-env-vars
-            # Use a more robust method that handles values with = signs
-            ENV_VARS_ARGS=""
-            while IFS= read -r line || [ -n "$line" ]; do
-              # Skip empty lines and comments
-              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-              # Split on first = only (to handle values with = signs)
-              key="${line%%=*}"
-              value="${line#*=}"
-              # Skip if no = found
-              [[ "$key" == "$line" ]] && continue
-              # Remove quotes from value if present
-              value=$(echo "$value" | sed 's/^"//;s/"$//')
-              # Append to args
-              if [ -z "$ENV_VARS_ARGS" ]; then
-                ENV_VARS_ARGS="$key=$value"
-              else
-                ENV_VARS_ARGS="$ENV_VARS_ARGS,$key=$value"
-              fi
-            done < "$ENV_FILE"
+            # Verify env file exists and has content
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "❌ Error: Environment file does not exist: $ENV_FILE"
+              exit 1
+            fi
             
-            echo "📋 Environment variables formatted: $(echo $ENV_VARS_ARGS | sed 's/[^,]*=[^,]*/VAR=***/g')"
+            echo "📋 Using environment file: $ENV_FILE"
+            echo "📋 Environment variables (masked):"
+            sed 's/=.*/=***/' "$ENV_FILE" | head -10
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
@@ -270,7 +257,7 @@ jobs:
               --port 8080 \
               --memory 512Mi \
               --cpu 1 \
-              --set-env-vars "$ENV_VARS_ARGS" \
+              --env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               2>&1) || {
               echo "❌ Deployment command failed"
@@ -281,38 +268,25 @@ jobs:
             echo "$DEPLOY_OUTPUT"
           else
             # Existing service - update image and env vars
-            # Read env file and convert to KEY=VALUE format for --update-env-vars
+            # Use --env-vars-file which handles special characters properly
             echo "🔄 Updating existing service..."
-            echo "📋 Deployment command: gcloud run deploy with --update-env-vars"
+            echo "📋 Deployment command: gcloud run deploy with --env-vars-file"
             
-            # Read env file and format as KEY=VALUE pairs
-            # Use a more robust method that handles values with = signs
-            ENV_VARS_ARGS=""
-            while IFS= read -r line || [ -n "$line" ]; do
-              # Skip empty lines and comments
-              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-              # Split on first = only (to handle values with = signs)
-              key="${line%%=*}"
-              value="${line#*=}"
-              # Skip if no = found
-              [[ "$key" == "$line" ]] && continue
-              # Remove quotes from value if present
-              value=$(echo "$value" | sed 's/^"//;s/"$//')
-              # Append to args
-              if [ -z "$ENV_VARS_ARGS" ]; then
-                ENV_VARS_ARGS="$key=$value"
-              else
-                ENV_VARS_ARGS="$ENV_VARS_ARGS,$key=$value"
-              fi
-            done < "$ENV_FILE"
+            # Verify env file exists and has content
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "❌ Error: Environment file does not exist: $ENV_FILE"
+              exit 1
+            fi
             
-            echo "📋 Environment variables formatted: $(echo $ENV_VARS_ARGS | sed 's/[^,]*=[^,]*/VAR=***/g')"
+            echo "📋 Using environment file: $ENV_FILE"
+            echo "📋 Environment variables (masked):"
+            sed 's/=.*/=***/' "$ENV_FILE" | head -10
             
             DEPLOY_OUTPUT=$(gcloud run deploy ${{ env.SERVICE_NAME }} \
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
-              --update-env-vars "$ENV_VARS_ARGS" \
+              --env-vars-file "$ENV_FILE" \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               2>&1) || {
               echo "❌ Deployment command failed"
