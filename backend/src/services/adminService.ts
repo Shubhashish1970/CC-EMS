@@ -440,6 +440,9 @@ export const getActivitiesWithSampling = async (filters?: {
       
       logger.debug(`Activity ${activityId} response: ${farmersArray.length} farmers in array, ${activityObj.farmerIds?.length || 0} farmerIds in activity`);
 
+      // Ensure farmers array is always present and is an array
+      const finalFarmersArray = Array.isArray(farmersArray) ? farmersArray : [];
+      
       result.push({
         activity: activityObj,
         samplingStatus: status,
@@ -454,8 +457,10 @@ export const getActivitiesWithSampling = async (filters?: {
         tasksCount: activityTasks.length,
         assignedAgents: Array.from(agentMap.values()),
         statusBreakdown,
-        farmers: farmersArray, // Always include farmers array (may be empty)
+        farmers: finalFarmersArray, // Always include farmers array (may be empty)
       });
+      
+      logger.debug(`Activity ${activityId} final response: ${finalFarmersArray.length} farmers in array`);
     }
 
     return {
