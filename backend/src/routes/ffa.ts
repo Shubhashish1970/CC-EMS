@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 import { syncFFAData, getSyncStatus } from '../services/ffaSync.js';
+import { sampleAllActivities } from '../services/samplingService.js';
 import { Activity } from '../models/Activity.js';
 import { Farmer } from '../models/Farmer.js';
 import logger from '../config/logger.js';
@@ -29,10 +30,26 @@ router.post(
       
       const result = await syncFFAData();
 
+      // Automatically trigger sampling for newly synced activities
+      let samplingResult = null;
+      if (result.activitiesSynced > 0) {
+        try {
+          logger.info('Auto-triggering sampling after FFA sync...');
+          samplingResult = await sampleAllActivities();
+          logger.info(`Sampling completed: ${samplingResult.activitiesProcessed} activities processed, ${samplingResult.totalTasksCreated} tasks created`);
+        } catch (samplingError) {
+          logger.error('Auto-sampling after sync failed:', samplingError);
+          // Don't fail the sync if sampling fails
+        }
+      }
+
       res.json({
         success: true,
-        message: `FFA sync completed: ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}`,
-        data: result,
+        message: `FFA sync completed: ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}${samplingResult ? `. Sampling: ${samplingResult.totalTasksCreated} tasks created` : ''}`,
+        data: {
+          ...result,
+          sampling: samplingResult,
+        },
       });
     } catch (error) {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
