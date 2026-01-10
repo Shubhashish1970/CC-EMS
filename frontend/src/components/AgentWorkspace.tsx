@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { tasksAPI } from '../services/api';
 import {
   Phone, User, CheckCircle, Zap, LogOut, Globe, Loader2, Database,
-  TrendingUp, MapPin, History, X, PhoneOff
+  TrendingUp, MapPin, History, X, PhoneOff, PhoneCall
 } from 'lucide-react';
 import BinaryToggle from './BinaryToggle';
 import MultiTagSelect from './MultiTagSelect';
@@ -580,6 +580,16 @@ const AgentWorkspace: React.FC = () => {
           </button>
         </div>
       </main>
+
+      {/* Floating Dialer Button - Always visible to quickly switch farmers */}
+      <button
+        onClick={() => setShowTaskSelectionModal(true)}
+        className="fixed bottom-6 right-6 w-16 h-16 bg-green-700 hover:bg-green-800 text-white rounded-full shadow-2xl flex items-center justify-center z-40 transition-all hover:scale-110 active:scale-95 border-4 border-white"
+        title="Switch Farmer / Load Task"
+        aria-label="Open contact dialer"
+      >
+        <PhoneCall size={28} className="text-white" />
+      </button>
 
       {/* Task Selection Modal */}
       <TaskSelectionModal
