@@ -145,23 +145,23 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* Header - iPhone style */}
-        <div className="bg-slate-900 px-6 pt-4 pb-3 border-b border-slate-800">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+        {/* Header - Light theme */}
+        <div className="bg-white px-6 pt-4 pb-3 border-b border-slate-200">
           {/* Close button and title */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">Select Contact</h2>
+            <h2 className="text-xl font-black text-slate-900">Select Contact</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-800 rounded-full transition-colors"
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors"
               disabled={isLoadingTask}
             >
-              <X size={22} className="text-slate-400" />
+              <X size={22} className="text-slate-600" />
             </button>
           </div>
 
-          {/* Search Bar - iPhone style */}
+          {/* Search Bar - Light theme */}
           <div className="relative mb-4">
             <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
@@ -169,38 +169,38 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
 
-          {/* Filter Tabs - iPhone style */}
+          {/* Filter Tabs - Light theme */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
                 filter === 'all'
-                  ? 'bg-slate-700 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               All
             </button>
             <button
               onClick={() => setFilter('in_progress')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
                 filter === 'in_progress'
-                  ? 'bg-slate-700 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               In Progress
             </button>
             <button
               onClick={() => setFilter('sampled_in_queue')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
                 filter === 'sampled_in_queue'
-                  ? 'bg-slate-700 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Queue
@@ -208,28 +208,28 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
           </div>
         </div>
 
-        {/* Content - iPhone Recents style */}
-        <div className="flex-1 overflow-y-auto bg-slate-900">
+        {/* Content - Light theme */}
+        <div className="flex-1 overflow-y-auto bg-slate-50">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-green-500" size={32} />
-              <span className="ml-3 text-slate-400 font-medium">Loading contacts...</span>
+              <Loader2 className="animate-spin text-green-700" size={32} />
+              <span className="ml-3 text-slate-600 font-medium">Loading contacts...</span>
             </div>
           ) : error ? (
             <div className="text-center py-20 px-6">
-              <Phone size={48} className="mx-auto text-slate-700 mb-4" />
-              <p className="text-red-400 mb-4 font-medium">{error}</p>
+              <Phone size={48} className="mx-auto text-slate-300 mb-4" />
+              <p className="text-red-600 mb-4 font-medium">{error}</p>
               <button
                 onClick={fetchAvailableTasks}
-                className="px-6 py-2 bg-green-600 text-white rounded-2xl font-medium hover:bg-green-700"
+                className="px-6 py-2 bg-green-700 text-white rounded-2xl font-medium hover:bg-green-800"
               >
                 Retry
               </button>
             </div>
           ) : sortedTasks.length === 0 ? (
             <div className="text-center py-20 px-6">
-              <Phone size={48} className="mx-auto text-slate-700 mb-4" />
-              <p className="text-slate-400 font-medium text-lg mb-2">
+              <Phone size={48} className="mx-auto text-slate-300 mb-4" />
+              <p className="text-slate-600 font-medium text-lg mb-2">
                 {searchQuery || filter !== 'all' ? 'No matches found' : 'No tasks available'}
               </p>
               <p className="text-sm text-slate-500">
@@ -239,7 +239,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-800">
+            <div className="divide-y divide-slate-200">
               {sortedTasks.map((task) => {
                 const isSelected = selectedTaskId === task.taskId;
                 const isInProgress = task.status === 'in_progress';
@@ -249,17 +249,17 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                     key={task.taskId}
                     onClick={() => !isLoadingTask && handleSelectTask(task)}
                     disabled={isLoadingTask}
-                    className={`w-full px-6 py-4 hover:bg-slate-800 active:bg-slate-750 transition-colors flex items-center gap-4 ${
-                      isSelected ? 'bg-slate-800' : ''
+                    className={`w-full px-6 py-4 hover:bg-white active:bg-slate-50 transition-colors flex items-center gap-4 ${
+                      isSelected ? 'bg-green-50' : ''
                     } ${isLoadingTask ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    {/* Profile Icon/Photo - iPhone style */}
+                    {/* Profile Icon/Photo - Light theme */}
                     <div className="flex-shrink-0 relative">
                       {task.farmer.photoUrl ? (
                         <img
                           src={task.farmer.photoUrl}
                           alt={task.farmer.name}
-                          className="w-14 h-14 rounded-full object-cover"
+                          className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';
@@ -272,7 +272,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                         />
                       ) : null}
                       <div
-                        className="avatar-fallback w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-lg"
+                        className="avatar-fallback w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-md border-2 border-white"
                         style={{ display: task.farmer.photoUrl ? 'none' : 'flex' }}
                       >
                         <span className="text-white text-lg font-bold">
@@ -281,33 +281,33 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                       </div>
                       {/* In Progress Indicator */}
                       {isInProgress && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 border-2 border-slate-900 rounded-full flex items-center justify-center">
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 border-2 border-white rounded-full flex items-center justify-center">
                           <Clock size={10} className="text-white animate-pulse" />
                         </div>
                       )}
                     </div>
 
-                    {/* Contact Info - iPhone Recents style */}
+                    {/* Contact Info - Light theme */}
                     <div className="flex-1 min-w-0 text-left">
                       {/* Farmer Name - Large and Bold */}
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-white truncate">
+                        <h3 className="text-base font-black text-slate-900 truncate">
                           {task.farmer.name}
                         </h3>
                         {isInProgress && (
-                          <span className="flex-shrink-0 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium border border-blue-500/30">
+                          <span className="flex-shrink-0 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200">
                             In Progress
                           </span>
                         )}
                       </div>
 
-                      {/* Mobile Number - Prominent like iPhone */}
+                      {/* Mobile Number - Prominent */}
                       <div className="flex items-center gap-2 mb-1">
-                        <Phone size={12} className="text-green-500 flex-shrink-0" />
+                        <Phone size={12} className="text-green-600 flex-shrink-0" />
                         <a
                           href={`tel:${task.farmer.mobileNumber}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm font-medium text-green-400 hover:text-green-300"
+                          className="text-sm font-bold text-green-700 hover:text-green-800"
                         >
                           {task.farmer.mobileNumber}
                         </a>
@@ -315,8 +315,8 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
 
                       {/* Location - Subtle */}
                       <div className="flex items-center gap-2">
-                        <MapPin size={12} className="text-slate-500 flex-shrink-0" />
-                        <span className="text-xs text-slate-400 truncate">
+                        <MapPin size={12} className="text-slate-400 flex-shrink-0" />
+                        <span className="text-xs text-slate-600 truncate">
                           {task.farmer.location}
                         </span>
                       </div>
@@ -324,17 +324,17 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
 
                     {/* Right Side - Time and Action */}
                     <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                      {/* Scheduled Date/Time - iPhone style */}
+                      {/* Scheduled Date/Time */}
                       <span className="text-xs text-slate-500 whitespace-nowrap">
                         {formatTime(task.scheduledDate)}
                       </span>
 
-                      {/* Call Button - Green Circle iPhone style */}
+                      {/* Call Button - Green Circle */}
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
                           isSelected
-                            ? 'bg-green-600 scale-95'
-                            : 'bg-green-500 hover:bg-green-600 active:scale-95'
+                            ? 'bg-green-700 scale-95'
+                            : 'bg-green-600 hover:bg-green-700 active:scale-95'
                         } ${isLoadingTask ? 'opacity-50' : ''}`}
                       >
                         {isSelected && isLoadingTask ? (
@@ -351,11 +351,11 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
           )}
         </div>
 
-        {/* Footer - Task Count iPhone style */}
-        <div className="bg-slate-900 border-t border-slate-800 px-6 py-3">
+        {/* Footer - Task Count */}
+        <div className="bg-white border-t border-slate-200 px-6 py-3">
           <div className="text-center">
             <p className="text-xs text-slate-500">
-              <span className="font-medium text-slate-400">{sortedTasks.length}</span> contact
+              <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
               {sortedTasks.length !== 1 ? 's' : ''} available
               {(searchQuery || filter !== 'all') && ` (filtered from ${tasks.length})`}
             </p>
