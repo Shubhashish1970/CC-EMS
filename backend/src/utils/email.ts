@@ -1,3 +1,4 @@
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import logger from '../config/logger.js';
 
@@ -9,13 +10,96 @@ interface EmailOptions {
 }
 
 /**
- * Create email transporter based on environment variables
+ * Send email using Resend API (preferred) or SMTP fallback
  */
-const createTransporter = () => {
-  const emailService = process.env.EMAIL_SERVICE || 'smtp';
+export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
+  try {
+    // Check for Resend API key first (preferred method)
+    const resendApiKey = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 
-  // SMTP Configuration (supports Gmail, Outlook, custom SMTP, etc.)
-  if (emailService === 'smtp' || emailService === 'gmail') {
+    if (resendApiKey) {
+      return await sendEmailWithResend(options, resendApiKey);
+    }
+
+    // Fallback to SMTP if Resend not configured
+    const emailService = process.env.EMAIL_SERVICE || 'smtp';
+
+    // Console mode for development (when explicitly set)
+    if (emailService === 'console') {
+      logger.info('📧 Email (Console Mode - not actually sent):', {
+        to: options.to,
+        subject: options.subject,
+        html: options.html.substring(0, 200) + '...', // Truncate for logging
+        text: options.text,
+      });
+      return true;
+    }
+
+    // Try SMTP as fallback
+    return await sendEmailWithSMTP(options);
+  } catch (error) {
+    logger.error('❌ Failed to send email:', {
+      to: options.to,
+      subject: options.subject,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return false;
+  }
+};
+
+/**
+ * Send email using Resend API
+ */
+const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promise<boolean> => {
+  try {
+    const resend = new Resend(apiKey);
+
+    const fromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM || 'onboarding@resend.dev';
+
+    // Extract email from "Name <email>" format if present
+    const fromEmailAddress = fromEmail.includes('<') 
+      ? fromEmail.match(/<(.+)>/)?.[1] || fromEmail
+      : fromEmail;
+
+    const result = await resend.emails.send({
+      from: fromEmailAddress,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+    });
+
+    if (result.error) {
+      logger.error('❌ Resend API error:', {
+        error: result.error,
+        to: options.to,
+        subject: options.subject,
+      });
+      return false;
+    }
+
+    logger.info(`✅ Email sent successfully via Resend to ${options.to}:`, {
+      id: result.data?.id,
+      subject: options.subject,
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('❌ Resend API failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      to: options.to,
+      subject: options.subject,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Send email using SMTP (fallback method)
+ */
+const sendEmailWithSMTP = async (options: EmailOptions): Promise<boolean> => {
+  try {
     const smtpConfig = {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
@@ -28,52 +112,6 @@ const createTransporter = () => {
 
     // Validate SMTP config
     if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-      logger.error('SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD environment variables.');
-      return null;
-    }
-
-    return nodemailer.createTransport(smtpConfig);
-  }
-
-  // SendGrid configuration (if using SendGrid API)
-  if (emailService === 'sendgrid') {
-    const sendgridApiKey = process.env.SENDGRID_API_KEY;
-    if (!sendgridApiKey) {
-      logger.error('SendGrid API key not configured. Please set SENDGRID_API_KEY environment variable.');
-      return null;
-    }
-
-    // Note: For SendGrid, you'd typically use @sendgrid/mail package
-    // This is a placeholder - implement SendGrid if needed
-    logger.warn('SendGrid integration not yet implemented. Using SMTP fallback.');
-    return null;
-  }
-
-  return null;
-};
-
-/**
- * Send email using configured email service
- */
-export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
-  try {
-    const emailService = process.env.EMAIL_SERVICE || 'smtp';
-
-    // Console mode for development (when explicitly set or no SMTP configured)
-    if (emailService === 'console') {
-      logger.info('📧 Email (Console Mode - not actually sent):', {
-        to: options.to,
-        subject: options.subject,
-        html: options.html.substring(0, 200) + '...', // Truncate for logging
-        text: options.text,
-      });
-      return true;
-    }
-
-    // Try to create transporter
-    const transporter = createTransporter();
-
-    if (!transporter) {
       logger.warn('📧 Email service not configured. Logging email to console instead:', {
         to: options.to,
         subject: options.subject,
@@ -83,6 +121,8 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
       });
       return false;
     }
+
+    const transporter = nodemailer.createTransport(smtpConfig);
 
     // Prepare email message
     const mailOptions = {
@@ -96,7 +136,7 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
     // Send email
     const info = await transporter.sendMail(mailOptions);
 
-    logger.info(`✅ Email sent successfully to ${options.to}:`, {
+    logger.info(`✅ Email sent successfully via SMTP to ${options.to}:`, {
       messageId: info.messageId,
       subject: options.subject,
       response: info.response,
@@ -104,13 +144,12 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    logger.error('❌ Failed to send email:', {
+    logger.error('❌ SMTP failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
       to: options.to,
       subject: options.subject,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
     });
-    return false;
+    throw error;
   }
 };
 
