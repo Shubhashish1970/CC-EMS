@@ -453,6 +453,180 @@ app.post('/api/debug/seed-agent', async (req, res) => {
   }
 });
 
+// Test data generation endpoint (protected with secret token)
+app.post('/api/debug/create-test-data', async (req, res) => {
+  try {
+    // Check for secret token in header
+    const secretToken = req.headers['x-seed-token'];
+    const expectedToken = process.env.ADMIN_SEED_TOKEN || 'change-this-secret-token';
+    
+    if (secretToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'Unauthorized' },
+      });
+    }
+
+    const mongoose = await import('mongoose');
+    const { Farmer } = await import('./models/Farmer.js');
+    const { Activity } = await import('./models/Activity.js');
+    const { CallTask } = await import('./models/CallTask.js');
+    const { User } = await import('./models/User.js');
+    const { sampleAndCreateTasks } = await import('./services/samplingService.js');
+    
+    const isConnected = mongoose.default.connection.readyState === 1;
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database not connected' },
+      });
+    }
+
+    // Import test data creation logic
+    const TERRITORIES = ['North Zone', 'South Zone', 'East Zone', 'West Zone', 'Central Zone'];
+    const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
+    const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
+    const CROPS = ['Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Soybean', 'Maize', 'Groundnut', 'Pulses'];
+    const PRODUCTS = ['NACL Pro', 'NACL Gold', 'NACL Premium', 'NACL Base', 'NACL Bio'];
+
+    const generateMobileNumber = (index: number): string => {
+      const base = 9000000000;
+      return String(base + index).padStart(10, '0');
+    };
+
+    const generateFarmerName = (index: number): string => {
+      const names = [
+        'Ram Kumar', 'Shyam Singh', 'Gopal Yadav', 'Mohan Das', 'Ramesh Patel',
+        'Suresh Reddy', 'Kumar Swamy', 'Rajesh Nair', 'Anil Kumar', 'Vinod Kumar',
+        'Prakash Singh', 'Amit Kumar', 'Sandeep Kumar', 'Raj Kumar', 'Deepak Singh',
+        'Manish Kumar', 'Ashok Kumar', 'Sunil Kumar', 'Ravi Kumar', 'Mukesh Kumar',
+        'Dinesh Kumar', 'Vijay Kumar', 'Naresh Kumar', 'Harish Kumar', 'Suresh Kumar',
+        'Mahesh Kumar', 'Ramesh Kumar', 'Ganesh Kumar', 'Dilip Kumar', 'Sanjay Kumar',
+        'Ajay Kumar', 'Pradeep Kumar', 'Rahul Kumar', 'Sachin Kumar', 'Nikhil Kumar',
+        'Arun Kumar', 'Tarun Kumar', 'Varun Kumar', 'Karan Kumar', 'Rohan Kumar',
+        'Aman Kumar', 'Rahul Singh', 'Amit Singh', 'Rohit Singh', 'Vikram Singh',
+        'Aditya Singh', 'Karan Singh', 'Arjun Singh', 'Yash Singh', 'Harsh Singh'
+      ];
+      return names[index % names.length];
+    };
+
+    // Find agent user
+    const agent = await User.findOne({ email: 'shubhashish@intelliagri.in' });
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Agent user not found. Please seed agent first.' },
+      });
+    }
+
+    const count = parseInt(req.body.count || '50');
+    const existingFarmerCount = await Farmer.countDocuments();
+    
+    // Create farmers
+    const farmerIds: mongoose.Types.ObjectId[] = [];
+    for (let i = 0; i < count; i++) {
+      const mobileNumber = generateMobileNumber(existingFarmerCount + i);
+      let farmer = await Farmer.findOne({ mobileNumber });
+      
+      if (!farmer) {
+        farmer = new Farmer({
+          name: generateFarmerName(existingFarmerCount + i),
+          mobileNumber,
+          location: `Village ${i + 1}, District ${(i % 5) + 1}`,
+          preferredLanguage: LANGUAGES[i % LANGUAGES.length],
+          territory: TERRITORIES[i % TERRITORIES.length],
+        });
+        await farmer.save();
+      }
+      farmerIds.push(farmer._id);
+    }
+
+    // Create activities
+    const activityIds: mongoose.Types.ObjectId[] = [];
+    const existingActivityCount = await Activity.countDocuments();
+    const farmersPerActivity = 8;
+
+    for (let i = 0; i < count; i++) {
+      const activityId = `TEST-ACT-${Date.now()}-${i}`;
+      let activity = await Activity.findOne({ activityId });
+      
+      if (!activity) {
+        const shuffled = [...farmerIds].sort(() => 0.5 - Math.random());
+        const selectedFarmers = shuffled.slice(0, Math.min(farmersPerActivity, farmerIds.length));
+        
+        activity = new Activity({
+          activityId,
+          type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
+          date: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)),
+          officerId: `OFFICER-${(i % 10) + 1}`,
+          officerName: `Officer ${(i % 10) + 1}`,
+          location: `Location ${i + 1}`,
+          territory: TERRITORIES[i % TERRITORIES.length],
+          farmerIds: selectedFarmers,
+          crops: CROPS.slice(0, (i % 3) + 1),
+          products: PRODUCTS.slice(0, (i % 2) + 1),
+        });
+        await activity.save();
+      }
+      activityIds.push(activity._id);
+    }
+
+    // Process sampling to create tasks
+    let tasksCreated = 0;
+    for (const activityId of activityIds) {
+      try {
+        const result = await sampleAndCreateTasks(activityId.toString());
+        tasksCreated += result.tasksCreated;
+      } catch (error) {
+        logger.error(`Error processing activity ${activityId}:`, error);
+      }
+    }
+
+    // Update task dates to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    await CallTask.updateMany(
+      {
+        assignedAgentId: agent._id,
+        status: 'pending',
+        scheduledDate: { $ne: today },
+      },
+      {
+        $set: { scheduledDate: today },
+      }
+    );
+
+    // Get final counts
+    const agentTaskCount = await CallTask.countDocuments({
+      assignedAgentId: agent._id,
+      status: { $in: ['pending', 'in_progress'] },
+    });
+
+    const totalTasks = await CallTask.countDocuments();
+
+    res.json({
+      success: true,
+      message: 'Test data created successfully',
+      data: {
+        farmersCreated: farmerIds.length,
+        activitiesCreated: activityIds.length,
+        tasksCreated,
+        agentTasks: agentTaskCount,
+        totalTasks,
+      },
+    });
+  } catch (error) {
+    logger.error('Error creating test data:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to create test data',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+});
+
 // API routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
