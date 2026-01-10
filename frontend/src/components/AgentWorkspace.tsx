@@ -51,6 +51,7 @@ const AgentWorkspace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'flow' | 'ai'>('flow');
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showTaskSelectionModal, setShowTaskSelectionModal] = useState(false);
   const [isAIPanelExpanded, setIsAIPanelExpanded] = useState(false);
   const [formData, setFormData] = useState({
     callStatus: '',
