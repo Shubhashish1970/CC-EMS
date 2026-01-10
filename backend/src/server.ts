@@ -95,20 +95,61 @@ app.get('/api/debug/admin-exists', async (req, res) => {
       });
     }
 
-    const admin = await User.findOne({ email: 'admin@nacl.com' });
+    // Try multiple email variations
+    const emailVariations = ['admin@nacl.com', 'Admin@nacl.com', 'ADMIN@NACL.COM'];
+    let admin = null;
+    let matchedEmail = null;
+
+    for (const email of emailVariations) {
+      admin = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+      if (admin) {
+        matchedEmail = email;
+        break;
+      }
+    }
+
     const userCount = await User.countDocuments();
+    
+    // Test password comparison if user exists
+    let passwordTestResult = null;
+    if (admin && admin.password) {
+      try {
+        const { comparePassword } = await import('./utils/password.js');
+        const testPassword = 'Admin@123';
+        const passwordMatch = await comparePassword(testPassword, admin.password);
+        passwordTestResult = {
+          testPassword: testPassword,
+          passwordExists: !!admin.password,
+          passwordLength: admin.password?.length || 0,
+          passwordStartsWith: admin.password?.substring(0, 10) || 'N/A',
+          passwordHashFormat: admin.password.startsWith('$2') ? 'bcrypt' : 'unknown',
+          passwordMatch: passwordMatch,
+        };
+      } catch (error) {
+        passwordTestResult = {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    } else if (admin && !admin.password) {
+      passwordTestResult = {
+        error: 'User exists but password field is missing or null',
+      };
+    }
     
     res.json({
       success: true,
       data: {
         adminExists: !!admin,
+        matchedEmail: matchedEmail,
         totalUsers: userCount,
         adminDetails: admin ? {
           email: admin.email,
           role: admin.role,
           isActive: admin.isActive,
           createdAt: admin.createdAt,
+          employeeId: admin.employeeId,
         } : null,
+        passwordTest: passwordTestResult,
       },
     });
   } catch (error) {
@@ -116,6 +157,71 @@ app.get('/api/debug/admin-exists', async (req, res) => {
       success: false,
       message: 'Debug check failed',
       error: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined,
+    });
+  }
+});
+
+// Password reset endpoint (protected with secret token)
+app.post('/api/debug/reset-admin-password', async (req, res) => {
+  try {
+    // Check for secret token in header
+    const secretToken = req.headers['x-seed-token'];
+    const expectedToken = process.env.ADMIN_SEED_TOKEN || 'change-this-secret-token';
+    
+    if (secretToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'Unauthorized' },
+      });
+    }
+
+    const mongoose = await import('mongoose');
+    const { User } = await import('./models/User.js');
+    const { hashPassword } = await import('./utils/password.js');
+    
+    const isConnected = mongoose.default.connection.readyState === 1;
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database not connected' },
+      });
+    }
+
+    // Find admin user
+    const admin = await User.findOne({ email: 'admin@nacl.com' }).select('+password');
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Admin user not found' },
+      });
+    }
+
+    // Reset password to Admin@123
+    const newPassword = req.body.password || 'Admin@123';
+    const hashedPassword = await hashPassword(newPassword);
+    
+    admin.password = hashedPassword;
+    await admin.save();
+    
+    logger.info(`✅ Admin user password reset via debug endpoint`);
+
+    res.json({
+      success: true,
+      message: 'Admin password reset successfully',
+      data: {
+        email: admin.email,
+        password: newPassword === 'Admin@123' ? 'Admin@123' : '[CUSTOM]',
+      },
+    });
+  } catch (error) {
+    logger.error('Error resetting admin password:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to reset admin password',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
     });
   }
 });

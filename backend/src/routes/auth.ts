@@ -31,7 +31,10 @@ router.post(
         });
       }
 
-      const { email, password } = req.body;
+      let { email, password } = req.body;
+
+      // Normalize email (lowercase and trim)
+      email = email.toLowerCase().trim();
 
       // Check database connection before querying
       const mongoose = await import('mongoose');
@@ -45,7 +48,7 @@ router.post(
 
       logger.info(`Login attempt for email: ${email}`);
 
-      // Find user by email (include password field)
+      // Find user by email (include password field) - email is already lowercase in DB
       const user = await User.findOne({ email }).select('+password');
 
       if (!user) {
@@ -67,13 +70,29 @@ router.post(
       }
 
       // Check password
-      const isPasswordValid = await comparePassword(password, user.password);
-
-      if (!isPasswordValid) {
+      if (!user.password) {
+        logger.error(`User ${user.email} exists but password field is missing or null`);
         const error: AppError = new Error('Invalid credentials');
         error.statusCode = 401;
         throw error;
       }
+
+      logger.info(`Password field exists: ${!!user.password}, Length: ${user.password.length}, Starts with: ${user.password.substring(0, 10)}`);
+      
+      const isPasswordValid = await comparePassword(password, user.password);
+
+      if (!isPasswordValid) {
+        logger.warn(`Password mismatch for user: ${user.email}. Password provided: [REDACTED], Hash length: ${user.password.length}`);
+        // Check if password hash format is correct
+        if (!user.password.startsWith('$2')) {
+          logger.error(`Password hash for user ${user.email} is not in bcrypt format!`);
+        }
+        const error: AppError = new Error('Invalid credentials');
+        error.statusCode = 401;
+        throw error;
+      }
+
+      logger.info(`Password verified successfully for user: ${user.email}`);
 
       // Update last login
       user.lastLogin = new Date();
