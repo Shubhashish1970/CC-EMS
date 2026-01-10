@@ -15,7 +15,7 @@ const seedAdmin = async () => {
     logger.info('Connected to MongoDB');
 
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin@nacl.com' });
+    const existingAdmin = await User.findOne({ email: 'shubhashish@kweka.ai' });
     if (existingAdmin) {
       logger.info('Admin user already exists. Skipping seed.');
       await mongoose.disconnect();
@@ -27,7 +27,7 @@ const seedAdmin = async () => {
     
     const admin = new User({
       name: 'System Administrator',
-      email: 'admin@nacl.com',
+      email: 'shubhashish@kweka.ai',
       password: hashedPassword,
       employeeId: 'ADMIN001',
       role: 'mis_admin',
@@ -38,7 +38,7 @@ const seedAdmin = async () => {
 
     await admin.save();
     logger.info('✅ Admin user created successfully!');
-    logger.info('📧 Email: admin@nacl.com');
+    logger.info('📧 Email: shubhashish@kweka.ai');
     logger.info('🔑 Password: Admin@123');
     logger.info('');
     logger.info('⚠️  Please change the password after first login!');

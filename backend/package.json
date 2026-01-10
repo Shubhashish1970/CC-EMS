@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "create:test-task": "tsx src/scripts/createTestTask.ts",
-    "test:admin": "tsx src/scripts/testAdminService.ts"
+    "test:admin": "tsx src/scripts/testAdminService.ts",
+    "update:emails": "tsx src/scripts/updateUserEmails.ts"
   },
   "dependencies": {
     "axios": "^1.13.2",

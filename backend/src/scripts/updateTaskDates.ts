@@ -16,7 +16,7 @@ const updateTaskDates = async () => {
     await mongoose.connect(mongoUri);
     logger.info('Connected to MongoDB');
 
-    const agent = await User.findOne({ role: 'cc_agent', email: 'agent@nacl.com' });
+    const agent = await User.findOne({ role: 'cc_agent', email: 'shubhashish@intelliagri.in' });
     if (!agent) {
       console.log('Agent not found');
       await mongoose.disconnect();

@@ -96,7 +96,7 @@ app.get('/api/debug/admin-exists', async (req, res) => {
     }
 
     // Try multiple email variations
-    const emailVariations = ['admin@nacl.com', 'Admin@nacl.com', 'ADMIN@NACL.COM'];
+    const emailVariations = ['shubhashish@kweka.ai', 'Shubhashish@kweka.ai', 'SHUBHASHISH@KWEKA.AI'];
     let admin = null;
     let matchedEmail = null;
 
@@ -189,7 +189,7 @@ app.post('/api/debug/reset-admin-password', async (req, res) => {
     }
 
     // Find admin user
-    const admin = await User.findOne({ email: 'admin@nacl.com' }).select('+password');
+    const admin = await User.findOne({ email: 'shubhashish@kweka.ai' }).select('+password');
     if (!admin) {
       return res.status(404).json({
         success: false,
@@ -253,7 +253,7 @@ app.post('/api/debug/seed-admin', async (req, res) => {
     }
 
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin@nacl.com' });
+    const existingAdmin = await User.findOne({ email: 'shubhashish@kweka.ai' });
     if (existingAdmin) {
       return res.json({
         success: true,
@@ -271,7 +271,7 @@ app.post('/api/debug/seed-admin', async (req, res) => {
     
     const admin = new User({
       name: 'System Administrator',
-      email: 'admin@nacl.com',
+      email: 'shubhashish@kweka.ai',
       password: hashedPassword,
       employeeId: 'ADMIN001',
       role: 'mis_admin',
