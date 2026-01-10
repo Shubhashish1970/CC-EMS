@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Login from './Login';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -23,9 +23,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     );
   }
 
-  // If not authenticated, show login page
+  // If not authenticated, redirect to login
   if (!isAuthenticated || !user) {
-    return <Login />;
+    return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {

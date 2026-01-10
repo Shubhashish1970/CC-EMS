@@ -180,6 +180,261 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
   }
 });
 
+// @route   POST /api/auth/forgot-password
+// @desc    Request password reset
+// @access  Public
+router.post(
+  '/forgot-password',
+  [
+    body('email').isEmail().withMessage('Please provide a valid email'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            errors: errors.array(),
+          },
+        });
+      }
+
+      const { email } = req.body;
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check database connection
+      const mongoose = await import('mongoose');
+      if (mongoose.default.connection.readyState !== 1) {
+        const error: AppError = new Error('Database connection error. Please try again later.');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      // Find user by email
+      const user = await User.findOne({ email: normalizedEmail });
+
+      // Always return success message to prevent email enumeration
+      // But only send email if user exists
+      if (!user) {
+        logger.warn(`Password reset requested for non-existent email: ${normalizedEmail}`);
+        return res.json({
+          success: true,
+          message: 'If an account with that email exists, a password reset link has been sent.',
+        });
+      }
+
+      if (!user.isActive) {
+        logger.warn(`Password reset requested for inactive account: ${normalizedEmail}`);
+        return res.json({
+          success: true,
+          message: 'If an account with that email exists, a password reset link has been sent.',
+        });
+      }
+
+      // Import PasswordResetToken model
+      const { PasswordResetToken, generateResetToken } = await import('../models/PasswordResetToken.js');
+      
+      // Invalidate any existing unused tokens for this user
+      await PasswordResetToken.updateMany(
+        { userId: user._id, used: false },
+        { used: true }
+      );
+
+      // Generate new reset token
+      const resetToken = generateResetToken();
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // Token expires in 1 hour
+
+      // Save reset token
+      const passwordResetToken = new PasswordResetToken({
+        userId: user._id,
+        token: resetToken,
+        expiresAt,
+        used: false,
+      });
+
+      await passwordResetToken.save();
+
+      // Send password reset email
+      const { sendEmail, generatePasswordResetEmail } = await import('../utils/email.js');
+      const emailContent = generatePasswordResetEmail(resetToken, user.name);
+      
+      const emailSent = await sendEmail({
+        to: user.email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+      });
+
+      if (!emailSent) {
+        logger.error(`Failed to send password reset email to ${user.email}`);
+      }
+
+      logger.info(`Password reset token generated for user: ${user.email}`);
+
+      res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      });
+    } catch (error) {
+      logger.error('Error in forgot-password:', error);
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with token
+// @access  Public
+router.post(
+  '/reset-password',
+  [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('password')
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters long')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+      .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            errors: errors.array(),
+          },
+        });
+      }
+
+      const { token, password } = req.body;
+
+      // Check database connection
+      const mongoose = await import('mongoose');
+      if (mongoose.default.connection.readyState !== 1) {
+        const error: AppError = new Error('Database connection error. Please try again later.');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      // Import PasswordResetToken model
+      const { PasswordResetToken } = await import('../models/PasswordResetToken.js');
+      
+      // Find valid reset token
+      const resetToken = await PasswordResetToken.findOne({
+        token,
+        used: false,
+        expiresAt: { $gt: new Date() },
+      }).populate('userId');
+
+      if (!resetToken) {
+        const error: AppError = new Error('Invalid or expired reset token');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Get user
+      const user = await User.findById(resetToken.userId);
+      if (!user) {
+        const error: AppError = new Error('User not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!user.isActive) {
+        const error: AppError = new Error('Account is inactive');
+        error.statusCode = 401;
+        throw error;
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(password);
+
+      // Update user password
+      user.password = hashedPassword;
+      await user.save();
+
+      // Mark token as used
+      resetToken.used = true;
+      await resetToken.save();
+
+      logger.info(`Password reset successful for user: ${user.email}`);
+
+      res.json({
+        success: true,
+        message: 'Password has been reset successfully. You can now log in with your new password.',
+      });
+    } catch (error) {
+      logger.error('Error in reset-password:', error);
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/auth/verify-reset-token
+// @desc    Verify reset token is valid
+// @access  Public
+router.post(
+  '/verify-reset-token',
+  [
+    body('token').notEmpty().withMessage('Reset token is required'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            errors: errors.array(),
+          },
+        });
+      }
+
+      const { token } = req.body;
+
+      // Check database connection
+      const mongoose = await import('mongoose');
+      if (mongoose.default.connection.readyState !== 1) {
+        return res.status(503).json({
+          success: false,
+          error: { message: 'Database connection error' },
+        });
+      }
+
+      // Import PasswordResetToken model
+      const { PasswordResetToken } = await import('../models/PasswordResetToken.js');
+      
+      // Find valid reset token
+      const resetToken = await PasswordResetToken.findOne({
+        token,
+        used: false,
+        expiresAt: { $gt: new Date() },
+      });
+
+      if (!resetToken) {
+        return res.json({
+          success: false,
+          message: 'Invalid or expired reset token',
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Reset token is valid',
+      });
+    } catch (error) {
+      logger.error('Error in verify-reset-token:', error);
+      next(error);
+    }
+  }
+);
+
 export default router;
 
 

@@ -108,6 +108,27 @@ export const authAPI = {
   getCurrentUser: async () => {
     return apiRequest<{ success: boolean; data: { user: any } }>('/auth/me');
   },
+
+  forgotPassword: async (email: string) => {
+    return apiRequest<{ success: boolean; message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword: async (token: string, password: string) => {
+    return apiRequest<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  verifyResetToken: async (token: string) => {
+    return apiRequest<{ success: boolean; message: string }>('/auth/verify-reset-token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
 };
 
 // Tasks API
