@@ -51,7 +51,7 @@ export interface AgentQueueSummary {
   employeeId: string;
   languageCapabilities: string[];
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;
@@ -69,7 +69,7 @@ export interface AgentQueueDetail {
     languageCapabilities: string[];
   };
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;

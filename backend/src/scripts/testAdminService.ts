@@ -50,7 +50,7 @@ const testAdminService = async () => {
         const firstAgent = agentQueues[0];
         logger.info(`   Sample agent: ${firstAgent.agentName} (${firstAgent.agentEmail})`);
         logger.info(`   Total tasks: ${firstAgent.statusBreakdown.total}`);
-        logger.info(`   Pending: ${firstAgent.statusBreakdown.pending}, In Progress: ${firstAgent.statusBreakdown.in_progress}`);
+        logger.info(`   Sampled - in queue: ${firstAgent.statusBreakdown.sampled_in_queue}, In Progress: ${firstAgent.statusBreakdown.in_progress}`);
       }
     } catch (error) {
       logger.error('❌ Error in getAgentQueues:', error);
