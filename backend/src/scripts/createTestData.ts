@@ -258,12 +258,9 @@ const createActivities = async (
     const shuffled = [...farmerIds].sort(() => 0.5 - Math.random());
     const selectedFarmers = shuffled.slice(0, Math.min(farmersPerActivity, farmerIds.length));
     
-    // Get location from first farmer in the activity
+    // Get location, officer name and territory from first farmer
     const firstFarmer = await Farmer.findById(selectedFarmers[0]);
-    const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : `Location ${i + 1}`;
-    
-    // Get officer name and territory from first farmer
-    const firstFarmer = await Farmer.findById(selectedFarmers[0]);
+    const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
     const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
     const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
     const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
