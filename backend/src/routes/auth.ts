@@ -213,7 +213,21 @@ router.post(
       }
 
       // Find user by email
+      logger.info(`Looking for user with email: ${normalizedEmail}`);
       const user = await User.findOne({ email: normalizedEmail });
+      
+      // Debug: Check if any users exist and what emails they have
+      if (!user) {
+        const userCount = await User.countDocuments();
+        logger.warn(`User not found. Total users in database: ${userCount}`);
+        
+        // Try to find user with case-insensitive search as fallback
+        const allUsers = await User.find({}, { email: 1, name: 1, role: 1 }).limit(10);
+        logger.info(`Sample users in database:`, {
+          count: allUsers.length,
+          users: allUsers.map(u => ({ email: u.email, name: u.name, role: u.role })),
+        });
+      }
 
       // Always return success message to prevent email enumeration
       // But only send email if user exists
