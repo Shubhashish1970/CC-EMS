@@ -3,11 +3,18 @@
 ## Direct Link to Logs Explorer
 https://console.cloud.google.com/logs/query?project=cc-ems-dev
 
-## Query to Use
+## Query to Use (Fixed Syntax)
 ```
 resource.type="cloud_run_revision" 
 AND resource.labels.service_name="cc-ems-backend" 
-AND (textPayload=~"email" OR textPayload=~"Resend" OR textPayload=~"📧" OR jsonPayload.message=~"email" OR jsonPayload.message=~"Resend")
+AND (textPayload=~"email" OR textPayload=~"Resend" OR jsonPayload.message=~"email" OR jsonPayload.message=~"Resend")
+```
+
+**Note:** The emoji search might not work. Use this simpler version if needed:
+```
+resource.type="cloud_run_revision" 
+AND resource.labels.service_name="cc-ems-backend" 
+AND (textPayload=~"email" OR textPayload=~"Resend" OR jsonPayload.message=~"email")
 ```
 
 ## Time Range
