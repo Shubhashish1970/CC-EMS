@@ -33,6 +33,18 @@ router.post(
 
       const { email, password } = req.body;
 
+      // Check database connection before querying
+      const mongoose = await import('mongoose');
+      const dbState = mongoose.default.connection.readyState;
+      if (dbState !== 1) {
+        logger.error(`Database not connected. ReadyState: ${dbState} (0=disconnected, 1=connected, 2=connecting, 3=disconnecting)`);
+        const error: AppError = new Error('Database connection error. Please try again later.');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      logger.info(`Login attempt for email: ${email}`);
+
       // Find user by email (include password field)
       const user = await User.findOne({ email }).select('+password');
 
@@ -82,6 +94,16 @@ router.post(
         },
       });
     } catch (error) {
+      // Enhanced error logging for debugging
+      if (error instanceof Error) {
+        if (error.name === 'MongoNetworkError' || error.message.includes('MongoServerError')) {
+          logger.error(`Database connection error during login: ${error.message}`, { stack: error.stack });
+          const dbError: AppError = new Error('Database connection error. Please try again later.');
+          dbError.statusCode = 503;
+          return next(dbError);
+        }
+        logger.error(`Login error for ${req.body.email}: ${error.message}`, { stack: error.stack });
+      }
       next(error);
     }
   }
