@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import logger from '../config/logger.js';
 
 interface EmailOptions {
@@ -8,36 +9,107 @@ interface EmailOptions {
 }
 
 /**
- * Send email - Currently logs to console/file
- * Can be extended to use SendGrid, AWS SES, Nodemailer, etc.
+ * Create email transporter based on environment variables
+ */
+const createTransporter = () => {
+  const emailService = process.env.EMAIL_SERVICE || 'smtp';
+
+  // SMTP Configuration (supports Gmail, Outlook, custom SMTP, etc.)
+  if (emailService === 'smtp' || emailService === 'gmail') {
+    const smtpConfig = {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_USER,
+        pass: process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD,
+      },
+    };
+
+    // Validate SMTP config
+    if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
+      logger.error('SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD environment variables.');
+      return null;
+    }
+
+    return nodemailer.createTransport(smtpConfig);
+  }
+
+  // SendGrid configuration (if using SendGrid API)
+  if (emailService === 'sendgrid') {
+    const sendgridApiKey = process.env.SENDGRID_API_KEY;
+    if (!sendgridApiKey) {
+      logger.error('SendGrid API key not configured. Please set SENDGRID_API_KEY environment variable.');
+      return null;
+    }
+
+    // Note: For SendGrid, you'd typically use @sendgrid/mail package
+    // This is a placeholder - implement SendGrid if needed
+    logger.warn('SendGrid integration not yet implemented. Using SMTP fallback.');
+    return null;
+  }
+
+  return null;
+};
+
+/**
+ * Send email using configured email service
  */
 export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
   try {
-    const emailService = process.env.EMAIL_SERVICE || 'console';
-    
-    if (emailService === 'console' || process.env.NODE_ENV === 'development') {
-      // Log email to console/file for development
-      logger.info('📧 Email (Development Mode):', {
+    const emailService = process.env.EMAIL_SERVICE || 'smtp';
+
+    // Console mode for development (when explicitly set or no SMTP configured)
+    if (emailService === 'console') {
+      logger.info('📧 Email (Console Mode - not actually sent):', {
         to: options.to,
         subject: options.subject,
-        html: options.html,
+        html: options.html.substring(0, 200) + '...', // Truncate for logging
         text: options.text,
       });
-      
-      // In production, you can uncomment this to use a real email service
-      // For now, return true to simulate successful sending
       return true;
     }
 
-    // TODO: Integrate with real email service (SendGrid, AWS SES, etc.)
-    // Example with Nodemailer:
-    // const transporter = nodemailer.createTransport({...});
-    // await transporter.sendMail({...});
-    
-    logger.info(`📧 Email sent to ${options.to}: ${options.subject}`);
+    // Try to create transporter
+    const transporter = createTransporter();
+
+    if (!transporter) {
+      logger.warn('📧 Email service not configured. Logging email to console instead:', {
+        to: options.to,
+        subject: options.subject,
+      });
+      logger.info('Email content (not sent):', {
+        html: options.html.substring(0, 500) + '...',
+      });
+      return false;
+    }
+
+    // Prepare email message
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@nacl.com',
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+    };
+
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+
+    logger.info(`✅ Email sent successfully to ${options.to}:`, {
+      messageId: info.messageId,
+      subject: options.subject,
+      response: info.response,
+    });
+
     return true;
   } catch (error) {
-    logger.error('Failed to send email:', error);
+    logger.error('❌ Failed to send email:', {
+      to: options.to,
+      subject: options.subject,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return false;
   }
 };

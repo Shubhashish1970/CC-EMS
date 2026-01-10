@@ -208,6 +208,14 @@ jobs:
             echo "ENABLE_CRON: \"true\""
             echo "FFA_API_URL: \"$FFA_API_URL_VALUE\""
             echo "ADMIN_SEED_TOKEN: \"${{ secrets.ADMIN_SEED_TOKEN || 'change-this-secret-token' }}\""
+            echo "EMAIL_SERVICE: \"${{ secrets.EMAIL_SERVICE || 'smtp' }}\""
+            echo "SMTP_HOST: \"${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}\""
+            echo "SMTP_PORT: \"${{ secrets.SMTP_PORT || '587' }}\""
+            echo "SMTP_SECURE: \"${{ secrets.SMTP_SECURE || 'false' }}\""
+            echo "SMTP_USER: \"${{ secrets.SMTP_USER }}\""
+            echo "SMTP_PASSWORD: \"${{ secrets.SMTP_PASSWORD }}\""
+            echo "EMAIL_FROM: \"${{ secrets.EMAIL_FROM || secrets.SMTP_USER }}\""
+            echo "FRONTEND_URL: \"${{ secrets.FRONTEND_URL || 'https://cc-ems-dev.web.app' }}\""
           } > "$ENV_FILE"
           
           # Verify env file was created correctly
@@ -219,6 +227,12 @@ jobs:
           echo "  - ENABLE_CRON: true"
           echo "  - FFA_API_URL: $FFA_API_URL_VALUE"
           echo "  - ADMIN_SEED_TOKEN: [REDACTED]"
+          echo "  - EMAIL_SERVICE: ${{ secrets.EMAIL_SERVICE || 'smtp' }}"
+          echo "  - SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}"
+          echo "  - SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}"
+          echo "  - SMTP_USER: [REDACTED]"
+          echo "  - EMAIL_FROM: [REDACTED]"
+          echo "  - FRONTEND_URL: ${{ secrets.FRONTEND_URL || 'https://cc-ems-dev.web.app' }}"
           
           # Verify file exists and has content
           if [ ! -f "$ENV_FILE" ]; then
@@ -227,8 +241,8 @@ jobs:
           fi
           
           ENV_FILE_LINES=$(wc -l < "$ENV_FILE" || echo "0")
-          if [ "$ENV_FILE_LINES" -lt 7 ]; then
-            echo "❌ Error: Environment file has insufficient lines (expected 7, got $ENV_FILE_LINES)"
+          if [ "$ENV_FILE_LINES" -lt 15 ]; then
+            echo "❌ Error: Environment file has insufficient lines (expected 15, got $ENV_FILE_LINES)"
             echo "File contents:"
             cat "$ENV_FILE"
             exit 1
