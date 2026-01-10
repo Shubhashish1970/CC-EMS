@@ -88,23 +88,37 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
       subject: options.subject,
     });
 
-    const result = await resend.emails.send({
+    // Prepare email payload
+    const emailPayload = {
       from: fromEmailAddress,
       to: options.to,
       subject: options.subject,
       html: options.html,
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+    };
+
+    logger.info('📧 Resend email payload (before send):', {
+      from: emailPayload.from,
+      to: emailPayload.to,
+      subject: emailPayload.subject,
+      hasHtml: !!emailPayload.html,
+      hasText: !!emailPayload.text,
     });
+
+    const result = await resend.emails.send(emailPayload);
 
     // Log full result for debugging
-    logger.info('📧 Resend API response:', {
-      hasError: !!result.error,
-      hasData: !!result.data,
-      resultKeys: Object.keys(result),
+    logger.info('📧 Resend API response (raw):', {
+      result: result,
+      resultType: typeof result,
+      resultKeys: result ? Object.keys(result) : 'null/undefined',
+      hasError: result && 'error' in result ? !!result.error : false,
+      hasData: result && 'data' in result ? !!result.data : false,
     });
 
-    // Check for errors in the result (Resend returns error as object)
-    if (result.error) {
+    // Resend SDK returns { data: {...}, error: null } on success
+    // Or { data: null, error: {...} } on error
+    if (result && result.error) {
       const errorDetails = result.error as any;
       logger.error('❌ Resend API error:', {
         error: errorDetails,
@@ -112,6 +126,7 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
         errorName: errorDetails?.name,
         errorType: typeof errorDetails,
         errorString: JSON.stringify(errorDetails),
+        fullError: JSON.stringify(errorDetails, Object.getOwnPropertyNames(errorDetails)),
         to: options.to,
         subject: options.subject,
         from: fromEmailAddress,
@@ -120,10 +135,11 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
     }
 
     // Check if data exists (successful send)
-    if (!result.data) {
-      logger.error('❌ Resend API returned no data:', {
-        result: JSON.stringify(result),
+    if (!result || !result.data) {
+      logger.error('❌ Resend API returned no data (unexpected response):', {
+        result: result,
         resultType: typeof result,
+        resultString: JSON.stringify(result),
         to: options.to,
         subject: options.subject,
         from: fromEmailAddress,
@@ -132,7 +148,7 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
     }
 
     // Success - email was sent
-    const emailId = (result.data as any)?.id || 'unknown';
+    const emailId = result.data?.id || 'unknown';
     logger.info(`✅ Email sent successfully via Resend to ${options.to}:`, {
       id: emailId,
       subject: options.subject,
