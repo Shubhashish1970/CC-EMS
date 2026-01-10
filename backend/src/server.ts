@@ -605,7 +605,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       return names[index % names.length];
     };
 
-    const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string } => {
+    const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string } => {
       const languageStateMap: Record<string, string[]> = {
         'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
         'Telugu': ['Andhra Pradesh', 'Telangana'],
@@ -619,9 +619,10 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       const state = possibleStates[index % possibleStates.length];
       const districts = INDIAN_DISTRICTS[state] || ['District 1'];
       const district = districts[index % districts.length];
-      const village = `Village ${String.fromCharCode(65 + (index % 26))}${(index % 100) + 1}`;
+      const village = INDIAN_VILLAGES[index % INDIAN_VILLAGES.length];
+      const territory = `${state} Zone`;
       
-      return { state, district, village };
+      return { state, district, village, territory };
     };
 
     // Find agent user
@@ -652,7 +653,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
           mobileNumber,
           location: `${village}, ${district}, ${state}`,
           preferredLanguage: language,
-          territory: TERRITORIES[i % TERRITORIES.length],
+          territory: territory,
         });
         await farmer.save();
       }
@@ -672,18 +673,21 @@ app.post('/api/debug/create-test-data', async (req, res) => {
         const shuffled = [...farmerIds].sort(() => 0.5 - Math.random());
         const selectedFarmers = shuffled.slice(0, Math.min(farmersPerActivity, farmerIds.length));
         
-        // Get location from first farmer in the activity
+        // Get location, territory, and officer details from first farmer
         const firstFarmer = await Farmer.findById(selectedFarmers[0]);
-        const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : `Location ${i + 1}`;
+        const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
+        const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
+        const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
+        const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
         
         activity = new Activity({
           activityId,
           type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
           date: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)),
-          officerId: `OFFICER-${(i % 10) + 1}`,
-          officerName: `Officer ${(i % 10) + 1}`,
+          officerId: officerId,
+          officerName: officerName,
           location: activityLocation,
-          territory: TERRITORIES[i % TERRITORIES.length],
+          territory: activityTerritory,
           farmerIds: selectedFarmers,
           crops: CROPS.slice(0, Math.min((i % 4) + 2, CROPS.length)), // 2-5 crops per activity
           products: PRODUCTS.slice(0, Math.min((i % 3) + 1, PRODUCTS.length)), // 1-3 products per activity

@@ -38,11 +38,46 @@ const INDIAN_DISTRICTS: Record<string, string[]> = {
   'Haryana': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Karnal', 'Rohtak']
 };
 
-const TERRITORIES = ['North Zone', 'South Zone', 'East Zone', 'West Zone', 'Central Zone'];
+// Indian territories (state-based zones)
+const TERRITORIES = [
+  'Uttar Pradesh Zone', 'Maharashtra Zone', 'Bihar Zone', 'West Bengal Zone', 'Madhya Pradesh Zone',
+  'Tamil Nadu Zone', 'Rajasthan Zone', 'Karnataka Zone', 'Gujarat Zone', 'Andhra Pradesh Zone',
+  'Odisha Zone', 'Telangana Zone', 'Kerala Zone', 'Punjab Zone', 'Haryana Zone'
+];
+
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
 const CROPS = ['Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Soybean', 'Maize', 'Groundnut', 'Pulses', 'Jowar', 'Bajra', 'Ragi', 'Mustard'];
 const PRODUCTS = ['NACL Pro', 'NACL Gold', 'NACL Premium', 'NACL Base', 'NACL Bio'];
+
+// Indian officer names
+const INDIAN_OFFICER_NAMES = [
+  'Rajesh Kumar Sharma', 'Suresh Singh Yadav', 'Amit Kumar Verma', 'Vinod Kumar Patel',
+  'Manoj Kumar Singh', 'Ramesh Kumar Gupta', 'Pradeep Kumar Tiwari', 'Anil Kumar Shukla',
+  'Sunil Kumar Pandey', 'Deepak Kumar Mishra', 'Vijay Kumar Dwivedi', 'Ravi Kumar Tripathi',
+  'Ajay Kumar Srivastava', 'Sandeep Kumar Dubey', 'Naresh Kumar Agarwal', 'Mahesh Kumar Saxena',
+  'Pankaj Kumar Ojha', 'Harish Kumar Varma', 'Dinesh Kumar Jaiswal', 'Mukesh Kumar Gaur',
+  'Ashok Kumar Bhatt', 'Nikhil Kumar Joshi', 'Rahul Kumar Agarwal', 'Arun Kumar Mehra',
+  'Tarun Kumar Kapoor', 'Varun Kumar Malhotra', 'Karan Kumar Sethi', 'Rohan Kumar Khurana',
+  'Aman Kumar Chawla', 'Vishal Kumar Bansal', 'Naveen Kumar Goel', 'Pankaj Kumar Ahuja',
+  'Rajesh Kumar Batra', 'Srinivas Kumar Reddy', 'Krishna Kumar Naidu', 'Rama Kumar Goud',
+  'Lakshmi Kumar Iyer', 'Sai Kumar Reddy', 'Nagarjuna Kumar Swamy', 'Chandra Kumar Nair',
+  'Surya Kumar Patil', 'Venkat Kumar Deshmukh', 'Mohan Kumar Jadhav', 'Raghu Kumar Kulkarni',
+  'Siva Kumar Gaikwad', 'Shankar Kumar Pawar', 'Ganesh Kumar More', 'Dilip Kumar Salvi'
+];
+
+// Indian village names
+const INDIAN_VILLAGES = [
+  'Amarpur', 'Badlapur', 'Chandrapur', 'Dharampur', 'Etah', 'Faridpur', 'Gulabpur',
+  'Harihar', 'Indrapur', 'Jagdishpur', 'Kalyanpur', 'Lakshmipur', 'Madhupur', 'Nagarjuna',
+  'Ojhar', 'Pratapgarh', 'Rajgarh', 'Sultanpur', 'Tikapur', 'Ujjain', 'Varanasi',
+  'Wardha', 'Yavatmal', 'Zirakpur', 'Akola', 'Bhandara', 'Chhindwara', 'Dewas',
+  'Etawah', 'Firozabad', 'Gorakhpur', 'Hamirpur', 'Idukki', 'Jalandhar', 'Kanchipuram',
+  'Latur', 'Mangalore', 'Nanded', 'Osmanabad', 'Parbhani', 'Ratnagiri', 'Sangli',
+  'Thane', 'Udaipur', 'Vidisha', 'Wayanad', 'Yadgir', 'Zunheboto', 'Aizawl', 'Bhopal',
+  'Chittorgarh', 'Dharwad', 'Erode', 'Fatehpur', 'Guntur', 'Hubli', 'Imphal', 'Jodhpur',
+  'Kolar', 'Ludhiana', 'Mysore', 'Nagpur', 'Ooty', 'Pali', 'Raipur', 'Satara', 'Tumkur'
+];
 
 // Indian farmer names by language/region
 const INDIAN_NAMES: Record<string, string[]> = {
@@ -133,7 +168,7 @@ const generateFarmerName = (index: number, language: string): string => {
   return names[index % names.length];
 };
 
-const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string } => {
+const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string } => {
   // Map languages to states
   const languageStateMap: Record<string, string[]> = {
     'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
@@ -148,9 +183,10 @@ const generateIndianLocation = (index: number, language: string): { state: strin
   const state = possibleStates[index % possibleStates.length];
   const districts = INDIAN_DISTRICTS[state] || ['District 1'];
   const district = districts[index % districts.length];
-  const village = `Village ${String.fromCharCode(65 + (index % 26))}${(index % 100) + 1}`;
+  const village = INDIAN_VILLAGES[index % INDIAN_VILLAGES.length];
+  const territory = `${state} Zone`;
   
-  return { state, district, village };
+  return { state, district, village, territory };
 };
 
 const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> => {
@@ -173,7 +209,7 @@ const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> 
     }
     
     const language = LANGUAGES[i % LANGUAGES.length];
-    const { state, district, village } = generateIndianLocation(existingCount + i, language);
+    const { state, district, village, territory } = generateIndianLocation(existingCount + i, language);
     const farmerName = generateFarmerName(existingCount + i, language);
     
     const farmer = new Farmer({
@@ -181,7 +217,7 @@ const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> 
       mobileNumber,
       location: `${village}, ${district}, ${state}`,
       preferredLanguage: language,
-      territory: TERRITORIES[i % TERRITORIES.length],
+      territory: territory,
     });
     
     await farmer.save();
@@ -226,15 +262,21 @@ const createActivities = async (
     const firstFarmer = await Farmer.findById(selectedFarmers[0]);
     const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : `Location ${i + 1}`;
     
+    // Get officer name and territory from first farmer
+    const firstFarmer = await Farmer.findById(selectedFarmers[0]);
+    const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
+    const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
+    const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
+    
     // Create activity
     const activity = new Activity({
       activityId,
       type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
       date: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)), // Activities over last N days
-      officerId: `OFFICER-${(i % 10) + 1}`,
-      officerName: `Officer ${(i % 10) + 1}`,
+      officerId: officerId,
+      officerName: officerName,
       location: activityLocation,
-      territory: TERRITORIES[i % TERRITORIES.length],
+      territory: activityTerritory,
       farmerIds: selectedFarmers,
       crops: CROPS.slice(0, Math.min((i % 4) + 2, CROPS.length)), // 2-5 crops per activity
       products: PRODUCTS.slice(0, Math.min((i % 3) + 1, PRODUCTS.length)), // 1-3 products per activity
