@@ -11,33 +11,146 @@ dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
 
-// Sample data for testing
+// Indian data for testing
+const INDIAN_STATES = [
+  'Uttar Pradesh', 'Maharashtra', 'Bihar', 'West Bengal', 'Madhya Pradesh',
+  'Tamil Nadu', 'Rajasthan', 'Karnataka', 'Gujarat', 'Andhra Pradesh',
+  'Odisha', 'Telangana', 'Kerala', 'Jharkhand', 'Assam', 'Punjab', 'Haryana'
+];
+
+const INDIAN_DISTRICTS: Record<string, string[]> = {
+  'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', 'Meerut', 'Ghaziabad'],
+  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Thane'],
+  'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga', 'Arrah'],
+  'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Bardhaman', 'Malda'],
+  'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Raipur', 'Sagar'],
+  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Erode'],
+  'Rajasthan': ['Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Bhilwara'],
+  'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum', 'Gulbarga', 'Davangere'],
+  'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
+  'Andhra Pradesh': ['Hyderabad', 'Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati'],
+  'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore'],
+  'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Mahbubnagar', 'Adilabad'],
+  'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Alappuzha', 'Kannur'],
+  'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar', 'Giridih'],
+  'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia', 'Tezpur'],
+  'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Pathankot', 'Hoshiarpur'],
+  'Haryana': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Karnal', 'Rohtak']
+};
+
 const TERRITORIES = ['North Zone', 'South Zone', 'East Zone', 'West Zone', 'Central Zone'];
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
-const CROPS = ['Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Soybean', 'Maize', 'Groundnut', 'Pulses'];
+const CROPS = ['Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Soybean', 'Maize', 'Groundnut', 'Pulses', 'Jowar', 'Bajra', 'Ragi', 'Mustard'];
 const PRODUCTS = ['NACL Pro', 'NACL Gold', 'NACL Premium', 'NACL Base', 'NACL Bio'];
 
-const generateMobileNumber = (index: number): string => {
-  // Generate a unique 10-digit mobile number
-  const base = 9000000000; // Start from 9000000000
-  return String(base + index).padStart(10, '0');
+// Indian farmer names by language/region
+const INDIAN_NAMES: Record<string, string[]> = {
+  'Hindi': [
+    'Ram Kumar Yadav', 'Shyam Singh', 'Gopal Prasad', 'Mohan Das', 'Ramesh Kumar',
+    'Suresh Kumar', 'Anil Kumar', 'Vinod Kumar', 'Prakash Singh', 'Amit Kumar',
+    'Sandeep Kumar', 'Raj Kumar', 'Deepak Singh', 'Manish Kumar', 'Ashok Kumar',
+    'Sunil Kumar', 'Ravi Kumar', 'Mukesh Kumar', 'Dinesh Kumar', 'Vijay Kumar',
+    'Naresh Kumar', 'Harish Kumar', 'Mahesh Kumar', 'Ganesh Kumar', 'Dilip Kumar',
+    'Sanjay Kumar', 'Ajay Kumar', 'Pradeep Kumar', 'Rahul Kumar', 'Sachin Kumar',
+    'Nikhil Kumar', 'Arun Kumar', 'Tarun Kumar', 'Varun Kumar', 'Karan Kumar',
+    'Rohan Kumar', 'Aman Kumar', 'Rahul Singh', 'Amit Singh', 'Rohit Singh',
+    'Vikram Singh', 'Aditya Singh', 'Karan Singh', 'Arjun Singh', 'Yash Singh',
+    'Harsh Singh', 'Vishal Kumar', 'Naveen Kumar', 'Pankaj Kumar', 'Rajesh Kumar'
+  ],
+  'Telugu': [
+    'Venkatesh Reddy', 'Ramesh Naidu', 'Suresh Goud', 'Kumar Swamy', 'Rajesh Naidu',
+    'Prakash Reddy', 'Anil Naidu', 'Vinod Goud', 'Sandeep Reddy', 'Deepak Naidu',
+    'Manish Reddy', 'Ashok Naidu', 'Sunil Goud', 'Ravi Naidu', 'Mukesh Reddy',
+    'Dinesh Naidu', 'Vijay Goud', 'Naresh Reddy', 'Harish Naidu', 'Mahesh Goud',
+    'Ganesh Reddy', 'Dilip Naidu', 'Sanjay Goud', 'Ajay Reddy', 'Pradeep Naidu',
+    'Rahul Goud', 'Sachin Reddy', 'Nikhil Naidu', 'Arun Goud', 'Tarun Reddy',
+    'Varun Naidu', 'Karan Goud', 'Rohan Reddy', 'Aman Naidu', 'Vishal Goud',
+    'Naveen Reddy', 'Pankaj Naidu', 'Rajesh Goud', 'Srinivas Reddy', 'Krishna Naidu',
+    'Rama Naidu', 'Lakshmi Reddy', 'Sai Goud', 'Nagarjuna Reddy', 'Chandra Naidu',
+    'Surya Goud', 'Venkat Reddy', 'Mohan Naidu', 'Raghu Goud', 'Siva Reddy'
+  ],
+  'Marathi': [
+    'Rajesh Patil', 'Suresh Deshmukh', 'Kumar Jadhav', 'Anil Pawar', 'Vinod Kulkarni',
+    'Prakash Patil', 'Sandeep Deshmukh', 'Deepak Jadhav', 'Manish Pawar', 'Ashok Kulkarni',
+    'Sunil Patil', 'Ravi Deshmukh', 'Mukesh Jadhav', 'Dinesh Pawar', 'Vijay Kulkarni',
+    'Naresh Patil', 'Harish Deshmukh', 'Mahesh Jadhav', 'Ganesh Pawar', 'Dilip Kulkarni',
+    'Sanjay Patil', 'Ajay Deshmukh', 'Pradeep Jadhav', 'Rahul Pawar', 'Sachin Kulkarni',
+    'Nikhil Patil', 'Arun Deshmukh', 'Tarun Jadhav', 'Varun Pawar', 'Karan Kulkarni',
+    'Rohan Patil', 'Aman Deshmukh', 'Vishal Jadhav', 'Naveen Pawar', 'Pankaj Kulkarni',
+    'Rajesh Gaikwad', 'Srinivas Patil', 'Krishna Deshmukh', 'Rama Jadhav', 'Lakshmi Pawar',
+    'Sai Kulkarni', 'Nagarjuna Patil', 'Chandra Deshmukh', 'Surya Jadhav', 'Venkat Pawar',
+    'Mohan Kulkarni', 'Raghu Patil', 'Siva Deshmukh', 'Shankar Jadhav', 'Ganesh Pawar'
+  ],
+  'Kannada': [
+    'Ramesh Gowda', 'Suresh Reddy', 'Kumar Naidu', 'Anil Gowda', 'Vinod Reddy',
+    'Prakash Naidu', 'Sandeep Gowda', 'Deepak Reddy', 'Manish Naidu', 'Ashok Gowda',
+    'Sunil Reddy', 'Ravi Naidu', 'Mukesh Gowda', 'Dinesh Reddy', 'Vijay Naidu',
+    'Naresh Gowda', 'Harish Reddy', 'Mahesh Naidu', 'Ganesh Gowda', 'Dilip Reddy',
+    'Sanjay Naidu', 'Ajay Gowda', 'Pradeep Reddy', 'Rahul Naidu', 'Sachin Gowda',
+    'Nikhil Reddy', 'Arun Naidu', 'Tarun Gowda', 'Varun Reddy', 'Karan Naidu',
+    'Rohan Gowda', 'Aman Reddy', 'Vishal Naidu', 'Naveen Gowda', 'Pankaj Reddy',
+    'Rajesh Naidu', 'Srinivas Gowda', 'Krishna Reddy', 'Rama Naidu', 'Lakshmi Gowda',
+    'Sai Reddy', 'Nagarjuna Naidu', 'Chandra Gowda', 'Surya Reddy', 'Venkat Naidu',
+    'Mohan Gowda', 'Raghu Reddy', 'Siva Naidu', 'Shankar Gowda', 'Ganesh Reddy'
+  ],
+  'Tamil': [
+    'Ramesh Nair', 'Suresh Iyer', 'Kumar Reddy', 'Anil Nair', 'Vinod Iyer',
+    'Prakash Reddy', 'Sandeep Nair', 'Deepak Iyer', 'Manish Reddy', 'Ashok Nair',
+    'Sunil Iyer', 'Ravi Reddy', 'Mukesh Nair', 'Dinesh Iyer', 'Vijay Reddy',
+    'Naresh Nair', 'Harish Iyer', 'Mahesh Reddy', 'Ganesh Nair', 'Dilip Iyer',
+    'Sanjay Reddy', 'Ajay Nair', 'Pradeep Iyer', 'Rahul Reddy', 'Sachin Nair',
+    'Nikhil Iyer', 'Arun Reddy', 'Tarun Nair', 'Varun Iyer', 'Karan Reddy',
+    'Rohan Nair', 'Aman Iyer', 'Vishal Reddy', 'Naveen Nair', 'Pankaj Iyer',
+    'Rajesh Reddy', 'Srinivas Nair', 'Krishna Iyer', 'Rama Reddy', 'Lakshmi Nair',
+    'Sai Iyer', 'Nagarjuna Reddy', 'Chandra Nair', 'Surya Iyer', 'Venkat Reddy',
+    'Mohan Nair', 'Raghu Iyer', 'Siva Reddy', 'Shankar Nair', 'Ganesh Iyer'
+  ],
+  'English': [
+    'John Kumar', 'David Singh', 'Michael Reddy', 'Robert Naidu', 'William Goud',
+    'James Patil', 'Richard Deshmukh', 'Joseph Jadhav', 'Thomas Pawar', 'Charles Kulkarni',
+    'Christopher Gowda', 'Daniel Iyer', 'Matthew Nair', 'Anthony Reddy', 'Mark Naidu',
+    'Donald Goud', 'Steven Patil', 'Paul Deshmukh', 'Andrew Jadhav', 'Joshua Pawar',
+    'Kenneth Kulkarni', 'Kevin Gowda', 'Brian Iyer', 'George Nair', 'Timothy Reddy',
+    'Ronald Naidu', 'Jason Goud', 'Edward Patil', 'Jeffrey Deshmukh', 'Ryan Jadhav',
+    'Jacob Pawar', 'Gary Kulkarni', 'Nicholas Gowda', 'Eric Iyer', 'Jonathan Nair',
+    'Stephen Reddy', 'Larry Naidu', 'Justin Goud', 'Scott Patil', 'Brandon Deshmukh',
+    'Benjamin Jadhav', 'Samuel Pawar', 'Frank Kulkarni', 'Gregory Gowda', 'Raymond Iyer',
+    'Alexander Nair', 'Patrick Reddy', 'Jack Naidu', 'Dennis Goud', 'Jerry Patil'
+  ]
 };
 
-const generateFarmerName = (index: number): string => {
-  const names = [
-    'Ram Kumar', 'Shyam Singh', 'Gopal Yadav', 'Mohan Das', 'Ramesh Patel',
-    'Suresh Reddy', 'Kumar Swamy', 'Rajesh Nair', 'Anil Kumar', 'Vinod Kumar',
-    'Prakash Singh', 'Amit Kumar', 'Sandeep Kumar', 'Raj Kumar', 'Deepak Singh',
-    'Manish Kumar', 'Ashok Kumar', 'Sunil Kumar', 'Ravi Kumar', 'Mukesh Kumar',
-    'Dinesh Kumar', 'Vijay Kumar', 'Naresh Kumar', 'Harish Kumar', 'Suresh Kumar',
-    'Mahesh Kumar', 'Ramesh Kumar', 'Ganesh Kumar', 'Dilip Kumar', 'Sanjay Kumar',
-    'Ajay Kumar', 'Pradeep Kumar', 'Rahul Kumar', 'Sachin Kumar', 'Nikhil Kumar',
-    'Arun Kumar', 'Tarun Kumar', 'Varun Kumar', 'Karan Kumar', 'Rohan Kumar',
-    'Aman Kumar', 'Rahul Singh', 'Amit Singh', 'Rohit Singh', 'Vikram Singh',
-    'Aditya Singh', 'Karan Singh', 'Arjun Singh', 'Yash Singh', 'Harsh Singh'
-  ];
+const generateMobileNumber = (index: number): string => {
+  // Generate a unique 10-digit Indian mobile number (starts with 7, 8, or 9)
+  const prefixes = [7, 8, 9];
+  const prefix = prefixes[index % prefixes.length];
+  const base = prefix * 1000000000; // e.g., 7000000000, 8000000000, 9000000000
+  return String(base + (index % 100000000)).padStart(10, '0');
+};
+
+const generateFarmerName = (index: number, language: string): string => {
+  const names = INDIAN_NAMES[language] || INDIAN_NAMES['Hindi'];
   return names[index % names.length];
+};
+
+const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string } => {
+  // Map languages to states
+  const languageStateMap: Record<string, string[]> = {
+    'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
+    'Telugu': ['Andhra Pradesh', 'Telangana'],
+    'Marathi': ['Maharashtra'],
+    'Kannada': ['Karnataka'],
+    'Tamil': ['Tamil Nadu'],
+    'English': ['Karnataka', 'Kerala', 'Tamil Nadu']
+  };
+  
+  const possibleStates = languageStateMap[language] || ['Uttar Pradesh'];
+  const state = possibleStates[index % possibleStates.length];
+  const districts = INDIAN_DISTRICTS[state] || ['District 1'];
+  const district = districts[index % districts.length];
+  const village = `Village ${String.fromCharCode(65 + (index % 26))}${(index % 100) + 1}`;
+  
+  return { state, district, village };
 };
 
 const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> => {
@@ -59,11 +172,15 @@ const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> 
       continue;
     }
     
+    const language = LANGUAGES[i % LANGUAGES.length];
+    const { state, district, village } = generateIndianLocation(existingCount + i, language);
+    const farmerName = generateFarmerName(existingCount + i, language);
+    
     const farmer = new Farmer({
-      name: generateFarmerName(existingCount + i),
+      name: farmerName,
       mobileNumber,
-      location: `Village ${i + 1}, District ${(i % 5) + 1}`,
-      preferredLanguage: LANGUAGES[i % LANGUAGES.length],
+      location: `${village}, ${district}, ${state}`,
+      preferredLanguage: language,
       territory: TERRITORIES[i % TERRITORIES.length],
     });
     
@@ -87,8 +204,8 @@ const createActivities = async (
   const existingCount = await Activity.countDocuments();
   logger.info(`Existing activities: ${existingCount}`);
   
-  // Get unique farmer groups for activities (each activity has 5-10 farmers)
-  const farmersPerActivity = 8;
+  // Get unique farmer groups for activities (each activity has 10-15 farmers for proper sampling)
+  const farmersPerActivity = 12; // Increased to ensure good sampling
   
   for (let i = 0; i < count; i++) {
     const activityId = `TEST-ACT-${Date.now()}-${i}`;
@@ -105,6 +222,10 @@ const createActivities = async (
     const shuffled = [...farmerIds].sort(() => 0.5 - Math.random());
     const selectedFarmers = shuffled.slice(0, Math.min(farmersPerActivity, farmerIds.length));
     
+    // Get location from first farmer in the activity
+    const firstFarmer = await Farmer.findById(selectedFarmers[0]);
+    const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : `Location ${i + 1}`;
+    
     // Create activity
     const activity = new Activity({
       activityId,
@@ -112,11 +233,11 @@ const createActivities = async (
       date: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)), // Activities over last N days
       officerId: `OFFICER-${(i % 10) + 1}`,
       officerName: `Officer ${(i % 10) + 1}`,
-      location: `Location ${i + 1}`,
+      location: activityLocation,
       territory: TERRITORIES[i % TERRITORIES.length],
       farmerIds: selectedFarmers,
-      crops: CROPS.slice(0, (i % 3) + 1), // 1-3 crops per activity
-      products: PRODUCTS.slice(0, (i % 2) + 1), // 1-2 products per activity
+      crops: CROPS.slice(0, Math.min((i % 4) + 2, CROPS.length)), // 2-5 crops per activity
+      products: PRODUCTS.slice(0, Math.min((i % 3) + 1, PRODUCTS.length)), // 1-3 products per activity
     });
     
     await activity.save();
