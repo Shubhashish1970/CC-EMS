@@ -13,6 +13,7 @@ import TaskDetailsPanel from './TaskDetailsPanel';
 import CallInteractionForm from './CallInteractionForm';
 import AICopilotPanel from './AICopilotPanel';
 import CallReviewModal from './CallReviewModal';
+import TaskSelectionModal from './TaskSelectionModal';
 import Button from './shared/Button';
 
 // Business Constants
@@ -82,60 +83,53 @@ const AgentWorkspace: React.FC = () => {
   }, [taskData, formData.callStatus]);
 
 
-  const handleLoadTasks = async () => {
-    console.log('handleLoadTasks: Function called, starting task load...');
-    
-    // Clear any existing abort controller and error
-    if (abortController) {
-      console.log('handleLoadTasks: Aborting existing controller');
-      abortController.abort();
-    }
+  const handleLoadTasks = () => {
+    // Show task selection modal instead of directly loading
+    setShowTaskSelectionModal(true);
     setError(null);
-    
-    const controller = new AbortController();
-    setAbortController(controller);
-    setIsLoading(true);
-    console.log('handleLoadTasks: isLoading set to true');
-    
-    let timeoutCleared = false;
-    
-    // Set a maximum timeout to ensure loading always clears (10 seconds)
-    const timeoutId = setTimeout(() => {
-      if (!controller.signal.aborted && !timeoutCleared) {
-        console.warn('handleLoadTasks: Timeout after 10 seconds');
-        controller.abort();
-        setIsLoading(false);
-        setTaskData(null);
-        setError('Request timed out. Please check your connection and try again.');
-        setAbortController(null);
-        timeoutCleared = true;
-      }
-    }, 10000);
-    
+  };
+
+  const handleTaskSelected = (selectedTask: any) => {
+    // Task is already loaded by the modal, format it for display
     try {
-      await fetchActiveTask(controller.signal);
-      // Clear error on success
+      const formattedTask: TaskData = {
+        taskId: selectedTask.taskId,
+        farmer: {
+          name: selectedTask.farmer.name,
+          location: selectedTask.farmer.location,
+          preferredLanguage: selectedTask.farmer.preferredLanguage,
+          mobileNumber: selectedTask.farmer.mobileNumber,
+          photoUrl: selectedTask.farmer.photoUrl,
+        },
+        activity: {
+          type: selectedTask.activity.type,
+          date: selectedTask.activity.date,
+          officer: selectedTask.activity.officerName,
+          location: selectedTask.activity.location,
+          crops: selectedTask.activity.crops || [],
+          products: selectedTask.activity.products || [],
+        },
+      };
+      setTaskData(formattedTask);
       setError(null);
-      console.log('handleLoadTasks: Task fetch completed successfully');
-    } catch (error) {
-      // Only handle error if not aborted
-      if (!controller.signal.aborted) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load tasks. Please try again.';
-        setError(errorMessage);
-        setTaskData(null);
-        console.error('handleLoadTasks: Error loading tasks:', error);
-      } else {
-        console.log('handleLoadTasks: Request was aborted, ignoring error');
-      }
-    } finally {
-      // Always clear timeout and loading state
-      if (!timeoutCleared) {
-        clearTimeout(timeoutId);
-      }
-      // Immediately clear loading state
-      console.log('handleLoadTasks: Finally block - clearing loading state');
-      setIsLoading(false);
-      setAbortController(null);
+      
+      // Reset form when new task is loaded
+      setFormData({
+        callStatus: '',
+        didAttend: null,
+        didRecall: null,
+        cropsDiscussed: [],
+        productsDiscussed: [],
+        hasPurchased: null,
+        willingToPurchase: null,
+        likelyPurchaseDate: undefined,
+        nonPurchaseReason: '',
+        purchasedProducts: [],
+        agentObservations: '',
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load selected task');
+      setTaskData(null);
     }
   };
 
@@ -585,6 +579,13 @@ const AgentWorkspace: React.FC = () => {
           </button>
         </div>
       </main>
+
+      {/* Task Selection Modal */}
+      <TaskSelectionModal
+        isOpen={showTaskSelectionModal}
+        onClose={() => setShowTaskSelectionModal(false)}
+        onSelectTask={handleTaskSelected}
+      />
 
       {/* Call Review Modal */}
       {taskData && (

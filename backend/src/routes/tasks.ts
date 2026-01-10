@@ -6,6 +6,7 @@ import { requireRole, requirePermission } from '../middleware/rbac.js';
 import { AppError } from '../middleware/errorHandler.js';
 import {
   getNextTaskForAgent,
+  getAvailableTasksForAgent,
   getPendingTasks,
   getTeamTasks,
   assignTaskToAgent,
@@ -30,8 +31,133 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// @route   GET /api/tasks/available
+// @desc    Get all available tasks for CC Agent (for selection)
+// @access  Private (CC Agent only)
+router.get(
+  '/available',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const tasks = await getAvailableTasksForAgent(agentId);
+
+      // Format tasks for response
+      const formattedTasks = tasks.map((task) => {
+        const farmer = task.farmerId as any;
+        const activity = task.activityId as any;
+        
+        return {
+          taskId: task._id.toString(),
+          farmer: {
+            name: farmer?.name || 'Unknown',
+            mobileNumber: farmer?.mobileNumber || 'Unknown',
+            location: farmer?.location || 'Unknown',
+            preferredLanguage: farmer?.preferredLanguage || 'Unknown',
+            photoUrl: farmer?.photoUrl,
+          },
+          activity: {
+            type: activity?.type || 'Unknown',
+            date: activity?.date || task.createdAt,
+            officerName: activity?.officerName || 'Unknown',
+            location: activity?.location || 'Unknown',
+            territory: activity?.territory || 'Unknown',
+            crops: Array.isArray(activity?.crops) ? activity.crops : (activity?.crops ? [activity.crops] : []),
+            products: Array.isArray(activity?.products) ? activity.products : (activity?.products ? [activity.products] : []),
+          },
+          status: task.status,
+          scheduledDate: task.scheduledDate,
+          createdAt: task.createdAt,
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          tasks: formattedTasks,
+          count: formattedTasks.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/tasks/:id/load
+// @desc    Load a specific task for CC Agent (sets status to in_progress)
+// @access  Private (CC Agent only)
+router.post(
+  '/:id/load',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const taskId = req.params.id;
+
+      // Get and verify task
+      const task = await CallTask.findById(taskId)
+        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+        .populate('activityId', 'type date officerName location territory crops products');
+
+      if (!task) {
+        const error: AppError = new Error('Task not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Verify task is assigned to this agent
+      if (task.assignedAgentId.toString() !== agentId) {
+        const error: AppError = new Error('Task not assigned to you');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      // Verify task is available (sampled_in_queue or in_progress)
+      if (task.status !== 'sampled_in_queue' && task.status !== 'in_progress') {
+        const error: AppError = new Error('Task is not available to load');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Update status to in_progress if it's sampled_in_queue
+      if (task.status === 'sampled_in_queue') {
+        await updateTaskStatus(taskId, 'in_progress', 'Task selected by agent');
+        task.status = 'in_progress';
+      }
+
+      // Format activity data
+      const activity = task.activityId as any;
+      const activityData = activity ? {
+        type: activity.type || 'Unknown',
+        date: activity.date || new Date(),
+        officerName: activity.officerName || 'Unknown',
+        location: activity.location || 'Unknown',
+        territory: activity.territory || 'Unknown',
+        crops: Array.isArray(activity.crops) ? activity.crops : (activity.crops ? [activity.crops] : []),
+        products: Array.isArray(activity.products) ? activity.products : (activity.products ? [activity.products] : []),
+      } : null;
+
+      res.json({
+        success: true,
+        data: {
+          taskId: task._id,
+          farmer: task.farmerId,
+          activity: activityData,
+          status: task.status,
+          scheduledDate: task.scheduledDate,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/tasks/active
-// @desc    Get next assigned task for CC Agent
+// @desc    Get next assigned task for CC Agent (legacy - for backward compatibility)
 // @access  Private (CC Agent only)
 router.get(
   '/active',

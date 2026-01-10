@@ -138,6 +138,16 @@ export const tasksAPI = {
     return response;
   },
 
+  getAvailableTasks: async (abortSignal?: AbortSignal) => {
+    return apiRequest<{ success: boolean; data: { tasks: any[]; count: number } }>('/tasks/available', {}, abortSignal);
+  },
+
+  loadTask: async (taskId: string) => {
+    return apiRequest<{ success: boolean; data: { taskId: string; farmer: any; activity: any; status: string; scheduledDate: string } }>(`/tasks/${taskId}/load`, {
+      method: 'POST',
+    });
+  },
+
   submitInteraction: async (taskId: string, log: any) => {
     return apiRequest(`/tasks/${taskId}/submit`, {
       method: 'POST',

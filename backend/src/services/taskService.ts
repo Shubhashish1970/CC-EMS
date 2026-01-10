@@ -12,6 +12,29 @@ export interface TaskAssignmentOptions {
 }
 
 /**
+ * Get all available tasks for an agent (sampled_in_queue and in_progress)
+ * Returns list of tasks sorted by scheduledDate (earliest first)
+ */
+export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallTask[]> => {
+  try {
+    const tasks = await CallTask.find({
+      assignedAgentId: new mongoose.Types.ObjectId(agentId),
+      status: { $in: ['sampled_in_queue', 'in_progress'] },
+      scheduledDate: { $lte: new Date() }, // Only tasks that are due
+    })
+      .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+      .populate('activityId', 'type date officerName location territory crops products')
+      .sort({ scheduledDate: 1 }) // Earliest first
+      .limit(50); // Reasonable limit
+
+    return tasks;
+  } catch (error) {
+    logger.error('Error fetching available tasks for agent:', error);
+    throw error;
+  }
+};
+
+/**
  * Get the next pending task for an agent
  * Prioritizes tasks by scheduledDate (earliest first)
  * Also returns in_progress tasks if agent is already working on them
@@ -36,10 +59,10 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
         status: 'in_progress',
         scheduledDate: { $lte: new Date() },
       })
-        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-        .populate('activityId', 'type date officerName location territory crops products')
-        .sort({ scheduledDate: 1 })
-        .limit(1);
+      .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+      .populate('activityId', 'type date officerName location territory crops products')
+      .sort({ scheduledDate: 1 })
+      .limit(1);
     }
 
     return task;
