@@ -31,7 +31,7 @@ const updateTaskDates = async () => {
     const result = await CallTask.updateMany(
       {
         assignedAgentId: agent._id,
-        status: 'pending',
+        status: 'sampled_in_queue',
         scheduledDate: { $gt: today }
       },
       {
@@ -45,7 +45,7 @@ const updateTaskDates = async () => {
     const pastResult = await CallTask.updateMany(
       {
         assignedAgentId: agent._id,
-        status: 'pending',
+        status: 'sampled_in_queue',
         scheduledDate: { $lt: today }
       },
       {
@@ -57,7 +57,7 @@ const updateTaskDates = async () => {
     
     const availableTasks = await CallTask.countDocuments({
       assignedAgentId: agent._id,
-      status: 'pending',
+      status: 'sampled_in_queue',
       scheduledDate: { $lte: today }
     });
 

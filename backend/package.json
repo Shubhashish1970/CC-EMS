@@ -15,7 +15,8 @@
     "create:test-data": "tsx src/scripts/createTestData.ts",
     "update:task-dates": "tsx src/scripts/updateTaskDates.ts",
     "test:admin": "tsx src/scripts/testAdminService.ts",
-    "update:emails": "tsx src/scripts/updateUserEmails.ts"
+    "update:emails": "tsx src/scripts/updateUserEmails.ts",
+    "migrate:status": "tsx src/scripts/migratePendingToSampledInQueue.ts"
   },
   "dependencies": {
     "@types/nodemailer": "^7.0.4",

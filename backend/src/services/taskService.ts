@@ -18,10 +18,10 @@ export interface TaskAssignmentOptions {
  */
 export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | null> => {
   try {
-    // First, try to get a pending task
+    // First, try to get a sampled_in_queue task
     let task = await CallTask.findOne({
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
-      status: 'pending',
+      status: 'sampled_in_queue',
       scheduledDate: { $lte: new Date() }, // Only tasks that are due
     })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
@@ -63,7 +63,7 @@ export const getPendingTasks = async (filters?: {
     const skip = (page - 1) * limit;
 
     const query: any = {
-      status: { $in: ['pending', 'in_progress'] },
+      status: { $in: ['sampled_in_queue', 'in_progress'] },
     };
 
     if (agentId) {
@@ -205,7 +205,7 @@ export const assignTaskToAgent = async (
     }
 
     task.assignedAgentId = new mongoose.Types.ObjectId(agentId);
-    task.status = 'pending';
+    task.status = 'sampled_in_queue';
     await task.save();
 
     logger.info(`Task ${taskId} assigned to agent ${agent.email}`);
@@ -249,7 +249,7 @@ export const autoAssignTask = async (taskId: string): Promise<ICallTask | null> 
       agents.map(async (agent) => {
         const count = await CallTask.countDocuments({
           assignedAgentId: agent._id,
-          status: { $in: ['pending', 'in_progress'] },
+          status: { $in: ['sampled_in_queue', 'in_progress'] },
         });
         return { agent, count };
       })
@@ -260,7 +260,7 @@ export const autoAssignTask = async (taskId: string): Promise<ICallTask | null> 
     const selectedAgent = agentTaskCounts[0].agent;
 
     task.assignedAgentId = selectedAgent._id;
-    task.status = 'pending';
+    task.status = 'sampled_in_queue';
     await task.save();
 
     logger.info(`Task ${taskId} auto-assigned to agent ${selectedAgent.email}`);

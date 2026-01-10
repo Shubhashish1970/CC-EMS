@@ -45,12 +45,12 @@ router.get(
       if (!task) {
         return res.json({
           success: true,
-          data: { task: null, message: 'No pending tasks available' },
+          data: { task: null, message: 'No tasks available in queue' },
         });
       }
 
       // Update status to in_progress
-      await updateTaskStatus(task._id.toString(), 'in_progress');
+      await updateTaskStatus(task._id.toString(), 'in_progress', 'Task loaded by agent');
 
       // Ensure activity data includes crops and products
       const activity = task.activityId as any;
@@ -137,7 +137,7 @@ router.get(
   '/team',
   requirePermission('tasks.view.team'),
   [
-    query('status').optional().isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('status').optional().isIn(['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
@@ -289,10 +289,12 @@ router.post(
         finalStatus = 'invalid_number';
       }
 
+      // Add to interaction history (record previous status before update)
+      const previousStatus = task.status;
       // Add to interaction history
       task.interactionHistory.push({
         timestamp: new Date(),
-        status: task.status,
+        status: previousStatus,
         notes: 'Call interaction submitted',
       });
 
@@ -377,7 +379,7 @@ router.put(
   [
     body('taskIds').isArray().withMessage('taskIds must be an array'),
     body('taskIds.*').isMongoId().withMessage('Each task ID must be valid'),
-    body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
+    body('status').isIn(['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
     body('notes').optional().isString(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
@@ -536,7 +538,7 @@ router.put(
         next();
       },
       [
-        body('status').isIn(['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
+        body('status').isIn(['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']).withMessage('Invalid status'),
         body('notes').optional().isString(),
       ],
       async (req: Request, res: Response, next: NextFunction) => {

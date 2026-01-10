@@ -11,7 +11,7 @@ interface AgentQueueSummary {
   employeeId: string;
   languageCapabilities: string[];
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;
@@ -29,7 +29,7 @@ interface AgentQueueDetail {
     languageCapabilities: string[];
   };
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;
@@ -50,7 +50,7 @@ interface AgentQueueDetail {
       officerName: string;
       territory: string;
     };
-    status: 'pending' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+    status: 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
     scheduledDate: string;
     createdAt: string;
   }>;
@@ -108,14 +108,14 @@ const AgentQueueView: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
+      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Sampled - in queue' },
       in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'In Progress' },
       completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
       not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Not Reachable' },
       invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: 'Invalid Number' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.sampled_in_queue;
     const Icon = config.icon;
 
     return (
@@ -190,8 +190,8 @@ const AgentQueueView: React.FC = () => {
               <p className="text-2xl font-black text-slate-900">{agentDetail.statusBreakdown.total}</p>
             </div>
             <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-              <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Pending</p>
-              <p className="text-2xl font-black text-yellow-800">{agentDetail.statusBreakdown.pending}</p>
+              <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+              <p className="text-2xl font-black text-yellow-800">{agentDetail.statusBreakdown.sampled_in_queue}</p>
             </div>
             <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
               <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
@@ -363,8 +363,8 @@ const AgentQueueView: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-600">Pending</span>
-                    <span className="font-bold text-yellow-700">{queue.statusBreakdown.pending}</span>
+                    <span className="text-slate-600">Sampled - in queue</span>
+                    <span className="font-bold text-yellow-700">{queue.statusBreakdown.sampled_in_queue}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">In Progress</span>

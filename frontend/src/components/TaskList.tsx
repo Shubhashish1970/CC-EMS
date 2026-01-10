@@ -7,10 +7,11 @@ import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
 import { exportToCSV, exportToPDF, exportToExcel, formatTaskForExport } from '../utils/exportUtils';
 import ReassignModal from './ReassignModal';
+import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
 
 interface Task {
   _id: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+  status: TaskStatus;
   scheduledDate: string;
   farmerId: {
     name: string;
@@ -121,14 +122,14 @@ const TaskList: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
-      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'In Progress' },
-      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
-      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Not Reachable' },
-      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: 'Invalid Number' },
+      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: getTaskStatusLabel('sampled_in_queue') },
+      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: getTaskStatusLabel('in_progress') },
+      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: getTaskStatusLabel('completed') },
+      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: getTaskStatusLabel('not_reachable') },
+      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: getTaskStatusLabel('invalid_number') },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.sampled_in_queue;
     const Icon = config.icon;
 
     return (
@@ -153,7 +154,7 @@ const TaskList: React.FC = () => {
   const calculateStatistics = () => {
     const stats = {
       total: filteredTasks.length,
-      pending: 0,
+      sampled_in_queue: 0,
       in_progress: 0,
       completed: 0,
       not_reachable: 0,
@@ -177,7 +178,7 @@ const TaskList: React.FC = () => {
 
       // Priority based on scheduled date
       const scheduledDate = new Date(task.scheduledDate);
-      if (scheduledDate < today && (task.status === 'pending' || task.status === 'in_progress')) {
+      if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
         stats.overdue++;
       } else if (scheduledDate >= today && scheduledDate < tomorrow) {
         stats.dueToday++;
@@ -197,7 +198,7 @@ const TaskList: React.FC = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    if (scheduledDate < today && (task.status === 'pending' || task.status === 'in_progress')) {
+    if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
       return { level: 'overdue', color: 'bg-red-100 text-red-800 border-red-300', icon: AlertTriangle, label: 'Overdue' };
     } else if (scheduledDate >= today && scheduledDate < new Date(today.getTime() + 24 * 60 * 60 * 1000)) {
       return { level: 'due-today', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: Clock, label: 'Due Today' };
@@ -369,7 +370,7 @@ const TaskList: React.FC = () => {
             <div>
               <h1 className="text-2xl font-black text-slate-900 mb-1">Task Management</h1>
               <p className="text-sm text-slate-600">
-                {user?.role === 'team_lead' ? 'View and manage your team tasks' : 'View and manage all pending tasks'}
+                {user?.role === 'team_lead' ? 'View and manage your team tasks' : 'View and manage all tasks in queue'}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -457,7 +458,7 @@ const TaskList: React.FC = () => {
                     className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
+                    <option value="sampled_in_queue">Sampled - in queue</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
                     <option value="not_reachable">Not Reachable</option>
@@ -533,8 +534,8 @@ const TaskList: React.FC = () => {
                 <p className="text-2xl font-black text-slate-900">{statistics.total}</p>
               </div>
               <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Pending</p>
-                <p className="text-2xl font-black text-yellow-800">{statistics.pending}</p>
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+                <p className="text-2xl font-black text-yellow-800">{statistics.sampled_in_queue}</p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
                 <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
@@ -811,7 +812,7 @@ interface BulkStatusModalProps {
 }
 
 const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUpdate, selectedCount, isProcessing }) => {
-  const [status, setStatus] = useState<string>('pending');
+  const [status, setStatus] = useState<string>('sampled_in_queue');
   const [notes, setNotes] = useState<string>('');
 
   if (!isOpen) return null;
@@ -835,7 +836,7 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
               onChange={(e) => setStatus(e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="pending">Pending</option>
+              <option value="sampled_in_queue">Sampled - in queue</option>
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="not_reachable">Not Reachable</option>

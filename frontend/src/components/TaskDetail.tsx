@@ -8,7 +8,7 @@ import ReassignModal from './ReassignModal';
 
 interface Task {
   _id: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+  status: 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
   scheduledDate: string;
   farmerId: {
     name: string;
@@ -90,14 +90,14 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
+      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Sampled - in queue' },
       in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'In Progress' },
       completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
       not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Not Reachable' },
       invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: 'Invalid Number' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.sampled_in_queue;
     const Icon = config.icon;
 
     return (
@@ -463,7 +463,7 @@ const StatusChangeModal: React.FC<StatusChangeModalProps> = ({ isOpen, onClose, 
               onChange={(e) => setStatus(e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="pending">Pending</option>
+              <option value="pending">Sampled - in queue</option>
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="not_reachable">Not Reachable</option>

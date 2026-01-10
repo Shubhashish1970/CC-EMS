@@ -39,7 +39,7 @@ const createTestTask = async () => {
       farmerId: farmer._id,
       activityId: activity._id,
       assignedAgentId: agent._id,
-      status: 'pending',
+      status: 'sampled_in_queue',
     });
 
     if (existingTask) {
@@ -52,7 +52,7 @@ const createTestTask = async () => {
       farmerId: farmer._id,
       activityId: activity._id,
       assignedAgentId: agent._id,
-      status: 'pending',
+      status: 'sampled_in_queue',
       retryCount: 0,
       scheduledDate: new Date(),
       interactionHistory: [],

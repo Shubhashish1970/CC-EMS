@@ -747,7 +747,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
     await CallTask.updateMany(
       {
         assignedAgentId: agent._id,
-        status: 'pending',
+        status: 'sampled_in_queue',
         scheduledDate: { $ne: today },
       },
       {
@@ -758,7 +758,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
     // Get final counts
     const agentTaskCount = await CallTask.countDocuments({
       assignedAgentId: agent._id,
-      status: { $in: ['pending', 'in_progress'] },
+      status: { $in: ['sampled_in_queue', 'in_progress'] },
     });
 
     const totalTasks = await CallTask.countDocuments();

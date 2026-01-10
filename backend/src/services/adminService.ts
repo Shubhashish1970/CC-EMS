@@ -23,7 +23,7 @@ export interface ActivitySamplingStatus {
     tasksCount: number;
   }>;
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;
@@ -299,7 +299,7 @@ export const getActivitiesWithSampling = async (filters?: {
 
       // Calculate status breakdown
       const statusBreakdown = {
-        pending: 0,
+        sampled_in_queue: 0,
         in_progress: 0,
         completed: 0,
         not_reachable: 0,
@@ -313,8 +313,11 @@ export const getActivitiesWithSampling = async (filters?: {
       >();
 
       for (const task of activityTasks) {
-        // Update status breakdown
-        statusBreakdown[task.status]++;
+        // Update status breakdown - handle status mapping
+        const statusKey = task.status === 'sampled_in_queue' ? 'sampled_in_queue' : task.status;
+        if (statusBreakdown.hasOwnProperty(statusKey)) {
+          statusBreakdown[statusKey as keyof typeof statusBreakdown]++;
+        }
 
         // Group by agent
         const agent = task.assignedAgentId as any;
@@ -514,14 +517,14 @@ export const getAgentQueues = async (filters?: {
     // Group tasks by agent and status
     const tasksByAgent = new Map<
       string,
-      { pending: number; in_progress: number; completed: number; not_reachable: number; invalid_number: number }
+      { sampled_in_queue: number; in_progress: number; completed: number; not_reachable: number; invalid_number: number }
     >();
 
     for (const task of tasks) {
       const agentIdStr = task.assignedAgentId.toString();
       if (!tasksByAgent.has(agentIdStr)) {
         tasksByAgent.set(agentIdStr, {
-          pending: 0,
+          sampled_in_queue: 0,
           in_progress: 0,
           completed: 0,
           not_reachable: 0,
@@ -529,7 +532,10 @@ export const getAgentQueues = async (filters?: {
         });
       }
       const breakdown = tasksByAgent.get(agentIdStr)!;
-      breakdown[task.status]++;
+      const statusKey = task.status === 'sampled_in_queue' ? 'sampled_in_queue' : task.status;
+      if (breakdown.hasOwnProperty(statusKey)) {
+        breakdown[statusKey as keyof typeof breakdown]++;
+      }
     }
 
     // Build result array
@@ -538,7 +544,7 @@ export const getAgentQueues = async (filters?: {
     for (const agent of agents) {
       const agentIdStr = agent._id.toString();
       const breakdown = tasksByAgent.get(agentIdStr) || {
-        pending: 0,
+        sampled_in_queue: 0,
         in_progress: 0,
         completed: 0,
         not_reachable: 0,
@@ -546,7 +552,7 @@ export const getAgentQueues = async (filters?: {
       };
 
       const total =
-        breakdown.pending +
+        breakdown.sampled_in_queue +
         breakdown.in_progress +
         breakdown.completed +
         breakdown.not_reachable +
@@ -611,7 +617,7 @@ export const getAgentQueue = async (
 
     // Calculate status breakdown
     const statusBreakdown = {
-      pending: 0,
+      sampled_in_queue: 0,
       in_progress: 0,
       completed: 0,
       not_reachable: 0,
@@ -620,7 +626,10 @@ export const getAgentQueue = async (
     };
 
     for (const task of tasks) {
-      statusBreakdown[task.status]++;
+      const statusKey = task.status === 'sampled_in_queue' ? 'sampled_in_queue' : task.status;
+      if (statusBreakdown.hasOwnProperty(statusKey)) {
+        statusBreakdown[statusKey as keyof typeof statusBreakdown]++;
+      }
     }
 
     // Build task details array

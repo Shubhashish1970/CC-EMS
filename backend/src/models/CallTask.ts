@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+export type TaskStatus = 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
 export type CallStatus = 'Connected' | 'Disconnected' | 'Not Reachable' | 'Invalid Number';
 
 export interface ICallLog {
@@ -107,8 +107,8 @@ const CallTaskSchema = new Schema<ICallTask>(
     },
     status: {
       type: String,
-      enum: ['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
-      default: 'pending',
+      enum: ['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
+      default: 'sampled_in_queue',
     },
     retryCount: {
       type: Number,

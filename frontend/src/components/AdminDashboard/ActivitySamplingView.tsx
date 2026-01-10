@@ -31,7 +31,7 @@ interface ActivitySamplingStatus {
     tasksCount: number;
   }>;
   statusBreakdown: {
-    pending: number;
+    sampled_in_queue: number;
     in_progress: number;
     completed: number;
     not_reachable: number;
@@ -363,9 +363,9 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Status Breakdown */}
                         {item.statusBreakdown && (
                           <div className="mt-3 flex items-center gap-4">
-                            {item.statusBreakdown.pending > 0 && (
+                            {item.statusBreakdown.sampled_in_queue > 0 && (
                               <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium">
-                                Pending: {item.statusBreakdown.pending}
+                                Sampled - in queue: {item.statusBreakdown.sampled_in_queue}
                               </span>
                             )}
                             {item.statusBreakdown.in_progress > 0 && (
@@ -537,7 +537,7 @@ const ActivitySamplingView: React.FC = () => {
                                           <div className="flex items-center justify-between mt-1">
                                             <span className="text-xs text-green-700 font-medium">Status:</span>
                                             <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                              farmer.taskStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                              farmer.taskStatus === 'sampled_in_queue' ? 'bg-yellow-100 text-yellow-700' :
                                               farmer.taskStatus === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                                               farmer.taskStatus === 'completed' ? 'bg-green-100 text-green-700' :
                                               'bg-orange-100 text-orange-700'

@@ -112,7 +112,7 @@ const assignSampledFarmersToAgents = async (
       await CallTask.create({
         farmerId,
         activityId,
-        status: 'pending',
+        status: 'sampled_in_queue',
         retryCount: 0,
         assignedAgentId: agent._id,
         scheduledDate,

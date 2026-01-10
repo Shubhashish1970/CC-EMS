@@ -337,7 +337,7 @@ const createTestData = async () => {
     // Verify tasks assigned to agent
     const agentTaskCount = await CallTask.countDocuments({
       assignedAgentId: agent._id,
-      status: { $in: ['pending', 'in_progress'] },
+      status: { $in: ['sampled_in_queue', 'in_progress'] },
     });
     
     logger.info(`✅ Tasks assigned to agent: ${agentTaskCount}`);
