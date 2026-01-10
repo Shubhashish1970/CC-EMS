@@ -27,6 +27,7 @@ const updateTaskDates = async () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Update tasks with future scheduled dates to today
     const result = await CallTask.updateMany(
       {
         assignedAgentId: agent._id,
@@ -40,24 +41,41 @@ const updateTaskDates = async () => {
 
     console.log(`\n✅ Updated ${result.modifiedCount} tasks to be due today`);
     
+    // Also update any tasks scheduled in the past to today
+    const pastResult = await CallTask.updateMany(
+      {
+        assignedAgentId: agent._id,
+        status: 'pending',
+        scheduledDate: { $lt: today }
+      },
+      {
+        $set: { scheduledDate: today }
+      }
+    );
+
+    console.log(`✅ Updated ${pastResult.modifiedCount} past tasks to today`);
+    
     const availableTasks = await CallTask.countDocuments({
       assignedAgentId: agent._id,
-      status: { $in: ['pending', 'in_progress'] },
-      scheduledDate: { $lte: new Date() }
+      status: 'pending',
+      scheduledDate: { $lte: today }
     });
 
-    console.log(`📊 Tasks available for agent: ${availableTasks}`);
-    console.log('\n💡 Tasks are now ready to be loaded in the frontend!');
+    console.log(`✅ Available tasks for agent: ${availableTasks}`);
+    
+    const totalTasks = await CallTask.countDocuments({
+      assignedAgentId: agent._id,
+    });
+
+    console.log(`✅ Total tasks for agent: ${totalTasks}`);
 
     await mongoose.disconnect();
     process.exit(0);
   } catch (error) {
-    logger.error('Error updating task dates:', error);
-    console.error('❌ Error:', error);
+    console.error('Error updating task dates:', error);
+    await mongoose.disconnect();
     process.exit(1);
   }
 };
 
 updateTaskDates();
-
-
