@@ -94,14 +94,25 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
     });
 
-    // Check for errors in the result
+    // Log full result for debugging
+    logger.info('📧 Resend API response:', {
+      hasError: !!result.error,
+      hasData: !!result.data,
+      resultKeys: Object.keys(result),
+    });
+
+    // Check for errors in the result (Resend returns error as object)
     if (result.error) {
+      const errorDetails = result.error as any;
       logger.error('❌ Resend API error:', {
-        error: result.error,
-        errorType: typeof result.error,
-        errorString: JSON.stringify(result.error),
+        error: errorDetails,
+        errorMessage: errorDetails?.message || JSON.stringify(errorDetails),
+        errorName: errorDetails?.name,
+        errorType: typeof errorDetails,
+        errorString: JSON.stringify(errorDetails),
         to: options.to,
         subject: options.subject,
+        from: fromEmailAddress,
       });
       return false;
     }
@@ -110,16 +121,21 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
     if (!result.data) {
       logger.error('❌ Resend API returned no data:', {
         result: JSON.stringify(result),
+        resultType: typeof result,
         to: options.to,
         subject: options.subject,
+        from: fromEmailAddress,
       });
       return false;
     }
 
+    // Success - email was sent
+    const emailId = (result.data as any)?.id || 'unknown';
     logger.info(`✅ Email sent successfully via Resend to ${options.to}:`, {
-      id: result.data.id,
+      id: emailId,
       subject: options.subject,
       from: fromEmailAddress,
+      data: result.data,
     });
 
     return true;
