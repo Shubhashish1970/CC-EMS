@@ -15,7 +15,9 @@ interface TaskDetailsPanelProps {
       type: string;
       date: string;
       officer: string;
-      location: string;
+      location: string; // village
+      territory: string;
+      state?: string;
     };
   } | null;
   isActive: boolean;
@@ -118,11 +120,29 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="mt-1 p-1 bg-white rounded-lg border border-slate-200">
+                    <MapPin size={12} className="text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Village</p>
+                    <p className="text-xs font-bold text-slate-800">{taskData.activity.location}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-white rounded-lg border border-slate-200">
                     <Layout size={12} className="text-slate-500" />
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Territory</p>
-                    <p className="text-xs font-bold text-slate-800">{taskData.activity.location}</p>
+                    <p className="text-xs font-bold text-slate-800">{taskData.activity.territory || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-white rounded-lg border border-slate-200">
+                    <MapPin size={12} className="text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">State</p>
+                    <p className="text-xs font-bold text-slate-800">{taskData.activity.state || taskData.activity.territory?.replace(/\s+Zone$/, '').trim() || 'N/A'}</p>
                   </div>
                 </div>
               </div>

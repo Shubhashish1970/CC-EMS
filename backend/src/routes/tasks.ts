@@ -130,12 +130,17 @@ router.post(
 
       // Format activity data
       const activity = task.activityId as any;
+      // Parse territory to extract state (format: "State Zone" -> "State")
+      const territory = activity?.territory || 'Unknown';
+      const state = territory.replace(/\s+Zone$/, '').trim() || territory;
+      
       const activityData = activity ? {
         type: activity.type || 'Unknown',
         date: activity.date || new Date(),
         officerName: activity.officerName || 'Unknown',
-        location: activity.location || 'Unknown',
-        territory: activity.territory || 'Unknown',
+        location: activity.location || 'Unknown', // village
+        territory: territory,
+        state: state,
         crops: Array.isArray(activity.crops) ? activity.crops : (activity.crops ? [activity.crops] : []),
         products: Array.isArray(activity.products) ? activity.products : (activity.products ? [activity.products] : []),
       } : null;
@@ -180,12 +185,17 @@ router.get(
 
       // Ensure activity data includes crops and products
       const activity = task.activityId as any;
+      // Parse territory to extract state (format: "State Zone" -> "State")
+      const territory = activity?.territory || 'Unknown';
+      const state = territory.replace(/\s+Zone$/, '').trim() || territory;
+      
       const activityData = activity ? {
         type: activity.type || 'Unknown',
         date: activity.date || new Date(),
         officerName: activity.officerName || 'Unknown',
-        location: activity.location || 'Unknown',
-        territory: activity.territory || 'Unknown',
+        location: activity.location || 'Unknown', // village
+        territory: territory,
+        state: state,
         crops: Array.isArray(activity.crops) ? activity.crops : (activity.crops ? [activity.crops] : []),
         products: Array.isArray(activity.products) ? activity.products : (activity.products ? [activity.products] : []),
       } : null;

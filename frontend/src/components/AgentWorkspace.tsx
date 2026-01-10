@@ -34,7 +34,9 @@ interface TaskData {
     type: string;
     date: string;
     officer: string;
-    location: string;
+    location: string; // village
+    territory?: string;
+    state?: string;
     crops?: string[];
     products?: string[];
   };
@@ -107,6 +109,8 @@ const AgentWorkspace: React.FC = () => {
           date: selectedTask.activity.date,
           officer: selectedTask.activity.officerName,
           location: selectedTask.activity.location,
+          territory: selectedTask.activity.territory,
+          state: selectedTask.activity.state,
           crops: selectedTask.activity.crops || [],
           products: selectedTask.activity.products || [],
         },
@@ -232,6 +236,8 @@ const AgentWorkspace: React.FC = () => {
               date: activity.date || new Date().toISOString(),
               officer: activity.officerName || activity.officer || 'Unknown',
               location: activity.location || 'Unknown',
+              territory: activity.territory,
+              state: activity.state,
               crops: activityCrops, // Crops from activity data
               products: activityProducts, // Products from activity data
             },
