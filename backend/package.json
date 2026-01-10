@@ -12,6 +12,7 @@
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:agent": "tsx src/scripts/seedAgent.ts",
     "create:test-task": "tsx src/scripts/createTestTask.ts",
+    "create:test-data": "tsx src/scripts/createTestData.ts",
     "test:admin": "tsx src/scripts/testAdminService.ts",
     "update:emails": "tsx src/scripts/updateUserEmails.ts"
   },
