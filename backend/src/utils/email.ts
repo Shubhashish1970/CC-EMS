@@ -2,6 +2,8 @@ import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import logger from '../config/logger.js';
 
+// Email service configuration: Uses Resend API (preferred) or SMTP fallback
+
 interface EmailOptions {
   to: string;
   subject: string;
