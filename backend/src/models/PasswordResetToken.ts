@@ -43,8 +43,11 @@ export const generateResetToken = (): string => {
   return crypto.randomBytes(32).toString('hex');
 };
 
-// Index for finding valid tokens
-PasswordResetTokenSchema.index({ token: 1, used: false, expiresAt: 1 });
+// Index for finding valid tokens (compound index on token, used, and expiresAt)
+PasswordResetTokenSchema.index({ token: 1, used: 1, expiresAt: 1 });
+
+// Partial index for unused tokens only (for efficient queries of valid tokens)
+PasswordResetTokenSchema.index({ token: 1, expiresAt: 1 }, { partialFilterExpression: { used: false } });
 
 export const PasswordResetToken = mongoose.model<IPasswordResetToken>(
   'PasswordResetToken',
