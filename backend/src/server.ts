@@ -80,6 +80,124 @@ app.get('/api/health/database', async (req, res) => {
   }
 });
 
+// Debug endpoint: Check if admin user exists (public, for debugging)
+app.get('/api/debug/admin-exists', async (req, res) => {
+  try {
+    const mongoose = await import('mongoose');
+    const { User } = await import('./models/User.js');
+    
+    const isConnected = mongoose.default.connection.readyState === 1;
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not connected',
+        readyState: mongoose.default.connection.readyState,
+      });
+    }
+
+    const admin = await User.findOne({ email: 'admin@nacl.com' });
+    const userCount = await User.countDocuments();
+    
+    res.json({
+      success: true,
+      data: {
+        adminExists: !!admin,
+        totalUsers: userCount,
+        adminDetails: admin ? {
+          email: admin.email,
+          role: admin.role,
+          isActive: admin.isActive,
+          createdAt: admin.createdAt,
+        } : null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Debug check failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Admin seed endpoint (protected with secret token)
+app.post('/api/debug/seed-admin', async (req, res) => {
+  try {
+    // Check for secret token in header
+    const secretToken = req.headers['x-seed-token'];
+    const expectedToken = process.env.ADMIN_SEED_TOKEN || 'change-this-secret-token';
+    
+    if (secretToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'Unauthorized' },
+      });
+    }
+
+    const mongoose = await import('mongoose');
+    const { User } = await import('./models/User.js');
+    const { hashPassword } = await import('./utils/password.js');
+    
+    const isConnected = mongoose.default.connection.readyState === 1;
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database not connected' },
+      });
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@nacl.com' });
+    if (existingAdmin) {
+      return res.json({
+        success: true,
+        message: 'Admin user already exists',
+        data: {
+          email: existingAdmin.email,
+          role: existingAdmin.role,
+          isActive: existingAdmin.isActive,
+        },
+      });
+    }
+
+    // Create admin user
+    const hashedPassword = await hashPassword('Admin@123');
+    
+    const admin = new User({
+      name: 'System Administrator',
+      email: 'admin@nacl.com',
+      password: hashedPassword,
+      employeeId: 'ADMIN001',
+      role: 'mis_admin',
+      languageCapabilities: ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'],
+      assignedTerritories: [],
+      isActive: true,
+    });
+
+    await admin.save();
+    
+    logger.info('✅ Admin user created via seed endpoint');
+
+    res.json({
+      success: true,
+      message: 'Admin user created successfully',
+      data: {
+        email: admin.email,
+        role: admin.role,
+      },
+    });
+  } catch (error) {
+    logger.error('Error seeding admin user:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to seed admin user',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+});
+
 // API routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';

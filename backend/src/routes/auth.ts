@@ -49,10 +49,16 @@ router.post(
       const user = await User.findOne({ email }).select('+password');
 
       if (!user) {
+        logger.warn(`Login failed: User not found for email: ${email}`);
+        // Check if any users exist at all (for debugging)
+        const userCount = await User.countDocuments();
+        logger.info(`Total users in database: ${userCount}`);
         const error: AppError = new Error('Invalid credentials');
         error.statusCode = 401;
         throw error;
       }
+
+      logger.info(`User found: ${user.email} (ID: ${user._id}, Role: ${user.role}, Active: ${user.isActive})`);
 
       if (!user.isActive) {
         const error: AppError = new Error('Account is inactive');
