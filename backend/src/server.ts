@@ -523,7 +523,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
     const existingFarmerCount = await Farmer.countDocuments();
     
     // Create farmers
-    const farmerIds: mongoose.Types.ObjectId[] = [];
+    const farmerIds: any[] = [];
     for (let i = 0; i < count; i++) {
       const mobileNumber = generateMobileNumber(existingFarmerCount + i);
       let farmer = await Farmer.findOne({ mobileNumber });
@@ -542,7 +542,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
     }
 
     // Create activities
-    const activityIds: mongoose.Types.ObjectId[] = [];
+    const activityIds: any[] = [];
     const existingActivityCount = await Activity.countDocuments();
     const farmersPerActivity = 8;
 
