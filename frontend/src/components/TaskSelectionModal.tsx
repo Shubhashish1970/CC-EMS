@@ -145,8 +145,8 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-end z-50 p-4">
+      <div className="bg-white rounded-3xl w-[375px] h-[812px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 mr-4" style={{ maxWidth: '375px' }}>
         {/* Header - Light theme */}
         <div className="bg-white px-6 pt-4 pb-3 border-b border-slate-200">
           {/* Close button and title */}
