@@ -226,6 +226,77 @@ app.post('/api/debug/reset-admin-password', async (req, res) => {
   }
 });
 
+// Test email endpoint (protected with secret token)
+app.post('/api/debug/test-email', async (req, res) => {
+  try {
+    // Check for secret token in header
+    const secretToken = req.headers['x-seed-token'];
+    const expectedToken = process.env.ADMIN_SEED_TOKEN || 'change-this-secret-token';
+    
+    if (secretToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'Unauthorized' },
+      });
+    }
+
+    const { to } = req.body;
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Email address (to) is required' },
+      });
+    }
+
+    const { sendEmail, generatePasswordResetEmail } = await import('./utils/email.js');
+    
+    // Generate a test token
+    const testToken = 'test-token-' + Date.now();
+    const emailContent = generatePasswordResetEmail(testToken, 'Test User');
+    
+    const emailSent = await sendEmail({
+      to,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+    });
+
+    if (emailSent) {
+      res.json({
+        success: true,
+        message: `Test email sent successfully to ${to}`,
+        data: {
+          to,
+          resendKeyPresent: !!process.env.RESEND_KEY,
+          resendKeyLength: process.env.RESEND_KEY?.length || 0,
+          emailFrom: process.env.EMAIL_FROM || process.env.RESEND_FROM || 'onboarding@resend.dev',
+        },
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to send test email',
+          details: {
+            to,
+            resendKeyPresent: !!process.env.RESEND_KEY,
+            emailFrom: process.env.EMAIL_FROM || process.env.RESEND_FROM || 'onboarding@resend.dev',
+          },
+        },
+      });
+    }
+  } catch (error) {
+    logger.error('Error in test-email:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to send test email',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+});
+
 // Admin seed endpoint (protected with secret token)
 app.post('/api/debug/seed-admin', async (req, res) => {
   try {

@@ -17,8 +17,19 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
     // Check for Resend API key first (preferred method)
     const resendApiKey = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 
+    logger.info('📧 Email service check:', {
+      hasResendKey: !!resendApiKey,
+      resendKeyLength: resendApiKey?.length || 0,
+      emailService: process.env.EMAIL_SERVICE,
+    });
+
     if (resendApiKey) {
-      return await sendEmailWithResend(options, resendApiKey);
+      logger.info('📧 Using Resend API for email sending');
+      const result = await sendEmailWithResend(options, resendApiKey);
+      if (!result) {
+        logger.warn('⚠️ Resend failed, will not fallback to SMTP (Resend was explicitly configured)');
+      }
+      return result;
     }
 
     // Fallback to SMTP if Resend not configured
@@ -53,6 +64,13 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
  */
 const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promise<boolean> => {
   try {
+    logger.info('📧 Attempting to send email via Resend:', {
+      to: options.to,
+      subject: options.subject,
+      apiKeyPresent: !!apiKey,
+      apiKeyLength: apiKey?.length || 0,
+    });
+
     const resend = new Resend(apiKey);
 
     const fromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM || 'onboarding@resend.dev';
@@ -62,6 +80,12 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
       ? fromEmail.match(/<(.+)>/)?.[1] || fromEmail
       : fromEmail;
 
+    logger.info('📧 Resend email configuration:', {
+      from: fromEmailAddress,
+      to: options.to,
+      subject: options.subject,
+    });
+
     const result = await resend.emails.send({
       from: fromEmailAddress,
       to: options.to,
@@ -70,9 +94,22 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
     });
 
+    // Check for errors in the result
     if (result.error) {
       logger.error('❌ Resend API error:', {
         error: result.error,
+        errorType: typeof result.error,
+        errorString: JSON.stringify(result.error),
+        to: options.to,
+        subject: options.subject,
+      });
+      return false;
+    }
+
+    // Check if data exists (successful send)
+    if (!result.data) {
+      logger.error('❌ Resend API returned no data:', {
+        result: JSON.stringify(result),
         to: options.to,
         subject: options.subject,
       });
@@ -80,18 +117,22 @@ const sendEmailWithResend = async (options: EmailOptions, apiKey: string): Promi
     }
 
     logger.info(`✅ Email sent successfully via Resend to ${options.to}:`, {
-      id: result.data?.id,
+      id: result.data.id,
       subject: options.subject,
+      from: fromEmailAddress,
     });
 
     return true;
   } catch (error) {
-    logger.error('❌ Resend API failed:', {
+    logger.error('❌ Resend API exception:', {
       error: error instanceof Error ? error.message : 'Unknown error',
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
       to: options.to,
       subject: options.subject,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
     });
-    throw error;
+    return false; // Don't throw, return false so caller can handle gracefully
   }
 };
 
