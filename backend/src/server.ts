@@ -375,6 +375,84 @@ app.post('/api/debug/seed-admin', async (req, res) => {
   }
 });
 
+// Agent seed endpoint (protected with secret token)
+app.post('/api/debug/seed-agent', async (req, res) => {
+  try {
+    // Check for secret token in header
+    const secretToken = req.headers['x-seed-token'];
+    const expectedToken = process.env.ADMIN_SEED_TOKEN || 'change-this-secret-token';
+    
+    if (secretToken !== expectedToken) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'Unauthorized' },
+      });
+    }
+
+    const mongoose = await import('mongoose');
+    const { User } = await import('./models/User.js');
+    const { hashPassword } = await import('./utils/password.js');
+    
+    const isConnected = mongoose.default.connection.readyState === 1;
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database not connected' },
+      });
+    }
+
+    // Check if agent already exists
+    const existingAgent = await User.findOne({ email: 'shubhashish@intelliagri.in' });
+    if (existingAgent) {
+      return res.json({
+        success: true,
+        message: 'Agent user already exists',
+        data: {
+          email: existingAgent.email,
+          role: existingAgent.role,
+          isActive: existingAgent.isActive,
+        },
+      });
+    }
+
+    // Create agent user
+    const hashedPassword = await hashPassword('Admin@123');
+    
+    const agent = new User({
+      name: 'Test Agent',
+      email: 'shubhashish@intelliagri.in',
+      password: hashedPassword,
+      employeeId: 'AGENT001',
+      role: 'cc_agent',
+      languageCapabilities: ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'],
+      assignedTerritories: [],
+      isActive: true,
+    });
+
+    await agent.save();
+    
+    logger.info('✅ Agent user created via seed endpoint');
+
+    res.json({
+      success: true,
+      message: 'Agent user created successfully',
+      data: {
+        email: agent.email,
+        role: agent.role,
+      },
+    });
+  } catch (error) {
+    logger.error('Error seeding agent user:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to seed agent user',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+  }
+});
+
 // API routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
