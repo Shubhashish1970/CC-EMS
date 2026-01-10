@@ -678,7 +678,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       
       if (!farmer) {
         const language = LANGUAGES[i % LANGUAGES.length];
-        const { state, district, village } = generateIndianLocation(existingFarmerCount + i, language);
+        const { state, district, village, territory } = generateIndianLocation(existingFarmerCount + i, language);
         const farmerName = generateFarmerName(existingFarmerCount + i, language);
         
         farmer = new Farmer({
