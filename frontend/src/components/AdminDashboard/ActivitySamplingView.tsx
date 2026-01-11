@@ -203,11 +203,22 @@ const ActivitySamplingView: React.FC = () => {
             <Button
               variant="primary"
               size="sm"
-              onClick={handleSyncFFA}
+              onClick={() => handleSyncFFA(false)}
               disabled={isSyncing}
+              title="Incremental sync: Only syncs new activities since last sync"
             >
               <Download size={16} className={isSyncing ? 'animate-spin' : ''} />
               {isSyncing ? 'Syncing...' : 'Sync FFA'}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleSyncFFA(true)}
+              disabled={isSyncing}
+              title="Full sync: Syncs all activities (takes longer)"
+            >
+              <Download size={16} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Full Syncing...' : 'Full Sync'}
             </Button>
           </div>
         </div>
