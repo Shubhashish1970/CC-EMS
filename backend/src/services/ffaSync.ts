@@ -41,7 +41,9 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
   }
 
   // Build URL with optional dateFrom parameter for incremental sync
-  let url = `${FFA_API_URL}/activities?limit=100`;
+  // Handle trailing slash in FFA_API_URL to avoid double slashes
+  const baseUrl = FFA_API_URL.endsWith('/') ? FFA_API_URL.slice(0, -1) : FFA_API_URL;
+  let url = `${baseUrl}/activities?limit=100`;
   if (dateFrom) {
     const dateFromISO = dateFrom.toISOString().split('T')[0]; // Format as YYYY-MM-DD
     url += `&dateFrom=${dateFromISO}`;
