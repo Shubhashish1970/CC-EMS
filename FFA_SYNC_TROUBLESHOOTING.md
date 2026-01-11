@@ -75,12 +75,18 @@ If you have `gcloud` CLI installed and authenticated:
 
 After deployment:
 
-1. **Check Backend Logs:**
+1. **Check Deployment Logs:**
+   - Go to GitHub Actions: https://github.com/Shubhashish1970/CC-EMS/actions/workflows/deploy-backend.yml
+   - Open the latest workflow run
+   - Look for: `✅ Found Mock FFA API at: https://...`
+   - Look for: `✅ Final FFA_API_URL_VALUE: https://mock-ffa-api-xxxxx.run.app/api`
+
+2. **Check Backend Logs (if still having issues):**
    - Go to Google Cloud Console
    - Navigate to Cloud Run → cc-ems-backend → Logs
-   - Look for: `✅ Found Mock FFA API at: https://...`
+   - Look for FFA sync attempts and connection details
 
-2. **Test FFA Sync:**
+3. **Test FFA Sync:**
    - Go to Admin Dashboard → Activity Sampling
    - Click "Sync FFA" button
    - Should see success message instead of timeout
