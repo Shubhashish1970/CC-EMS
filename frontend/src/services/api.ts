@@ -307,7 +307,9 @@ export const adminAPI = {
 // FFA Sync API
 export const ffaAPI = {
   syncFFAData: async () => {
-    return apiRequest('/ffa/sync', { method: 'POST' });
+    // FFA sync can take 30-60 seconds (fetches activities, syncs them, triggers sampling)
+    // Use 90 second timeout to allow for completion
+    return apiRequest('/ffa/sync', { method: 'POST' }, undefined, 90000);
   },
 
   getFFASyncStatus: async () => {
