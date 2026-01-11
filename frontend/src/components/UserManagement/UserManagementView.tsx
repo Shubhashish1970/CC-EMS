@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Search, Users as UsersIcon, Info } from 'lucide-react';
+import { Plus, Filter, Search, Users as UsersIcon, Info, Grid3x3 } from 'lucide-react';
 import { usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import UserList from './UserList';
 import UserForm, { UserRole } from './UserForm';
+import AgentLanguageMatrix from './AgentLanguageMatrix';
 
 interface User {
   _id: string;
