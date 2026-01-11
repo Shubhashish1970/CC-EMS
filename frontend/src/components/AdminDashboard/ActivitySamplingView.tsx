@@ -60,7 +60,8 @@ const ActivitySamplingView: React.FC = () => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isIncrementalSyncing, setIsIncrementalSyncing] = useState(false);
+  const [isFullSyncing, setIsFullSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ lastSyncAt: string | null; totalActivities: number; totalFarmers: number } | null>(null);
   const [filters, setFilters] = useState({
     activityType: '',
@@ -124,7 +125,13 @@ const ActivitySamplingView: React.FC = () => {
   };
 
   const handleSyncFFA = async (fullSync: boolean = false) => {
-    setIsSyncing(true);
+    // Set appropriate loading state based on sync type
+    if (fullSync) {
+      setIsFullSyncing(true);
+    } else {
+      setIsIncrementalSyncing(true);
+    }
+    
     try {
       const response = await ffaAPI.syncFFAData(fullSync) as any;
       if (response.success) {
@@ -139,7 +146,12 @@ const ActivitySamplingView: React.FC = () => {
     } catch (err: any) {
       showError(err.message || 'Failed to sync FFA data');
     } finally {
-      setIsSyncing(false);
+      // Clear appropriate loading state
+      if (fullSync) {
+        setIsFullSyncing(false);
+      } else {
+        setIsIncrementalSyncing(false);
+      }
     }
   };
 
@@ -204,21 +216,21 @@ const ActivitySamplingView: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={() => handleSyncFFA(false)}
-              disabled={isSyncing}
+              disabled={isIncrementalSyncing || isFullSyncing}
               title="Incremental sync: Only syncs new activities since last sync"
             >
-              <Download size={16} className={isSyncing ? 'animate-spin' : ''} />
-              {isSyncing ? 'Syncing...' : 'Sync FFA'}
+              <Download size={16} className={isIncrementalSyncing ? 'animate-spin' : ''} />
+              {isIncrementalSyncing ? 'Syncing...' : 'Sync FFA'}
             </Button>
             <Button
               variant="secondary"
               size="sm"
               onClick={() => handleSyncFFA(true)}
-              disabled={isSyncing}
+              disabled={isIncrementalSyncing || isFullSyncing}
               title="Full sync: Syncs all activities (takes longer)"
             >
-              <Download size={16} className={isSyncing ? 'animate-spin' : ''} />
-              {isSyncing ? 'Full Syncing...' : 'Full Sync'}
+              <Download size={16} className={isFullSyncing ? 'animate-spin' : ''} />
+              {isFullSyncing ? 'Full Syncing...' : 'Full Sync'}
             </Button>
           </div>
         </div>
@@ -585,11 +597,11 @@ const ActivitySamplingView: React.FC = () => {
                                       variant="secondary"
                                       size="sm"
                                       onClick={() => handleSyncFFA(false)}
-                                      disabled={isSyncing}
+                                      disabled={isIncrementalSyncing || isFullSyncing}
                                       className="mt-2"
                                     >
-                                      <Download size={14} className={isSyncing ? 'animate-spin' : ''} />
-                                      {isSyncing ? 'Syncing...' : 'Sync FFA Data'}
+                                      <Download size={14} className={isIncrementalSyncing ? 'animate-spin' : ''} />
+                                      {isIncrementalSyncing ? 'Syncing...' : 'Sync FFA Data'}
                                     </Button>
                                   </div>
                                 )}
