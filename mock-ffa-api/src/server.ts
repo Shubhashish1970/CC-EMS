@@ -5,6 +5,9 @@ const app: Express = express();
 // Cloud Run uses PORT 8080, local development uses 4000
 const PORT = process.env.PORT || 4000;
 
+// Log server start
+console.log(`🚀 Mock FFA API starting on port ${PORT}`);
+
 app.use(cors());
 app.use(express.json());
 
