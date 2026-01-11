@@ -222,17 +222,22 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
   try {
     // Determine sync type and get last sync date for incremental sync
     if (!fullSync) {
-      // Get the most recently synced activity to determine the cutoff date
-      const lastActivity = await Activity.findOne().sort({ syncedAt: -1 });
-      if (lastActivity && lastActivity.syncedAt) {
-        // Use the activity date (not syncedAt) to ensure we get activities created after the last synced activity
-        // Subtract 1 day as a buffer to catch any activities that might have been created on the same day
-        lastSyncDate = new Date(lastActivity.date);
-        lastSyncDate.setDate(lastSyncDate.getDate() - 1);
-        logger.info(`[FFA SYNC] Incremental sync: last activity date was ${lastActivity.date.toISOString()}, fetching activities after ${lastSyncDate.toISOString()}`);
-      } else {
-        logger.info(`[FFA SYNC] No previous sync found, performing full sync`);
-        fullSync = true; // Fall back to full sync if no previous sync exists
+      try {
+        // Get the most recently synced activity to determine the cutoff date
+        const lastActivity = await Activity.findOne().sort({ syncedAt: -1 });
+        if (lastActivity && lastActivity.date) {
+          // Use the activity date (not syncedAt) to ensure we get activities created after the last synced activity
+          // Subtract 1 day as a buffer to catch any activities that might have been created on the same day
+          lastSyncDate = new Date(lastActivity.date);
+          lastSyncDate.setDate(lastSyncDate.getDate() - 1);
+          logger.info(`[FFA SYNC] Incremental sync: last activity date was ${lastActivity.date.toISOString()}, fetching activities after ${lastSyncDate.toISOString()}`);
+        } else {
+          logger.info(`[FFA SYNC] No previous sync found, performing full sync`);
+          fullSync = true; // Fall back to full sync if no previous sync exists
+        }
+      } catch (error) {
+        logger.error('[FFA SYNC] Error determining last sync date, falling back to full sync:', error);
+        fullSync = true; // Fall back to full sync on error
       }
     }
 
