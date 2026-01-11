@@ -186,15 +186,28 @@ jobs:
             FFA_API_URL_VALUE="${MOCK_FFA_API_URL}/api"
             echo "✅ Using deployed Mock FFA API URL: $FFA_API_URL_VALUE"
           else
-            FFA_API_URL_VALUE="http://localhost:4000/api"
-            echo "⚠️ Using default FFA_API_URL: $FFA_API_URL_VALUE"
+            echo "❌ Error: Mock FFA API service not found and FFA_API_URL secret not set"
+            echo "📝 Solutions:"
+            echo "   1. Deploy Mock FFA API first by pushing changes to mock-ffa-api/ directory"
+            echo "   2. Set FFA_API_URL as a GitHub secret with the Mock FFA API URL"
+            echo "   3. Trigger mock-ffa-api deployment workflow manually"
+            echo ""
+            echo "⚠️ Cannot use localhost:4000 in production (Cloud Run)"
+            exit 1
           fi
           
-          # Validate FFA_API_URL_VALUE is set
+          # Validate FFA_API_URL_VALUE is set and not localhost in production
           if [ -z "$FFA_API_URL_VALUE" ]; then
             echo "❌ Error: FFA_API_URL_VALUE is empty after all checks"
             exit 1
           fi
+          
+          # Warn if using localhost (shouldn't happen due to check above, but just in case)
+          if echo "$FFA_API_URL_VALUE" | grep -q "localhost"; then
+            echo "⚠️ Warning: FFA_API_URL contains localhost, which won't work in Cloud Run"
+            echo "   This should not happen - please verify Mock FFA API deployment"
+          fi
+          
           echo "✅ Final FFA_API_URL_VALUE: $FFA_API_URL_VALUE"
           
           # Create temporary env file in YAML format (required by --env-vars-file)
