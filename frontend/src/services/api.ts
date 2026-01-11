@@ -43,7 +43,8 @@ const fetchWithTimeout = (url: string, options: RequestInit, timeout: number = 8
 const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  timeout: number = 8000 // Default 8 second timeout
 ): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   const config: RequestInit = {
@@ -55,7 +56,7 @@ const apiRequest = async <T>(
   };
 
   try {
-    const response = await fetchWithTimeout(url, config, 8000, abortSignal); // 8 second timeout
+    const response = await fetchWithTimeout(url, config, timeout, abortSignal);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: { message: 'Request failed' } }));
