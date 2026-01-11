@@ -47,13 +47,17 @@ router.post(
         }
       }
 
+      // Convert Date objects to ISO strings for JSON serialization
+      const responseData = {
+        ...result,
+        lastSyncDate: result.lastSyncDate ? result.lastSyncDate.toISOString() : undefined,
+        sampling: samplingResult,
+      };
+
       res.json({
         success: true,
-        message: `FFA sync completed: ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}${samplingResult ? `. Sampling: ${samplingResult.totalTasksCreated} tasks created` : ''}`,
-        data: {
-          ...result,
-          sampling: samplingResult,
-        },
+        message: `FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}${samplingResult ? `. Sampling: ${samplingResult.totalTasksCreated} tasks created` : ''}`,
+        data: responseData,
       });
     } catch (error) {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
