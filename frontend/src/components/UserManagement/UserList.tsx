@@ -1,0 +1,208 @@
+import React from 'react';
+import { Edit2, Trash2, UserCheck, UserX, Mail, Hash, Users as UsersIcon } from 'lucide-react';
+import { UserRole } from './UserForm';
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  employeeId: string;
+  role: UserRole;
+  languageCapabilities: string[];
+  teamLeadId?: string;
+  teamLead?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  isActive: boolean;
+  createdAt?: string;
+}
+
+interface UserListProps {
+  users: User[];
+  isLoading: boolean;
+  onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
+  currentUserId?: string;
+}
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  cc_agent: 'CC Agent',
+  team_lead: 'Team Lead',
+  mis_admin: 'MIS Admin',
+  core_sales_head: 'Core Sales Head',
+  marketing_head: 'Marketing Head',
+};
+
+const ROLE_COLORS: Record<UserRole, string> = {
+  cc_agent: 'bg-blue-100 text-blue-800',
+  team_lead: 'bg-purple-100 text-purple-800',
+  mis_admin: 'bg-green-100 text-green-800',
+  core_sales_head: 'bg-orange-100 text-orange-800',
+  marketing_head: 'bg-pink-100 text-pink-800',
+};
+
+const UserList: React.FC<UserListProps> = ({ users, isLoading, onEdit, onDelete, currentUserId }) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (users.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <UsersIcon size={48} className="mx-auto text-slate-300 mb-4" />
+        <p className="text-slate-600 font-medium text-lg mb-2">No users found</p>
+        <p className="text-sm text-slate-500">Create a new user to get started</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
+                User
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
+                Role
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
+                Languages
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
+                Team Lead
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-4 text-right text-xs font-black text-slate-700 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-slate-200">
+            {users.map((user) => {
+              const isCurrentUser = user._id === currentUserId;
+              return (
+                <tr key={user._id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold text-slate-900">{user.name}</div>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-slate-600">
+                        <div className="flex items-center gap-1">
+                          <Mail size={14} />
+                          <span>{user.email}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Hash size={14} />
+                          <span>{user.employeeId}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${ROLE_COLORS[user.role]}`}
+                    >
+                      {ROLE_LABELS[user.role]}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {user.role === 'cc_agent' && user.languageCapabilities.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {user.languageCapabilities.slice(0, 3).map((lang) => (
+                          <span
+                            key={lang}
+                            className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-lg"
+                          >
+                            {lang}
+                          </span>
+                        ))}
+                        {user.languageCapabilities.length > 3 && (
+                          <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-lg">
+                            +{user.languageCapabilities.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-sm">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {user.role === 'cc_agent' && user.teamLead ? (
+                      <div className="text-sm text-slate-700">
+                        <div className="font-medium">{user.teamLead.name}</div>
+                        <div className="text-xs text-slate-500">{user.teamLead.email}</div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-sm">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                        user.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {user.isActive ? (
+                        <>
+                          <UserCheck size={14} />
+                          Active
+                        </>
+                      ) : (
+                        <>
+                          <UserX size={14} />
+                          Inactive
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => onEdit(user)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit user"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => onDelete(user)}
+                        disabled={isCurrentUser}
+                        className={`p-2 rounded-lg transition-colors ${
+                          isCurrentUser
+                            ? 'text-slate-300 cursor-not-allowed'
+                            : 'text-red-600 hover:bg-red-50'
+                        }`}
+                        title={isCurrentUser ? 'Cannot delete your own account' : 'Deactivate user'}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default UserList;

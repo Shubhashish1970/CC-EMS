@@ -241,6 +241,10 @@ export const usersAPI = {
       method: 'DELETE',
     });
   },
+
+  getUser: async (userId: string) => {
+    return apiRequest(`/users/${userId}`);
+  },
 };
 
 export const masterDataAPI = {
