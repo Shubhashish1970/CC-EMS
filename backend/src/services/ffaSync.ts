@@ -90,7 +90,7 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
       throw new Error('FFA API response does not contain activities array');
     }
 
-    logger.info(`Successfully fetched ${data.data.activities.length} activities from FFA API`);
+    logger.info(`[FFA SYNC] Successfully fetched ${data.data.activities.length} activities from FFA API`);
     return data.data.activities;
   } catch (error) {
     let errorMessage = 'Unknown error';
@@ -133,7 +133,7 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
       errorDetails = { rawError: error };
     }
     
-    logger.error('Error fetching activities from FFA API:', {
+    logger.error('[FFA SYNC] Error fetching activities from FFA API:', {
       error: errorMessage,
       url,
       ffaApiUrl: FFA_API_URL,
@@ -193,50 +193,74 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     activity.farmerIds = farmerIds;
     await activity.save();
 
-    logger.info(`Synced activity: ${ffaActivity.activityId} with ${farmerIds.length} farmers`);
+    logger.info(`[FFA SYNC] Synced activity: ${ffaActivity.activityId} with ${farmerIds.length} farmers`);
 
     return activity;
   } catch (error) {
-    logger.error(`Error syncing activity ${ffaActivity.activityId}:`, error);
+    logger.error(`[FFA SYNC] Error syncing activity ${ffaActivity.activityId}:`, error);
     throw error;
   }
 };
 
 /**
  * Sync all activities from FFA API
+ * @param fullSync - If true, syncs all activities. If false, only syncs activities after the last sync date (incremental)
  */
-export const syncFFAData = async (): Promise<{
+export const syncFFAData = async (fullSync: boolean = false): Promise<{
   activitiesSynced: number;
   farmersSynced: number;
   errors: string[];
+  syncType: 'full' | 'incremental';
+  lastSyncDate?: Date;
 }> => {
   const startTime = Date.now();
   const errors: string[] = [];
   let activitiesSynced = 0;
   let farmersSynced = 0;
+  let lastSyncDate: Date | undefined;
 
   try {
-    logger.info('Starting FFA data sync...', {
+    // Determine sync type and get last sync date for incremental sync
+    if (!fullSync) {
+      // Get the most recently synced activity to determine the cutoff date
+      const lastActivity = await Activity.findOne().sort({ syncedAt: -1 });
+      if (lastActivity && lastActivity.syncedAt) {
+        // Use the activity date (not syncedAt) to ensure we get activities created after the last synced activity
+        // Subtract 1 day as a buffer to catch any activities that might have been created on the same day
+        lastSyncDate = new Date(lastActivity.date);
+        lastSyncDate.setDate(lastSyncDate.getDate() - 1);
+        logger.info(`[FFA SYNC] Incremental sync: last activity date was ${lastActivity.date.toISOString()}, fetching activities after ${lastSyncDate.toISOString()}`);
+      } else {
+        logger.info(`[FFA SYNC] No previous sync found, performing full sync`);
+        fullSync = true; // Fall back to full sync if no previous sync exists
+      }
+    }
+
+    logger.info(`[FFA SYNC] Starting FFA data sync (${fullSync ? 'full' : 'incremental'})...`, {
       ffaApiUrl: FFA_API_URL,
       hasEnvVar: !!process.env.FFA_API_URL,
+      fullSync,
+      lastSyncDate: lastSyncDate?.toISOString(),
     });
 
     let ffaActivities: FFAActivity[];
     try {
-      ffaActivities = await fetchFFAActivities();
-      logger.info(`Fetched ${ffaActivities.length} activities from FFA API`);
+      ffaActivities = await fetchFFAActivities(fullSync ? undefined : lastSyncDate);
+      logger.info(`[FFA SYNC] Fetched ${ffaActivities.length} activities from FFA API`);
     } catch (fetchError) {
       const errorMsg = fetchError instanceof Error ? fetchError.message : 'Failed to fetch activities from FFA API';
-      logger.error('Failed to fetch activities from FFA API:', errorMsg);
+      logger.error('[FFA SYNC] Failed to fetch activities from FFA API:', errorMsg);
       throw new Error(`Failed to fetch activities from FFA API: ${errorMsg}`);
     }
 
     if (!ffaActivities || ffaActivities.length === 0) {
-      logger.warn('No activities returned from FFA API');
+      logger.warn('[FFA SYNC] No activities returned from FFA API');
       return {
         activitiesSynced: 0,
         farmersSynced: 0,
         errors: ['No activities found in FFA API response'],
+        syncType: fullSync ? 'full' : 'incremental',
+        lastSyncDate,
       };
     }
 
@@ -244,7 +268,7 @@ export const syncFFAData = async (): Promise<{
       try {
         if (!ffaActivity.activityId) {
           errors.push('Skipped activity: missing activityId');
-          logger.warn('Skipped activity with missing activityId');
+          logger.warn('[FFA SYNC] Skipped activity with missing activityId');
           continue;
         }
 
@@ -254,7 +278,7 @@ export const syncFFAData = async (): Promise<{
       } catch (error) {
         const errorMsg = `Failed to sync activity ${ffaActivity.activityId || 'unknown'}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         errors.push(errorMsg);
-        logger.error(errorMsg, error);
+        logger.error(`[FFA SYNC] ${errorMsg}`, error);
       }
     }
 
@@ -270,7 +294,7 @@ export const syncFFAData = async (): Promise<{
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('FFA sync failed:', {
+    logger.error('[FFA SYNC] FFA sync failed:', {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
     });
