@@ -21,14 +21,18 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
-      logger.info('Manual FFA sync triggered', {
+      // Check if fullSync flag is set in query params or body
+      const fullSync = req.query.fullSync === 'true' || req.body?.fullSync === true;
+      
+      logger.info(`[FFA SYNC] Manual FFA sync triggered (${fullSync ? 'full' : 'incremental'})`, {
         userId: (req as any).user?.id,
         userEmail: (req as any).user?.email,
         ffaApiUrl: ffaApiUrl,
         hasEnvVar: !!process.env.FFA_API_URL,
+        fullSync,
       });
       
-      const result = await syncFFAData();
+      const result = await syncFFAData(fullSync);
 
       // Automatically trigger sampling for newly synced activities
       let samplingResult = null;

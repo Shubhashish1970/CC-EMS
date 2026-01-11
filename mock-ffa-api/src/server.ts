@@ -288,10 +288,21 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // Get all activities
 app.get('/api/activities', (req: Request, res: Response) => {
-  const { page = 1, limit = 100 } = req.query; // Default limit 100 to get all activities
+  const { page = 1, limit = 100, dateFrom } = req.query; // dateFrom for incremental sync
   const skip = (Number(page) - 1) * Number(limit);
 
-  const activities = mockActivities.slice(skip, skip + Number(limit));
+  // Filter activities by dateFrom if provided (for incremental sync)
+  let filteredActivities = mockActivities;
+  if (dateFrom && typeof dateFrom === 'string') {
+    const dateFromDate = new Date(dateFrom);
+    filteredActivities = mockActivities.filter((activity) => {
+      const activityDate = new Date(activity.date);
+      return activityDate >= dateFromDate;
+    });
+    console.log(`Filtering activities: ${mockActivities.length} total, ${filteredActivities.length} after ${dateFrom}`);
+  }
+
+  const activities = filteredActivities.slice(skip, skip + Number(limit));
 
   res.json({
     success: true,
@@ -300,8 +311,8 @@ app.get('/api/activities', (req: Request, res: Response) => {
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total: mockActivities.length,
-        pages: Math.ceil(mockActivities.length / Number(limit)),
+        total: filteredActivities.length,
+        pages: Math.ceil(filteredActivities.length / Number(limit)),
       },
     },
   });

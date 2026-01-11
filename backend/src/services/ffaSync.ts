@@ -32,18 +32,30 @@ const FFA_API_URL = process.env.FFA_API_URL || 'http://localhost:4000/api';
 
 /**
  * Fetch activities from FFA API with timeout and better error handling
+ * @param dateFrom - Optional date to fetch activities after (for incremental sync)
  */
-const fetchFFAActivities = async (): Promise<FFAActivity[]> => {
+const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
   // Validate FFA_API_URL is set
   if (!process.env.FFA_API_URL) {
     logger.warn('FFA_API_URL environment variable is not set, using default: http://localhost:4000/api');
   }
 
-  const url = `${FFA_API_URL}/activities?limit=100`;
-  logger.info(`Fetching activities from FFA API: ${url}`, {
+  // Build URL with optional dateFrom parameter for incremental sync
+  let url = `${FFA_API_URL}/activities?limit=100`;
+  if (dateFrom) {
+    const dateFromISO = dateFrom.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    url += `&dateFrom=${dateFromISO}`;
+    logger.info(`[FFA SYNC] Incremental sync: fetching activities after ${dateFromISO}`);
+  } else {
+    logger.info(`[FFA SYNC] Full sync: fetching all activities`);
+  }
+
+  logger.info(`[FFA SYNC] Fetching activities from FFA API: ${url}`, {
     ffaApiUrl: FFA_API_URL,
     fullUrl: url,
     hasEnvVar: !!process.env.FFA_API_URL,
+    incremental: !!dateFrom,
+    dateFrom: dateFrom?.toISOString(),
   });
 
   try {
@@ -247,12 +259,14 @@ export const syncFFAData = async (): Promise<{
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    logger.info(`FFA sync completed in ${duration}s: ${activitiesSynced} activities, ${farmersSynced} farmers, ${errors.length} errors`);
+    logger.info(`[FFA SYNC] FFA sync completed in ${duration}s (${fullSync ? 'full' : 'incremental'}): ${activitiesSynced} activities, ${farmersSynced} farmers, ${errors.length} errors`);
 
     return {
       activitiesSynced,
       farmersSynced,
       errors,
+      syncType: fullSync ? 'full' : 'incremental',
+      lastSyncDate,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

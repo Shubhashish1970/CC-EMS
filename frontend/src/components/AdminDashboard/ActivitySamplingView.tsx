@@ -123,12 +123,13 @@ const ActivitySamplingView: React.FC = () => {
     }
   };
 
-  const handleSyncFFA = async () => {
+  const handleSyncFFA = async (fullSync: boolean = false) => {
     setIsSyncing(true);
     try {
-      const response = await ffaAPI.syncFFAData() as any;
+      const response = await ffaAPI.syncFFAData(fullSync) as any;
       if (response.success) {
-        showSuccess(`FFA sync completed: ${response.data.activitiesSynced} activities, ${response.data.farmersSynced} farmers synced`);
+        const syncType = response.data.syncType || 'incremental';
+        showSuccess(`FFA sync completed (${syncType}): ${response.data.activitiesSynced} activities, ${response.data.farmersSynced} farmers synced`);
         // Refresh activities and sync status
         await fetchActivities(pagination.page);
         await fetchSyncStatus();
@@ -572,7 +573,7 @@ const ActivitySamplingView: React.FC = () => {
                                     <Button
                                       variant="secondary"
                                       size="sm"
-                                      onClick={handleSyncFFA}
+                                      onClick={() => handleSyncFFA(false)}
                                       disabled={isSyncing}
                                       className="mt-2"
                                     >
