@@ -115,7 +115,9 @@ const TaskList: React.FC = () => {
         setPagination(response.data.pagination || null);
         setCurrentPage(page);
       } else {
-        setError(response.error?.message || 'Failed to load tasks');
+        const errorMsg = response.error?.message || 'Failed to load tasks';
+        setError(errorMsg);
+        showError(errorMsg);
       }
     } catch (err: any) {
       const errorMessage = err.message || err.response?.data?.error?.message || 'Failed to load tasks';
