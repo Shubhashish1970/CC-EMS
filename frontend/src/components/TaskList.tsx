@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
@@ -84,18 +84,24 @@ const TaskList: React.FC = () => {
   }, []);
 
   // Fetch tasks
-  const fetchTasks = async (page: number = 1) => {
+  const fetchTasks = useCallback(async (page: number = 1) => {
+    // Don't fetch if user is not loaded yet
+    if (!user) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
       let response;
-      if (user?.role === 'team_lead') {
+      if (user.role === 'team_lead') {
         response = await tasksAPI.getTeamTasks({
           status: filters.status || undefined,
           page,
           limit: 20,
         });
       } else {
+        // For MIS Admin and other roles, use getPendingTasks
         response = await tasksAPI.getPendingTasks({
           agentId: filters.agentId || undefined,
           territory: filters.territory || undefined,
@@ -108,17 +114,24 @@ const TaskList: React.FC = () => {
         setTasks(response.data.tasks || []);
         setPagination(response.data.pagination || null);
         setCurrentPage(page);
+      } else {
+        setError(response.error?.message || 'Failed to load tasks');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load tasks');
+      const errorMessage = err.message || err.response?.data?.error?.message || 'Failed to load tasks';
+      setError(errorMessage);
+      showError(errorMessage);
+      console.error('Error fetching tasks:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, filters.status, filters.agentId, filters.territory, showError]);
 
   useEffect(() => {
-    fetchTasks(1);
-  }, [filters.status, filters.agentId, filters.territory]);
+    if (user) {
+      fetchTasks(1);
+    }
+  }, [user, fetchTasks]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
