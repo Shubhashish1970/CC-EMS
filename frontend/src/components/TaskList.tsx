@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
@@ -46,6 +46,13 @@ interface Pagination {
 const TaskList: React.FC = () => {
   const { user } = useAuth();
   const { showSuccess, showError, showWarning, showInfo } = useToast();
+  
+  // Use refs to store toast functions to avoid dependency issues in useCallback
+  const toastRef = useRef({ showSuccess, showError, showWarning, showInfo });
+  useEffect(() => {
+    toastRef.current = { showSuccess, showError, showWarning, showInfo };
+  }, [showSuccess, showError, showWarning, showInfo]);
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,18 +124,16 @@ const TaskList: React.FC = () => {
       } else {
         const errorMsg = response.error?.message || 'Failed to load tasks';
         setError(errorMsg);
-        showError(errorMsg);
+        toastRef.current.showError(errorMsg);
       }
     } catch (err: any) {
       const errorMessage = err.message || err.response?.data?.error?.message || 'Failed to load tasks';
       setError(errorMessage);
-      showError(errorMessage);
+      toastRef.current.showError(errorMessage);
       console.error('Error fetching tasks:', err);
     } finally {
       setIsLoading(false);
     }
-    // showError is stable from useToast, so we can safely exclude it from deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, filters.status, filters.agentId, filters.territory]);
 
   useEffect(() => {
@@ -305,13 +310,13 @@ const TaskList: React.FC = () => {
         setShowBulkReassignModal(false);
         fetchTasks(currentPage);
         if (response.data.failed > 0) {
-          showWarning(`Reassigned ${response.data.successful} task(s), ${response.data.failed} failed`);
+          toastRef.current.showWarning(`Reassigned ${response.data.successful} task(s), ${response.data.failed} failed`);
         } else {
-          showSuccess(`Successfully reassigned ${response.data.successful} task(s)`);
+          toastRef.current.showSuccess(`Successfully reassigned ${response.data.successful} task(s)`);
         }
       }
     } catch (err: any) {
-      showError(err.message || 'Failed to reassign tasks');
+      toastRef.current.showError(err.message || 'Failed to reassign tasks');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -328,13 +333,13 @@ const TaskList: React.FC = () => {
         setShowBulkStatusModal(false);
         fetchTasks(currentPage);
         if (response.data.failed > 0) {
-          showWarning(`Updated status for ${response.data.successful} task(s), ${response.data.failed} failed`);
+          toastRef.current.showWarning(`Updated status for ${response.data.successful} task(s), ${response.data.failed} failed`);
         } else {
-          showSuccess(`Successfully updated status for ${response.data.successful} task(s)`);
+          toastRef.current.showSuccess(`Successfully updated status for ${response.data.successful} task(s)`);
         }
       }
     } catch (err: any) {
-      showError(err.message || 'Failed to update task status');
+      toastRef.current.showError(err.message || 'Failed to update task status');
     } finally {
       setIsBulkProcessing(false);
     }
@@ -343,25 +348,25 @@ const TaskList: React.FC = () => {
   // Export functions
   const handleExportCSV = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToCSV(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    exportToCSV(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
     if (tasksToExport.length > 0) {
-      showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
+      toastRef.current.showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
     }
   };
 
   const handleExportPDF = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToPDF(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    exportToPDF(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
     if (tasksToExport.length > 0) {
-      showInfo('Opening print dialog for PDF export');
+      toastRef.current.showInfo('Opening print dialog for PDF export');
     }
   };
 
   const handleExportExcel = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToExcel(tasksToExport, 'tasks', (msg) => showWarning(msg));
+    exportToExcel(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
     if (tasksToExport.length > 0) {
-      showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
+      toastRef.current.showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
     }
   };
 
