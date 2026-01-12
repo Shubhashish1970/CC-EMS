@@ -3,6 +3,7 @@ import { useToast } from '../../context/ToastContext';
 import { adminAPI } from '../../services/api';
 import { Loader2, RefreshCw, Users as UsersIcon, Calendar, Phone, MapPin, CheckCircle, Clock, XCircle, AlertCircle, Search, ChevronRight } from 'lucide-react';
 import Button from '../shared/Button';
+import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
 interface AgentQueueSummary {
   agentId: string;
@@ -108,20 +109,21 @@ const AgentQueueView: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Sampled - in queue' },
-      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'In Progress' },
-      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
-      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Not Reachable' },
-      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200', label: 'Invalid Number' },
+      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200' },
+      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200' },
+      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200' },
+      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.sampled_in_queue;
     const Icon = config.icon;
+    const label = getTaskStatusLabel(status);
 
     return (
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${config.color}`}>
         <Icon size={12} className={status === 'in_progress' ? 'animate-spin' : ''} />
-        {config.label}
+        {label}
       </span>
     );
   };

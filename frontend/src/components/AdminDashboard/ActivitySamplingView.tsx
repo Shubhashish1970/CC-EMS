@@ -3,6 +3,7 @@ import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
 import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download } from 'lucide-react';
 import Button from '../shared/Button';
+import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
 interface ActivitySamplingStatus {
   activity: {
@@ -568,12 +569,7 @@ const ActivitySamplingView: React.FC = () => {
                                               farmer.taskStatus === 'invalid_number' ? 'bg-red-100 text-red-700' :
                                               'bg-gray-100 text-gray-700'
                                             }`}>
-                                              {farmer.taskStatus === 'sampled_in_queue' ? 'Sampled - In Queue' :
-                                               farmer.taskStatus === 'in_progress' ? 'In Progress' :
-                                               farmer.taskStatus === 'completed' ? 'Completed' :
-                                               farmer.taskStatus === 'not_reachable' ? 'Not Reachable' :
-                                               farmer.taskStatus === 'invalid_number' ? 'Invalid Number' :
-                                               farmer.taskStatus || 'Unknown'}
+                                              {farmer.taskStatus ? getTaskStatusLabel(farmer.taskStatus) : 'Unknown'}
                                             </span>
                                           </div>
                                         </div>
