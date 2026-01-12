@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
-import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download } from 'lucide-react';
+import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3 } from 'lucide-react';
 import Button from '../shared/Button';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
@@ -180,6 +180,60 @@ const ActivitySamplingView: React.FC = () => {
     setExpandedActivity(expandedActivity === activityId ? null : activityId);
   };
 
+  const calculateStatistics = () => {
+    const stats = {
+      totalActivities: activities.length,
+      activitiesSampled: 0,
+      activitiesNotSampled: 0,
+      activitiesPartial: 0,
+      totalFarmers: 0,
+      farmersSampled: 0,
+      totalTasks: 0,
+      tasksSampledInQueue: 0,
+      tasksInProgress: 0,
+      tasksCompleted: 0,
+      tasksNotReachable: 0,
+      tasksInvalidNumber: 0,
+    };
+
+    activities.forEach((item) => {
+      // Count activities by sampling status
+      if (item.samplingStatus === 'sampled') {
+        stats.activitiesSampled++;
+      } else if (item.samplingStatus === 'not_sampled') {
+        stats.activitiesNotSampled++;
+      } else if (item.samplingStatus === 'partial') {
+        stats.activitiesPartial++;
+      }
+
+      // Count farmers
+      const totalFarmersInActivity = item.activity.farmerIds?.length || 0;
+      stats.totalFarmers += totalFarmersInActivity;
+      
+      if (item.samplingAudit) {
+        stats.farmersSampled += item.samplingAudit.sampledCount;
+      }
+
+      // Count tasks
+      if (item.tasksCount) {
+        stats.totalTasks += item.tasksCount;
+      }
+
+      // Count tasks by status
+      if (item.statusBreakdown) {
+        stats.tasksSampledInQueue += item.statusBreakdown.sampled_in_queue || 0;
+        stats.tasksInProgress += item.statusBreakdown.in_progress || 0;
+        stats.tasksCompleted += item.statusBreakdown.completed || 0;
+        stats.tasksNotReachable += item.statusBreakdown.not_reachable || 0;
+        stats.tasksInvalidNumber += item.statusBreakdown.invalid_number || 0;
+      }
+    });
+
+    return stats;
+  };
+
+  const statistics = calculateStatistics();
+
   return (
     <div className="space-y-6">
       {/* Header with Filters */}
@@ -316,6 +370,88 @@ const ActivitySamplingView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Statistics Dashboard */}
+      {!isLoading && activities.length > 0 && (
+        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="text-green-700" size={20} />
+            <h2 className="text-lg font-black text-slate-900">Activity Sampling Statistics</h2>
+          </div>
+          
+          {/* Activity Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Activities</p>
+              <p className="text-2xl font-black text-slate-900">{statistics.totalActivities}</p>
+            </div>
+            <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Activities Sampled</p>
+              <p className="text-2xl font-black text-green-800">{statistics.activitiesSampled}</p>
+            </div>
+            <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
+              <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Activities Partial</p>
+              <p className="text-2xl font-black text-orange-800">{statistics.activitiesPartial}</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Not Sampled</p>
+              <p className="text-2xl font-black text-slate-800">{statistics.activitiesNotSampled}</p>
+            </div>
+          </div>
+
+          {/* Farmer Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">Total Farmers</p>
+              <p className="text-2xl font-black text-blue-800">{statistics.totalFarmers}</p>
+            </div>
+            <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Farmers Sampled</p>
+              <p className="text-2xl font-black text-green-800">{statistics.farmersSampled}</p>
+              {statistics.totalFarmers > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  ({Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)
+                </p>
+              )}
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Farmers Not Sampled</p>
+              <p className="text-2xl font-black text-slate-800">{statistics.totalFarmers - statistics.farmersSampled}</p>
+            </div>
+          </div>
+
+          {/* Task Statistics */}
+          <div className="border-t border-slate-200 pt-4">
+            <h3 className="text-sm font-black text-slate-700 mb-3">Task Status Breakdown</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Tasks</p>
+                <p className="text-2xl font-black text-slate-900">{statistics.totalTasks}</p>
+              </div>
+              <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+                <p className="text-2xl font-black text-yellow-800">{statistics.tasksSampledInQueue}</p>
+              </div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-2xl font-black text-blue-800">{statistics.tasksInProgress}</p>
+              </div>
+              <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-2xl font-black text-green-800">{statistics.tasksCompleted}</p>
+              </div>
+              <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
+                <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Not Reachable</p>
+                <p className="text-2xl font-black text-orange-800">{statistics.tasksNotReachable}</p>
+              </div>
+              <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
+                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Invalid Number</p>
+                <p className="text-2xl font-black text-red-800">{statistics.tasksInvalidNumber}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Activities List */}
       {isLoading ? (
