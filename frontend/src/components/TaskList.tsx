@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle } from 'lucide-react';
 import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
 import { exportToCSV, exportToPDF, exportToExcel, formatTaskForExport } from '../utils/exportUtils';
@@ -45,13 +45,7 @@ interface Pagination {
 
 const TaskList: React.FC = () => {
   const { user } = useAuth();
-  const { showSuccess, showError, showWarning, showInfo } = useToast();
-  
-  // Use refs to store toast functions to avoid dependency issues in useCallback
-  const toastRef = useRef({ showSuccess, showError, showWarning, showInfo });
-  useEffect(() => {
-    toastRef.current = { showSuccess, showError, showWarning, showInfo };
-  }, [showSuccess, showError, showWarning, showInfo]);
+  const toast = useToast();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -59,7 +53,7 @@ const TaskList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filters, setFilters] = useState({
-    status: '' as string,
+    status: '',
     agentId: '',
     territory: '',
     search: '',
@@ -75,9 +69,9 @@ const TaskList: React.FC = () => {
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
-  // Fetch agents for filter dropdown
+  // Fetch agents
   useEffect(() => {
-    const fetchAgents = async () => {
+    const loadAgents = async () => {
       try {
         const response = await usersAPI.getUsers({ role: 'cc_agent', isActive: true }) as any;
         if (response.success && response.data?.users) {
@@ -87,60 +81,91 @@ const TaskList: React.FC = () => {
         console.error('Error fetching agents:', err);
       }
     };
-    fetchAgents();
+    loadAgents();
   }, []);
 
   // Fetch tasks
-  const fetchTasks = useCallback(async (page: number = 1) => {
-    // Don't fetch if user is not loaded yet
-    if (!user) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      let response;
-      if (user.role === 'team_lead') {
-        response = await tasksAPI.getTeamTasks({
-          status: filters.status || undefined,
-          page,
-          limit: 20,
-        });
-      } else {
-        // For MIS Admin and other roles, use getPendingTasks
-        response = await tasksAPI.getPendingTasks({
-          agentId: filters.agentId || undefined,
-          territory: filters.territory || undefined,
-          page,
-          limit: 20,
-        });
-      }
-
-      if (response.success && response.data) {
-        setTasks(response.data.tasks || []);
-        setPagination(response.data.pagination || null);
-        setCurrentPage(page);
-      } else {
-        const errorMsg = response.error?.message || 'Failed to load tasks';
-        setError(errorMsg);
-        toastRef.current.showError(errorMsg);
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || err.response?.data?.error?.message || 'Failed to load tasks';
-      setError(errorMessage);
-      toastRef.current.showError(errorMessage);
-      console.error('Error fetching tasks:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, filters.status, filters.agentId, filters.territory]);
-
   useEffect(() => {
+    if (!user) return;
+
+    const loadTasks = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        let response;
+        if (user.role === 'team_lead') {
+          response = await tasksAPI.getTeamTasks({
+            status: filters.status || undefined,
+            page: currentPage,
+            limit: 20,
+          });
+        } else {
+          response = await tasksAPI.getPendingTasks({
+            agentId: filters.agentId || undefined,
+            territory: filters.territory || undefined,
+            page: currentPage,
+            limit: 20,
+          });
+        }
+
+        if (response.success && response.data) {
+          setTasks(response.data.tasks || []);
+          setPagination(response.data.pagination || null);
+        } else {
+          const errorMsg = response.error?.message || 'Failed to load tasks';
+          setError(errorMsg);
+          toast.showError(errorMsg);
+        }
+      } catch (err: any) {
+        const errorMessage = err.message || err.response?.data?.error?.message || 'Failed to load tasks';
+        setError(errorMessage);
+        toast.showError(errorMessage);
+        console.error('Error fetching tasks:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTasks();
+  }, [user, filters.status, filters.agentId, filters.territory, currentPage]);
+
+  const handleRefresh = () => {
     if (user) {
-      fetchTasks(1);
+      const loadTasks = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          let response;
+          if (user.role === 'team_lead') {
+            response = await tasksAPI.getTeamTasks({
+              status: filters.status || undefined,
+              page: currentPage,
+              limit: 20,
+            });
+          } else {
+            response = await tasksAPI.getPendingTasks({
+              agentId: filters.agentId || undefined,
+              territory: filters.territory || undefined,
+              page: currentPage,
+              limit: 20,
+            });
+          }
+
+          if (response.success && response.data) {
+            setTasks(response.data.tasks || []);
+            setPagination(response.data.pagination || null);
+          }
+        } catch (err: any) {
+          const errorMessage = err.message || 'Failed to load tasks';
+          setError(errorMessage);
+          toast.showError(errorMessage);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadTasks();
     }
-  }, [user, fetchTasks]);
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -167,71 +192,6 @@ const TaskList: React.FC = () => {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  // Calculate task statistics
-  const calculateStatistics = () => {
-    const stats = {
-      total: filteredTasks.length,
-      sampled_in_queue: 0,
-      in_progress: 0,
-      completed: 0,
-      not_reachable: 0,
-      invalid_number: 0,
-      overdue: 0,
-      dueToday: 0,
-      dueSoon: 0,
-      onTime: 0,
-    };
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
-    filteredTasks.forEach(task => {
-      // Status counts
-      stats[task.status as keyof typeof stats]++;
-
-      // Priority based on scheduled date
-      const scheduledDate = new Date(task.scheduledDate);
-      if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
-        stats.overdue++;
-      } else if (scheduledDate >= today && scheduledDate < tomorrow) {
-        stats.dueToday++;
-      } else if (scheduledDate >= tomorrow && scheduledDate < nextWeek) {
-        stats.dueSoon++;
-      } else {
-        stats.onTime++;
-      }
-    });
-
-    return stats;
-  };
-
-  // Get priority indicator for a task
-  const getTaskPriority = (task: Task) => {
-    const scheduledDate = new Date(task.scheduledDate);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
-      return { level: 'overdue', color: 'bg-red-100 text-red-800 border-red-300', icon: AlertTriangle, label: 'Overdue' };
-    } else if (scheduledDate >= today && scheduledDate < new Date(today.getTime() + 24 * 60 * 60 * 1000)) {
-      return { level: 'due-today', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: Clock, label: 'Due Today' };
-    } else if (scheduledDate >= new Date(today.getTime() + 24 * 60 * 60 * 1000) && scheduledDate < new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-      return { level: 'due-soon', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock, label: 'Due Soon' };
-    }
-    return { level: 'on-time', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle, label: 'On Time' };
-  };
-
-  const statistics = calculateStatistics();
-
   const filteredTasks = tasks.filter(task => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -245,7 +205,6 @@ const TaskList: React.FC = () => {
     return true;
   });
 
-  // Sort tasks
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     let aValue: any;
     let bValue: any;
@@ -276,7 +235,51 @@ const TaskList: React.FC = () => {
     return 0;
   });
 
-  // Toggle task selection
+  const calculateStatistics = () => {
+    const stats = {
+      total: filteredTasks.length,
+      sampled_in_queue: 0,
+      in_progress: 0,
+      completed: 0,
+      not_reachable: 0,
+      invalid_number: 0,
+      overdue: 0,
+      dueToday: 0,
+    };
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    filteredTasks.forEach(task => {
+      stats[task.status as keyof typeof stats]++;
+      const scheduledDate = new Date(task.scheduledDate);
+      if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
+        stats.overdue++;
+      } else if (scheduledDate >= today && scheduledDate < tomorrow) {
+        stats.dueToday++;
+      }
+    });
+
+    return stats;
+  };
+
+  const getTaskPriority = (task: Task) => {
+    const scheduledDate = new Date(task.scheduledDate);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    if (scheduledDate < today && (task.status === 'sampled_in_queue' || task.status === 'in_progress')) {
+      return { level: 'overdue', color: 'bg-red-100 text-red-800 border-red-300', icon: AlertTriangle, label: 'Overdue' };
+    } else if (scheduledDate >= today && scheduledDate < new Date(today.getTime() + 24 * 60 * 60 * 1000)) {
+      return { level: 'due-today', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: Clock, label: 'Due Today' };
+    }
+    return { level: 'on-time', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle, label: 'On Time' };
+  };
+
+  const statistics = calculateStatistics();
+
   const toggleTaskSelection = (taskId: string) => {
     const newSelected = new Set(selectedTasks);
     if (newSelected.has(taskId)) {
@@ -288,7 +291,6 @@ const TaskList: React.FC = () => {
     setShowBulkActions(newSelected.size > 0);
   };
 
-  // Select all visible tasks
   const toggleSelectAll = () => {
     if (selectedTasks.size === sortedTasks.length) {
       setSelectedTasks(new Set());
@@ -299,7 +301,6 @@ const TaskList: React.FC = () => {
     }
   };
 
-  // Bulk reassign
   const handleBulkReassign = async (agentId: string) => {
     setIsBulkProcessing(true);
     try {
@@ -308,21 +309,20 @@ const TaskList: React.FC = () => {
         setSelectedTasks(new Set());
         setShowBulkActions(false);
         setShowBulkReassignModal(false);
-        fetchTasks(currentPage);
+        handleRefresh();
         if (response.data.failed > 0) {
-          toastRef.current.showWarning(`Reassigned ${response.data.successful} task(s), ${response.data.failed} failed`);
+          toast.showWarning(`Reassigned ${response.data.successful} task(s), ${response.data.failed} failed`);
         } else {
-          toastRef.current.showSuccess(`Successfully reassigned ${response.data.successful} task(s)`);
+          toast.showSuccess(`Successfully reassigned ${response.data.successful} task(s)`);
         }
       }
     } catch (err: any) {
-      toastRef.current.showError(err.message || 'Failed to reassign tasks');
+      toast.showError(err.message || 'Failed to reassign tasks');
     } finally {
       setIsBulkProcessing(false);
     }
   };
 
-  // Bulk status update
   const handleBulkStatusUpdate = async (status: string, notes?: string) => {
     setIsBulkProcessing(true);
     try {
@@ -331,42 +331,41 @@ const TaskList: React.FC = () => {
         setSelectedTasks(new Set());
         setShowBulkActions(false);
         setShowBulkStatusModal(false);
-        fetchTasks(currentPage);
+        handleRefresh();
         if (response.data.failed > 0) {
-          toastRef.current.showWarning(`Updated status for ${response.data.successful} task(s), ${response.data.failed} failed`);
+          toast.showWarning(`Updated status for ${response.data.successful} task(s), ${response.data.failed} failed`);
         } else {
-          toastRef.current.showSuccess(`Successfully updated status for ${response.data.successful} task(s)`);
+          toast.showSuccess(`Successfully updated status for ${response.data.successful} task(s)`);
         }
       }
     } catch (err: any) {
-      toastRef.current.showError(err.message || 'Failed to update task status');
+      toast.showError(err.message || 'Failed to update task status');
     } finally {
       setIsBulkProcessing(false);
     }
   };
 
-  // Export functions
   const handleExportCSV = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToCSV(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
+    exportToCSV(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
     if (tasksToExport.length > 0) {
-      toastRef.current.showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
+      toast.showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
     }
   };
 
   const handleExportPDF = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToPDF(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
+    exportToPDF(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
     if (tasksToExport.length > 0) {
-      toastRef.current.showInfo('Opening print dialog for PDF export');
+      toast.showInfo('Opening print dialog for PDF export');
     }
   };
 
   const handleExportExcel = () => {
     const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToExcel(tasksToExport, 'tasks', (msg) => toastRef.current.showWarning(msg));
+    exportToExcel(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
     if (tasksToExport.length > 0) {
-      toastRef.current.showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
+      toast.showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
     }
   };
 
@@ -377,7 +376,7 @@ const TaskList: React.FC = () => {
         onBack={() => setSelectedTask(null)}
         onTaskUpdated={() => {
           setSelectedTask(null);
-          fetchTasks(currentPage);
+          handleRefresh();
         }}
       />
     );
@@ -457,7 +456,7 @@ const TaskList: React.FC = () => {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => fetchTasks(currentPage)}
+                onClick={handleRefresh}
                 disabled={isLoading}
               >
                 <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
@@ -576,26 +575,6 @@ const TaskList: React.FC = () => {
                 <p className="text-2xl font-black text-orange-800">{statistics.dueToday}</p>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-xs font-medium text-slate-600">Overdue: {statistics.overdue}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                  <span className="text-xs font-medium text-slate-600">Due Today: {statistics.dueToday}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span className="text-xs font-medium text-slate-600">Due Soon: {statistics.dueSoon}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-xs font-medium text-slate-600">On Time: {statistics.onTime}</span>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -609,7 +588,7 @@ const TaskList: React.FC = () => {
           <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
             <AlertCircle className="mx-auto mb-4 text-red-500" size={32} />
             <p className="text-sm text-red-600 font-medium">{error}</p>
-            <Button variant="secondary" size="sm" onClick={() => fetchTasks(currentPage)} className="mt-4">
+            <Button variant="secondary" size="sm" onClick={handleRefresh} className="mt-4">
               Try Again
             </Button>
           </div>
@@ -672,98 +651,96 @@ const TaskList: React.FC = () => {
                 </label>
               </div>
 
-              {sortedTasks.map((task) => (
-                <div
-                  key={task._id}
-                  className={`bg-white rounded-2xl p-5 border shadow-sm transition-all ${
-                    selectedTasks.has(task._id)
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-slate-200 hover:shadow-md cursor-pointer'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      {/* Checkbox */}
-                      <div className="flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedTasks.has(task._id)}
-                          onChange={() => toggleTaskSelection(task._id)}
-                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
-                        />
-                      </div>
-                      {/* Farmer Avatar */}
-                      <div className="flex-shrink-0">
-                        {task.farmerId.photoUrl ? (
-                          <img
-                            src={task.farmerId.photoUrl}
-                            alt={task.farmerId.name}
-                            className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = '/images/farmer-default-logo.png';
-                            }}
+              {sortedTasks.map((task) => {
+                const priority = getTaskPriority(task);
+                const PriorityIcon = priority.icon;
+                return (
+                  <div
+                    key={task._id}
+                    className={`bg-white rounded-2xl p-5 border shadow-sm transition-all ${
+                      selectedTasks.has(task._id)
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-slate-200 hover:shadow-md cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4 flex-1">
+                        {/* Checkbox */}
+                        <div className="flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTasks.has(task._id)}
+                            onChange={() => toggleTaskSelection(task._id)}
+                            className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
                           />
-                        ) : (
-                          <div className="w-14 h-14 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
-                            <UserIcon className="text-slate-400" size={24} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Task Info */}
-                      <div
-                        className="flex-1 min-w-0"
-                        onClick={() => setSelectedTask(task)}
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-base font-black text-slate-900 truncate">{task.farmerId.name}</h3>
-                          {getStatusBadge(task.status)}
-                          {(() => {
-                            const priority = getTaskPriority(task);
-                            const PriorityIcon = priority.icon;
-                            return (
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
-                                <PriorityIcon size={12} />
-                                {priority.label}
-                              </span>
-                            );
-                          })()}
+                        </div>
+                        {/* Farmer Avatar */}
+                        <div className="flex-shrink-0">
+                          {task.farmerId.photoUrl ? (
+                            <img
+                              src={task.farmerId.photoUrl}
+                              alt={task.farmerId.name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = '/images/farmer-default-logo.png';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
+                              <UserIcon className="text-slate-400" size={24} />
+                            </div>
+                          )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
-                          <div className="flex items-center gap-2">
-                            <Phone size={14} />
-                            <span className="font-medium">{task.farmerId.mobileNumber}</span>
+                        {/* Task Info */}
+                        <div
+                          className="flex-1 min-w-0"
+                          onClick={() => setSelectedTask(task)}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-base font-black text-slate-900 truncate">{task.farmerId.name}</h3>
+                            {getStatusBadge(task.status)}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
+                              <PriorityIcon size={12} />
+                              {priority.label}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin size={14} />
-                            <span>{task.farmerId.location}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <UserIcon size={14} />
-                            <span>Agent: {task.assignedAgentId.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar size={14} />
-                            <span>Scheduled: {formatDate(task.scheduledDate)}</span>
-                          </div>
-                        </div>
 
-                        <div className="mt-2 pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-4 text-xs text-slate-500">
-                            <span>Activity: {task.activityId.type}</span>
-                            <span>•</span>
-                            <span>Officer: {task.activityId.officerName}</span>
-                            <span>•</span>
-                            <span>Language: {task.farmerId.preferredLanguage}</span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <Phone size={14} />
+                              <span className="font-medium">{task.farmerId.mobileNumber}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <MapPin size={14} />
+                              <span>{task.farmerId.location}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <UserIcon size={14} />
+                              <span>Agent: {task.assignedAgentId.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar size={14} />
+                              <span>Scheduled: {formatDate(task.scheduledDate)}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 pt-2 border-t border-slate-100">
+                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                              <span>Activity: {task.activityId.type}</span>
+                              <span>•</span>
+                              <span>Officer: {task.activityId.officerName}</span>
+                              <span>•</span>
+                              <span>Language: {task.farmerId.preferredLanguage}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -777,7 +754,7 @@ const TaskList: React.FC = () => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => fetchTasks(currentPage - 1)}
+                      onClick={() => setCurrentPage(currentPage - 1)}
                       disabled={currentPage === 1 || isLoading}
                     >
                       Previous
@@ -785,7 +762,7 @@ const TaskList: React.FC = () => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => fetchTasks(currentPage + 1)}
+                      onClick={() => setCurrentPage(currentPage + 1)}
                       disabled={currentPage >= pagination.pages || isLoading}
                     >
                       Next
