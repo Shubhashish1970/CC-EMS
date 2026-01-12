@@ -296,6 +296,42 @@ export const autoAssignTask = async (taskId: string): Promise<ICallTask | null> 
 };
 
 /**
+ * Ensure only one task is in_progress per agent
+ * If agent has another in_progress task, set it back to sampled_in_queue
+ */
+export const ensureSingleInProgressTask = async (
+  agentId: string,
+  currentTaskId?: string
+): Promise<void> => {
+  try {
+    const query: any = {
+      assignedAgentId: new mongoose.Types.ObjectId(agentId),
+      status: 'in_progress',
+    };
+
+    // Exclude current task if provided
+    if (currentTaskId) {
+      query._id = { $ne: new mongoose.Types.ObjectId(currentTaskId) };
+    }
+
+    const existingInProgressTasks = await CallTask.find(query);
+
+    // Set all other in_progress tasks back to sampled_in_queue
+    for (const task of existingInProgressTasks) {
+      await updateTaskStatus(
+        task._id.toString(),
+        'sampled_in_queue',
+        'Another task was loaded, setting previous task back to queue'
+      );
+      logger.info(`Set task ${task._id} back to sampled_in_queue for agent ${agentId}`);
+    }
+  } catch (error) {
+    logger.error('Error ensuring single in_progress task:', error);
+    throw error;
+  }
+};
+
+/**
  * Update task status
  */
 export const updateTaskStatus = async (
