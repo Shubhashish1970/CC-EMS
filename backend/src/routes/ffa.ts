@@ -54,6 +54,20 @@ router.post(
         sampling: samplingResult,
       };
 
+      // Handle skipped syncs (no new data or too soon)
+      if (result.skipped) {
+        res.json({
+          success: true,
+          message: result.skipReason || 'Sync skipped',
+          data: {
+            ...responseData,
+            skipped: true,
+            skipReason: result.skipReason,
+          },
+        });
+        return;
+      }
+
       res.json({
         success: true,
         message: `FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}${samplingResult ? `. Sampling: ${samplingResult.totalTasksCreated} tasks created` : ''}`,

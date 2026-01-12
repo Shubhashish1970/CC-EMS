@@ -208,12 +208,21 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
  * Sync all activities from FFA API
  * @param fullSync - If true, syncs all activities. If false, only syncs activities after the last sync date (incremental)
  */
+// Sync lock to prevent concurrent syncs
+let isSyncing = false;
+let lastSyncTime: number | null = null;
+
+// Minimum time between syncs (in milliseconds) - default 10 minutes
+const MIN_SYNC_INTERVAL = parseInt(process.env.MIN_SYNC_INTERVAL || '600000', 10); // 10 minutes default
+
 export const syncFFAData = async (fullSync: boolean = false): Promise<{
   activitiesSynced: number;
   farmersSynced: number;
   errors: string[];
   syncType: 'full' | 'incremental';
   lastSyncDate?: Date;
+  skipped?: boolean;
+  skipReason?: string;
 }> => {
   const startTime = Date.now();
   const errors: string[] = [];
@@ -222,17 +231,66 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
   let lastSyncDate: Date | undefined;
 
   try {
+    // Check if sync is already in progress
+    if (isSyncing) {
+      const skipReason = 'Another sync is already in progress';
+      logger.warn(`[FFA SYNC] ${skipReason}`);
+      return {
+        activitiesSynced: 0,
+        farmersSynced: 0,
+        errors: [skipReason],
+        syncType: 'incremental',
+        skipped: true,
+        skipReason,
+      };
+    }
+
+    // Check if sync was run recently (for incremental sync only)
+    if (!fullSync && lastSyncTime && (Date.now() - lastSyncTime) < MIN_SYNC_INTERVAL) {
+      const timeSinceLastSync = Math.round((Date.now() - lastSyncTime) / 1000 / 60); // minutes
+      const skipReason = `Sync was completed ${timeSinceLastSync} minute(s) ago. Please wait at least ${Math.round(MIN_SYNC_INTERVAL / 1000 / 60)} minutes between syncs.`;
+      logger.info(`[FFA SYNC] ${skipReason}`);
+      return {
+        activitiesSynced: 0,
+        farmersSynced: 0,
+        errors: [],
+        syncType: 'incremental',
+        skipped: true,
+        skipReason,
+      };
+    }
+
+    // Set sync lock
+    isSyncing = true;
+
     // Determine sync type and get last sync date for incremental sync
     if (!fullSync) {
       try {
         // Get the most recently synced activity to determine the cutoff date
         const lastActivity = await Activity.findOne().sort({ syncedAt: -1 });
-        if (lastActivity && lastActivity.date) {
-          // Use the activity date (not syncedAt) to ensure we get activities created after the last synced activity
-          // Subtract 1 day as a buffer to catch any activities that might have been created on the same day
-          lastSyncDate = new Date(lastActivity.date);
-          lastSyncDate.setDate(lastSyncDate.getDate() - 1);
-          logger.info(`[FFA SYNC] Incremental sync: last activity date was ${lastActivity.date.toISOString()}, fetching activities after ${lastSyncDate.toISOString()}`);
+        if (lastActivity && lastActivity.syncedAt) {
+          // Use syncedAt timestamp (when activity was last synced) instead of date
+          // This is more accurate for incremental sync as it reflects actual sync time
+          // Subtract 1 hour as a buffer to account for API delays and timezone differences
+          lastSyncDate = new Date(lastActivity.syncedAt);
+          lastSyncDate.setHours(lastSyncDate.getHours() - 1);
+          logger.info(`[FFA SYNC] Incremental sync: last activity synced at ${lastActivity.syncedAt.toISOString()}, fetching activities after ${lastSyncDate.toISOString()}`);
+          
+          // Additional check: if last sync was very recent (within last 5 minutes), skip
+          const timeSinceLastSync = Date.now() - lastActivity.syncedAt.getTime();
+          if (timeSinceLastSync < 5 * 60 * 1000) { // 5 minutes
+            const skipReason = `Last sync completed ${Math.round(timeSinceLastSync / 1000)} seconds ago. No new data expected.`;
+            logger.info(`[FFA SYNC] ${skipReason}`);
+            isSyncing = false;
+            return {
+              activitiesSynced: 0,
+              farmersSynced: 0,
+              errors: [],
+              syncType: 'incremental',
+              skipped: true,
+              skipReason,
+            };
+          }
         } else {
           logger.info(`[FFA SYNC] No previous sync found, performing full sync`);
           fullSync = true; // Fall back to full sync if no previous sync exists
@@ -262,6 +320,8 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
 
     if (!ffaActivities || ffaActivities.length === 0) {
       logger.warn('[FFA SYNC] No activities returned from FFA API');
+      isSyncing = false;
+      lastSyncTime = Date.now();
       return {
         activitiesSynced: 0,
         farmersSynced: 0,
@@ -271,7 +331,44 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
       };
     }
 
-    for (const ffaActivity of ffaActivities) {
+    // Check which activities are actually new (not already synced recently)
+    // This prevents redundant processing when sync is run consecutively
+    let newActivities: FFAActivity[] = [];
+    if (!fullSync && ffaActivities.length > 0) {
+      const existingActivityIds = await Activity.find({
+        activityId: { $in: ffaActivities.map(a => a.activityId).filter(Boolean) },
+        syncedAt: { $gte: lastSyncDate || new Date(0) }, // Only check activities synced after cutoff
+      }).select('activityId').lean();
+
+      const existingIds = new Set(existingActivityIds.map(a => a.activityId));
+      newActivities = ffaActivities.filter(a => !existingIds.has(a.activityId));
+      
+      const skippedCount = ffaActivities.length - newActivities.length;
+      if (skippedCount > 0) {
+        logger.info(`[FFA SYNC] Skipping ${skippedCount} activities that were already synced recently`);
+      }
+      
+      if (newActivities.length === 0) {
+        logger.info(`[FFA SYNC] All ${ffaActivities.length} fetched activities were already synced. No new data to process.`);
+        isSyncing = false;
+        lastSyncTime = Date.now();
+        return {
+          activitiesSynced: 0,
+          farmersSynced: 0,
+          errors: [],
+          syncType: 'incremental',
+          lastSyncDate,
+          skipped: true,
+          skipReason: `All ${ffaActivities.length} activities were already synced. No new data to process.`,
+        };
+      }
+      
+      logger.info(`[FFA SYNC] Processing ${newActivities.length} new activities (${skippedCount} already synced)`);
+    } else {
+      newActivities = ffaActivities;
+    }
+
+    for (const ffaActivity of newActivities) {
       try {
         if (!ffaActivity.activityId) {
           errors.push('Skipped activity: missing activityId');
@@ -292,6 +389,10 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.info(`[FFA SYNC] FFA sync completed in ${duration}s (${fullSync ? 'full' : 'incremental'}): ${activitiesSynced} activities, ${farmersSynced} farmers, ${errors.length} errors`);
 
+    // Release sync lock and update last sync time
+    isSyncing = false;
+    lastSyncTime = Date.now();
+
     return {
       activitiesSynced,
       farmersSynced,
@@ -300,6 +401,8 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
       lastSyncDate,
     };
   } catch (error) {
+    // Release sync lock on error
+    isSyncing = false;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('[FFA SYNC] FFA sync failed:', {
       error: errorMessage,
