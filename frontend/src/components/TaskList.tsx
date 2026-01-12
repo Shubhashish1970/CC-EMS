@@ -57,6 +57,8 @@ const TaskList: React.FC = () => {
     agentId: '',
     territory: '',
     search: '',
+    dateFrom: '',
+    dateTo: '',
   });
   const [agents, setAgents] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -96,6 +98,8 @@ const TaskList: React.FC = () => {
         if (user.role === 'team_lead') {
           response = await tasksAPI.getTeamTasks({
             status: filters.status || undefined,
+            dateFrom: filters.dateFrom || undefined,
+            dateTo: filters.dateTo || undefined,
             page: currentPage,
             limit: 20,
           });
@@ -103,6 +107,8 @@ const TaskList: React.FC = () => {
           response = await tasksAPI.getPendingTasks({
             agentId: filters.agentId || undefined,
             territory: filters.territory || undefined,
+            dateFrom: filters.dateFrom || undefined,
+            dateTo: filters.dateTo || undefined,
             page: currentPage,
             limit: 20,
           });
@@ -127,7 +133,7 @@ const TaskList: React.FC = () => {
     };
 
     loadTasks();
-  }, [user, filters.status, filters.agentId, filters.territory, currentPage]);
+  }, [user, filters.status, filters.agentId, filters.territory, filters.dateFrom, filters.dateTo, currentPage]);
 
   const handleRefresh = () => {
     if (user) {
@@ -139,6 +145,8 @@ const TaskList: React.FC = () => {
           if (user.role === 'team_lead') {
             response = await tasksAPI.getTeamTasks({
               status: filters.status || undefined,
+              dateFrom: filters.dateFrom || undefined,
+              dateTo: filters.dateTo || undefined,
               page: currentPage,
               limit: 20,
             });
@@ -146,6 +154,8 @@ const TaskList: React.FC = () => {
             response = await tasksAPI.getPendingTasks({
               agentId: filters.agentId || undefined,
               territory: filters.territory || undefined,
+              dateFrom: filters.dateFrom || undefined,
+              dateTo: filters.dateTo || undefined,
               page: currentPage,
               limit: 20,
             });
@@ -521,6 +531,31 @@ const TaskList: React.FC = () => {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                    Date From
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                    Date To
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
               </div>
 
               <div>

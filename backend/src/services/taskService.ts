@@ -100,11 +100,13 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
 export const getPendingTasks = async (filters?: {
   agentId?: string;
   territory?: string;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
   page?: number;
   limit?: number;
 }) => {
   try {
-    const { agentId, territory, page = 1, limit = 20 } = filters || {};
+    const { agentId, territory, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
     const skip = (page - 1) * limit;
 
     const query: any = {
@@ -119,6 +121,21 @@ export const getPendingTasks = async (filters?: {
     if (territory) {
       const activities = await Activity.find({ territory }).select('_id');
       query.activityId = { $in: activities.map(a => a._id) };
+    }
+
+    // Filter by scheduled date range
+    if (dateFrom || dateTo) {
+      query.scheduledDate = {};
+      if (dateFrom) {
+        const fromDate = typeof dateFrom === 'string' ? new Date(dateFrom) : dateFrom;
+        fromDate.setHours(0, 0, 0, 0);
+        query.scheduledDate.$gte = fromDate;
+      }
+      if (dateTo) {
+        const toDate = typeof dateTo === 'string' ? new Date(dateTo) : dateTo;
+        toDate.setHours(23, 59, 59, 999);
+        query.scheduledDate.$lte = toDate;
+      }
     }
 
     const tasks = await CallTask.find(query)
@@ -151,6 +168,8 @@ export const getPendingTasks = async (filters?: {
  */
 export const getTeamTasks = async (teamLeadId: string, filters?: {
   status?: TaskStatus;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
   page?: number;
   limit?: number;
 }) => {
@@ -164,7 +183,7 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
 
     const agentIds = teamAgents.map(agent => agent._id);
 
-    const { status, page = 1, limit = 20 } = filters || {};
+    const { status, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
     const skip = (page - 1) * limit;
 
     const query: any = {
@@ -188,6 +207,21 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
         statusType: typeof status,
         filters 
       });
+    }
+
+    // Filter by scheduled date range
+    if (dateFrom || dateTo) {
+      query.scheduledDate = {};
+      if (dateFrom) {
+        const fromDate = typeof dateFrom === 'string' ? new Date(dateFrom) : dateFrom;
+        fromDate.setHours(0, 0, 0, 0);
+        query.scheduledDate.$gte = fromDate;
+      }
+      if (dateTo) {
+        const toDate = typeof dateTo === 'string' ? new Date(dateTo) : dateTo;
+        toDate.setHours(23, 59, 59, 999);
+        query.scheduledDate.$lte = toDate;
+      }
     }
 
     logger.info('🔍 Team tasks query being executed', { 

@@ -234,6 +234,8 @@ router.get(
   [
     query('agentId').optional().isMongoId(),
     query('territory').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
@@ -247,11 +249,13 @@ router.get(
         });
       }
 
-      const { agentId, territory, page, limit } = req.query;
+      const { agentId, territory, dateFrom, dateTo, page, limit } = req.query;
 
       const result = await getPendingTasks({
         agentId: agentId as string,
         territory: territory as string,
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });
@@ -274,6 +278,8 @@ router.get(
   requirePermission('tasks.view.team'),
   [
     query('status').optional().isIn(['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
@@ -289,17 +295,19 @@ router.get(
 
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
-      const { status, page, limit } = req.query;
+      const { status, dateFrom, dateTo, page, limit } = req.query;
 
       logger.info('📥 GET /api/tasks/team - Request received', {
         teamLeadId,
-        queryParams: { status, page, limit },
+        queryParams: { status, dateFrom, dateTo, page, limit },
         statusType: typeof status,
         statusValue: status,
       });
 
       const result = await getTeamTasks(teamLeadId, {
         status: status ? (status as string).trim() as TaskStatus : undefined,
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });

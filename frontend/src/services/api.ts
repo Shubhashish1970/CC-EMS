@@ -156,10 +156,12 @@ export const tasksAPI = {
     });
   },
 
-  getPendingTasks: async (filters?: { agentId?: string; territory?: string; page?: number; limit?: number }) => {
+  getPendingTasks: async (filters?: { agentId?: string; territory?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     if (filters?.page) params.append('page', String(filters.page));
     if (filters?.limit) params.append('limit', String(filters.limit));
 
@@ -167,9 +169,11 @@ export const tasksAPI = {
     return apiRequest(`/tasks/pending${query ? `?${query}` : ''}`);
   },
 
-  getTeamTasks: async (filters?: { status?: string; page?: number; limit?: number }) => {
+  getTeamTasks: async (filters?: { status?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     if (filters?.page) params.append('page', String(filters.page));
     if (filters?.limit) params.append('limit', String(filters.limit));
 
