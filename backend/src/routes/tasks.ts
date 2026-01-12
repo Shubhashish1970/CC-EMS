@@ -1,6 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult, query } from 'express-validator';
-import mongoose from 'mongoose';
 import { CallTask, ICallLog, TaskStatus } from '../models/CallTask.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/rbac.js';
@@ -12,7 +11,6 @@ import {
   getTeamTasks,
   assignTaskToAgent,
   updateTaskStatus,
-  ensureSingleInProgressTask,
 } from '../services/taskService.js';
 import logger from '../config/logger.js';
 
@@ -124,10 +122,6 @@ router.post(
         throw error;
       }
 
-      // BUSINESS RULE: Only one task can be in_progress per agent at a time
-      // If agent already has an in_progress task, set it back to sampled_in_queue
-      await ensureSingleInProgressTask(agentId, task._id.toString());
-
       // Update status to in_progress if it's sampled_in_queue
       if (task.status === 'sampled_in_queue') {
         await updateTaskStatus(taskId, 'in_progress', 'Task selected by agent');
@@ -185,10 +179,6 @@ router.get(
           data: { task: null, message: 'No tasks available in queue' },
         });
       }
-
-      // BUSINESS RULE: Only one task can be in_progress per agent at a time
-      // If agent already has an in_progress task, set it back to sampled_in_queue
-      await ensureSingleInProgressTask(agentId, task._id.toString());
 
       // Update status to in_progress
       await updateTaskStatus(task._id.toString(), 'in_progress', 'Task loaded by agent');
