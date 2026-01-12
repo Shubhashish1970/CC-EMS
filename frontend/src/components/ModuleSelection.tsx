@@ -16,6 +16,7 @@ const ModuleSelection: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [modules, setModules] = useState<Module[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     // Hardcoded modules for now (Option 1 approach)
@@ -33,14 +34,32 @@ const ModuleSelection: React.FC = () => {
     setModules(availableModules);
     setIsLoading(false);
 
-    // Auto-redirect if only one module (Option A: immediate redirect)
-    // This happens after a brief moment to allow component to mount
+    // Auto-redirect if only one module after 5 seconds
+    // This allows users to see the landing page before redirecting
     if (availableModules.length === 1) {
+      // Start countdown from 5
+      setCountdown(5);
+      
+      // Update countdown every second
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownInterval);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Redirect after 5 seconds
       const redirectTimer = setTimeout(() => {
         navigate('/workspace/ems', { replace: true });
-      }, 50); // Very brief delay to prevent flash
+      }, 5000); // 5 second delay to show the landing page
       
-      return () => clearTimeout(redirectTimer);
+      return () => {
+        clearTimeout(redirectTimer);
+        clearInterval(countdownInterval);
+      };
     }
   }, [navigate]);
 
@@ -66,6 +85,11 @@ const ModuleSelection: React.FC = () => {
         <div className="text-center mb-12">
           <h1 className="text-3xl font-black text-slate-900 mb-2">Select Module</h1>
           <p className="text-slate-600">Choose a module to start working</p>
+          {countdown !== null && countdown > 0 && (
+            <p className="text-sm text-green-700 font-medium mt-2">
+              Auto-redirecting to {modules[0]?.name} in {countdown} second{countdown !== 1 ? 's' : ''}...
+            </p>
+          )}
         </div>
 
         {/* Module Cards Grid */}
