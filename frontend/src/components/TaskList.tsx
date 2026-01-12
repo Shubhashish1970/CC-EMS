@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle, ChevronDown } from 'lucide-react';
 import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
 import { exportToCSV, exportToPDF, exportToExcel, formatTaskForExport } from '../utils/exportUtils';
@@ -70,6 +70,7 @@ const TaskList: React.FC = () => {
   const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
 
   // Fetch agents
   useEffect(() => {
@@ -379,6 +380,20 @@ const TaskList: React.FC = () => {
     }
   };
 
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showExportDropdown && !target.closest('.export-dropdown-container')) {
+        setShowExportDropdown(false);
+      }
+    };
+    if (showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showExportDropdown]);
+
   if (selectedTask) {
     return (
       <TaskDetail
@@ -436,33 +451,49 @@ const TaskList: React.FC = () => {
                 <Filter size={16} />
                 Filters
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={sortedTasks.length === 0}
-              >
-                <Download size={16} />
-                Export CSV
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportPDF}
-                disabled={sortedTasks.length === 0}
-              >
-                <Download size={16} />
-                Export PDF
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportExcel}
-                disabled={sortedTasks.length === 0}
-              >
-                <Download size={16} />
-                Export Excel
-              </Button>
+              <div className="relative export-dropdown-container">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  disabled={sortedTasks.length === 0}
+                >
+                  <Download size={16} />
+                  Export
+                  <ChevronDown size={14} className="ml-1" />
+                </Button>
+                {showExportDropdown && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl border border-slate-200 shadow-lg z-50">
+                    <button
+                      onClick={() => {
+                        handleExportCSV();
+                        setShowExportDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportExcel();
+                        setShowExportDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
+                    >
+                      Export XLSX
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportPDF();
+                        setShowExportDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
+                    >
+                      Export PDF
+                    </button>
+                  </div>
+                )}
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
