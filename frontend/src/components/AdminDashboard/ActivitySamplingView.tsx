@@ -564,9 +564,16 @@ const ActivitySamplingView: React.FC = () => {
                                               farmer.taskStatus === 'sampled_in_queue' ? 'bg-yellow-100 text-yellow-700' :
                                               farmer.taskStatus === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                                               farmer.taskStatus === 'completed' ? 'bg-green-100 text-green-700' :
-                                              'bg-orange-100 text-orange-700'
+                                              farmer.taskStatus === 'not_reachable' ? 'bg-red-100 text-red-700' :
+                                              farmer.taskStatus === 'invalid_number' ? 'bg-red-100 text-red-700' :
+                                              'bg-gray-100 text-gray-700'
                                             }`}>
-                                              {farmer.taskStatus.replace('_', ' ').toUpperCase()}
+                                              {farmer.taskStatus === 'sampled_in_queue' ? 'Sampled - In Queue' :
+                                               farmer.taskStatus === 'in_progress' ? 'In Progress' :
+                                               farmer.taskStatus === 'completed' ? 'Completed' :
+                                               farmer.taskStatus === 'not_reachable' ? 'Not Reachable' :
+                                               farmer.taskStatus === 'invalid_number' ? 'Invalid Number' :
+                                               farmer.taskStatus || 'Unknown'}
                                             </span>
                                           </div>
                                         </div>

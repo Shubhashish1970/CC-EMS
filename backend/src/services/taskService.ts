@@ -17,17 +17,39 @@ export interface TaskAssignmentOptions {
  */
 export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallTask[]> => {
   try {
+    // Get agent to check language capabilities
+    const agent = await User.findById(agentId);
+    if (!agent || !agent.isActive || agent.role !== 'cc_agent') {
+      throw new Error('Invalid or inactive agent');
+    }
+
+    // Get tasks assigned to agent with correct status
+    // Note: Removed scheduledDate filter to show all tasks regardless of due date
+    // Agents should be able to see and work on tasks immediately after sampling
     const tasks = await CallTask.find({
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
       status: { $in: ['sampled_in_queue', 'in_progress'] },
-      scheduledDate: { $lte: new Date() }, // Only tasks that are due
     })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
       .populate('activityId', 'type date officerName location territory crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
       .limit(50); // Reasonable limit
 
-    return tasks;
+    // Filter tasks by agent's language capabilities
+    const languageFilteredTasks = tasks.filter((task) => {
+      const farmer = task.farmerId as any;
+      if (!farmer || !farmer.preferredLanguage) {
+        logger.warn(`Task ${task._id} has no farmer or preferredLanguage`);
+        return false; // Skip tasks without farmer language info
+      }
+      const hasLanguageMatch = agent.languageCapabilities.includes(farmer.preferredLanguage);
+      if (!hasLanguageMatch) {
+        logger.warn(`Agent ${agent.email} does not have language capability ${farmer.preferredLanguage} for task ${task._id}`);
+      }
+      return hasLanguageMatch;
+    });
+
+    return languageFilteredTasks;
   } catch (error) {
     logger.error('Error fetching available tasks for agent:', error);
     throw error;
