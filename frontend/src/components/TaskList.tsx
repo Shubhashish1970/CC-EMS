@@ -127,7 +127,9 @@ const TaskList: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, filters.status, filters.agentId, filters.territory, showError]);
+    // showError is stable from useToast, so we can safely exclude it from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, filters.status, filters.agentId, filters.territory]);
 
   useEffect(() => {
     if (user) {
