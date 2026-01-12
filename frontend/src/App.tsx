@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import ModuleSelection from './components/ModuleSelection';
 import AgentWorkspace from './components/AgentWorkspace';
 import TaskList from './components/TaskList';
 import AdminDashboardContainer from './components/AdminDashboard/AdminDashboardContainer';
@@ -14,9 +15,9 @@ import AdminDashboardContainer from './components/AdminDashboard/AdminDashboardC
 const AppContent: React.FC = () => {
   const { user } = useAuth();
 
-  // CC Agents see Agent Workspace
+  // CC Agents see Module Selection (or auto-redirect to workspace if single module)
   if (user?.role === 'cc_agent') {
-    return <AgentWorkspace />;
+    return <ModuleSelection />;
   }
 
   // MIS Admin sees Admin Dashboard
@@ -50,6 +51,16 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <AppContent />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Module workspace routes */}
+            <Route
+              path="/workspace/ems"
+              element={
+                <ProtectedRoute>
+                  <AgentWorkspace />
                 </ProtectedRoute>
               }
             />
