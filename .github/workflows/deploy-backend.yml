@@ -220,6 +220,7 @@ jobs:
             echo "CORS_ORIGIN: \"${{ secrets.CORS_ORIGIN }}\""
             echo "ENABLE_CRON: \"true\""
             echo "FFA_API_URL: \"$FFA_API_URL_VALUE\""
+            echo "GEMINI_API_KEY: \"${{ secrets.GEMINI_API_KEY }}\""
             echo "ADMIN_SEED_TOKEN: \"${{ secrets.ADMIN_SEED_TOKEN || 'change-this-secret-token' }}\""
             echo "RESEND_KEY: \"${{ secrets.RESEND_KEY }}\""
             echo "EMAIL_FROM: \"${{ secrets.EMAIL_FROM || 'onboarding@resend.dev' }}\""
@@ -240,6 +241,7 @@ jobs:
           echo "  - CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}"
           echo "  - ENABLE_CRON: true"
           echo "  - FFA_API_URL: $FFA_API_URL_VALUE"
+          echo "  - GEMINI_API_KEY: [REDACTED]"
           echo "  - ADMIN_SEED_TOKEN: [REDACTED]"
           echo "  - RESEND_KEY: [REDACTED] (preferred email service)"
           echo "  - EMAIL_FROM: ${{ secrets.EMAIL_FROM || 'onboarding@resend.dev' }}"
@@ -253,8 +255,8 @@ jobs:
           fi
           
           ENV_FILE_LINES=$(wc -l < "$ENV_FILE" || echo "0")
-          if [ "$ENV_FILE_LINES" -lt 15 ]; then
-            echo "❌ Error: Environment file has insufficient lines (expected 15, got $ENV_FILE_LINES)"
+          if [ "$ENV_FILE_LINES" -lt 16 ]; then
+            echo "❌ Error: Environment file has insufficient lines (expected 16, got $ENV_FILE_LINES)"
             echo "File contents:"
             cat "$ENV_FILE"
             exit 1
