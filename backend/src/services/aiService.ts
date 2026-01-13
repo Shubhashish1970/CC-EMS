@@ -45,7 +45,17 @@ export const extractDataFromNotes = async (
     throw new Error('Notes cannot be empty');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  // Use JSON mode for more reliable structured data extraction
+  const generationConfig = {
+    temperature: 0.1, // Lower temperature for more deterministic responses
+    topP: 0.8,
+    topK: 40,
+  };
+
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-1.5-flash',
+    generationConfig,
+  });
 
   // Build context string
   const contextInfo = context
@@ -66,7 +76,9 @@ ${contextInfo}
 Agent Notes:
 ${notes}
 
-Extract the following information and return ONLY valid JSON (no markdown, no explanation, no code blocks):
+IMPORTANT: Return ONLY valid JSON with no markdown, no code blocks, no explanations. Start your response with { and end with }.
+
+Extract the following information and return as valid JSON:
 {
   "didAttend": "Yes, I attended" | "No, I missed" | "Don't recall" | "Identity Wrong" | "Not a Farmer" | null,
   "didRecall": true | false | null,
@@ -153,7 +165,7 @@ Important:
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
 
     // Clean JSON response (remove markdown code blocks if present)
     let jsonText = text.trim();
@@ -162,9 +174,31 @@ Important:
     // Remove any leading/trailing whitespace or newlines
     jsonText = jsonText.replace(/^\s+|\s+$/g, '');
 
-    logger.info('Gemini AI response received', { responseLength: jsonText.length });
+    // Try to extract JSON if it's wrapped in text
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
 
-    const extracted = JSON.parse(jsonText) as ExtractedData;
+    logger.info('Gemini AI response received', { 
+      responseLength: jsonText.length,
+      preview: jsonText.substring(0, 200),
+    });
+
+    if (!jsonText || jsonText.length === 0) {
+      throw new Error('Empty response from AI service');
+    }
+
+    let extracted: ExtractedData;
+    try {
+      extracted = JSON.parse(jsonText) as ExtractedData;
+    } catch (parseError) {
+      logger.error('JSON parse error', {
+        jsonText: jsonText.substring(0, 500),
+        error: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+      });
+      throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
 
     // Validate and clean extracted data
     const validated = validateAndCleanExtractedData(extracted, context);

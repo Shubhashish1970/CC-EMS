@@ -82,10 +82,32 @@ router.post(
         data: extractedData,
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('AI extraction error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
       });
+      
+      // Return user-friendly error message
+      if (error instanceof Error) {
+        if (error.message.includes('GEMINI_API_KEY') || error.message.includes('not configured')) {
+          return res.status(503).json({
+            success: false,
+            error: {
+              message: 'AI service is not available. GEMINI_API_KEY is not configured.',
+            },
+          });
+        }
+        if (error.message.includes('parse') || error.message.includes('JSON')) {
+          return res.status(500).json({
+            success: false,
+            error: {
+              message: 'Failed to parse AI response. Please try again with different notes.',
+            },
+          });
+        }
+      }
+      
       next(error);
     }
   }
