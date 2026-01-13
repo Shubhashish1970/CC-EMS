@@ -141,6 +141,12 @@ jobs:
           fi
           echo "  ✅ CORS_ORIGIN is set"
           
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "⚠️ Warning: GEMINI_API_KEY secret is not set - AI features will be disabled"
+          else
+            echo "  ✅ GEMINI_API_KEY is set"
+          fi
+          
           # Check if service exists to determine initial settings
           echo "🔍 Checking if service exists..."
           SERVICE_EXISTS=false
