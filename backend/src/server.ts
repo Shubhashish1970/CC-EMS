@@ -794,6 +794,7 @@ import ffaRoutes from './routes/ffa.js';
 import samplingRoutes from './routes/sampling.js';
 import masterDataRoutes from './routes/masterData.js';
 import adminRoutes from './routes/admin.js';
+import aiRoutes from './routes/ai.js';
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
@@ -801,6 +802,7 @@ app.use('/api/ffa', ffaRoutes);
 app.use('/api/sampling', samplingRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 handler
 app.use(notFound);

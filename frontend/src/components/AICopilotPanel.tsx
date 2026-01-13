@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Zap, Send, Info, Loader2 } from 'lucide-react';
+import { Zap, Send, Info, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import Button from './shared/Button';
+import { aiAPI, ExtractionContext } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface AICopilotPanelProps {
   formData: any;
@@ -12,38 +14,66 @@ interface AICopilotPanelProps {
 const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, isActive, taskData }) => {
   const [scratchpad, setScratchpad] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const { showError, showSuccess } = useToast();
 
   const handleMagicSync = async () => {
     if (!scratchpad.trim()) return;
+    
     setIsSyncing(true);
-    try {
-      // TODO: Move to backend API endpoint in Phase 3
-      // For now, this is a placeholder that will be enhanced
-      const response = await fetch('/api/ai/extract', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        },
-        body: JSON.stringify({ notes: scratchpad }),
-      });
+    setError(null);
+    setSuccess(false);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setFormData((prev: any) => ({ ...prev, ...data.data }));
+    try {
+      // Build context from taskData for better AI extraction
+      const context: ExtractionContext | undefined = taskData
+        ? {
+            farmerName: taskData.farmer?.name,
+            activityType: taskData.activity?.type,
+            crops: taskData.activity?.crops || [],
+            products: taskData.activity?.products || [],
+            territory: taskData.activity?.territory,
+          }
+        : undefined;
+
+      const response = await aiAPI.extractData(scratchpad, context);
+
+      if (response.success && response.data) {
+        // Merge extracted data with existing form data
+        setFormData((prev: any) => ({
+          ...prev,
+          ...response.data,
+        }));
+        
+        setSuccess(true);
+        showSuccess('Form fields populated successfully! Please review and edit as needed.');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        throw new Error('Failed to extract data from notes');
+      }
+    } catch (error: any) {
+      console.error('AI Sync failed', error);
+      
+      let errorMessage = 'Failed to extract data from notes. Please try again.';
+      
+      if (error?.message) {
+        if (error.message.includes('GEMINI_API_KEY')) {
+          errorMessage = 'AI service is not configured. Please contact administrator.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else {
+          errorMessage = error.message;
         }
       }
-    } catch (error) {
-      console.error('AI Sync failed', error);
-      // Fallback: Simple pattern matching for demo
-      const lowerNotes = scratchpad.toLowerCase();
-      if (lowerNotes.includes('purchased') || lowerNotes.includes('bought')) {
-        setFormData((prev: any) => ({ ...prev, hasPurchased: true }));
-      }
-      if (lowerNotes.includes('attended')) {
-        setFormData((prev: any) => ({ ...prev, didAttend: 'Yes, I attended' }));
-      }
+      
+      setError(errorMessage);
+      showError(errorMessage);
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSyncing(false);
     }
@@ -61,10 +91,31 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
       <div className="flex-1 flex flex-col gap-4">
         <textarea
           value={scratchpad}
-          onChange={(e) => setScratchpad(e.target.value)}
+          onChange={(e) => {
+            setScratchpad(e.target.value);
+            setError(null);
+            setSuccess(false);
+          }}
           className="flex-1 w-full p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] focus:ring-4 focus:ring-green-100 outline-none text-sm leading-relaxed resize-none font-medium placeholder:text-slate-300 italic shadow-inner"
           placeholder="Agent shorthand: 'Farmer Rao attended, high paddy recall. Bought Root Booster but not Insecticide due to price...'"
         />
+        
+        {/* Error Message */}
+        {error && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+            <p className="flex-1">{error}</p>
+          </div>
+        )}
+        
+        {/* Success Message */}
+        {success && (
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs">
+            <CheckCircle size={16} className="flex-shrink-0 mt-0.5" />
+            <p className="flex-1">Form fields populated successfully! Please review and edit as needed.</p>
+          </div>
+        )}
+        
         <Button
           onClick={handleMagicSync}
           disabled={isSyncing || !scratchpad.trim()}

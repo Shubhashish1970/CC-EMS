@@ -19,6 +19,7 @@
     "migrate:status": "tsx src/scripts/migratePendingToSampledInQueue.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@types/nodemailer": "^7.0.4",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",

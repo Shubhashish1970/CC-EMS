@@ -321,3 +321,55 @@ export const ffaAPI = {
     return apiRequest('/ffa/status');
   },
 };
+
+// AI API
+export interface ExtractionContext {
+  farmerName?: string;
+  activityType?: string;
+  crops?: string[];
+  products?: string[];
+  territory?: string;
+}
+
+export interface ExtractedData {
+  didAttend?: string | null;
+  didRecall?: boolean | null;
+  cropsDiscussed?: string[];
+  productsDiscussed?: string[];
+  hasPurchased?: boolean | null;
+  willingToPurchase?: boolean | null;
+  likelyPurchaseDate?: string | undefined;
+  nonPurchaseReason?: string;
+  purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
+  agentObservations?: string;
+}
+
+export const aiAPI = {
+  extractData: async (notes: string, context?: ExtractionContext) => {
+    // AI extraction can take 5-10 seconds, use 30 second timeout
+    return apiRequest<{
+      success: boolean;
+      message: string;
+      data: ExtractedData;
+    }>(
+      '/ai/extract',
+      {
+        method: 'POST',
+        body: JSON.stringify({ notes, context }),
+      },
+      undefined,
+      30000
+    );
+  },
+
+  getStatus: async () => {
+    return apiRequest<{
+      success: boolean;
+      data: {
+        available: boolean;
+        model: string;
+        hasApiKey: boolean;
+      };
+    }>('/ai/status');
+  },
+};
