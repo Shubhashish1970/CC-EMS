@@ -313,10 +313,16 @@ export const getActivitiesWithSampling = async (filters?: {
       >();
 
       for (const task of activityTasks) {
-        // Update status breakdown - handle status mapping
-        const statusKey = task.status === 'sampled_in_queue' ? 'sampled_in_queue' : task.status;
+        // Update status breakdown - ensure all tasks are counted
+        const taskStatus = task.status || 'sampled_in_queue'; // Default to sampled_in_queue if missing
+        const statusKey = taskStatus === 'sampled_in_queue' ? 'sampled_in_queue' : taskStatus;
+        
         if (statusBreakdown.hasOwnProperty(statusKey)) {
           statusBreakdown[statusKey as keyof typeof statusBreakdown]++;
+        } else {
+          // If status is not in breakdown, log warning and count as sampled_in_queue
+          logger.warn(`Task ${task._id} has unknown status: ${taskStatus}, counting as sampled_in_queue`);
+          statusBreakdown.sampled_in_queue++;
         }
 
         // Group by agent

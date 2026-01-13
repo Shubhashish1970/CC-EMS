@@ -189,12 +189,13 @@ const ActivitySamplingView: React.FC = () => {
       activitiesNotSampled: 0,
       totalFarmers: 0,
       farmersSampled: 0,
-      totalTasks: 0, // Calculated from statusBreakdown to ensure accuracy
+      totalTasks: 0, // Use statusBreakdown sum as source of truth (ensures all tasks have status)
       tasksSampledInQueue: 0,
       tasksInProgress: 0,
       tasksCompleted: 0,
       tasksNotReachable: 0,
       tasksInvalidNumber: 0,
+      tasksWithMismatch: 0, // Track activities where tasksCount != statusBreakdown sum
     };
 
     activities.forEach((item) => {
@@ -217,19 +218,31 @@ const ActivitySamplingView: React.FC = () => {
         stats.farmersSampled += item.samplingAudit.sampledCount;
       }
 
-      // Count tasks - use tasksCount as source of truth (actual tasks created)
-      // statusBreakdown shows distribution but may not include all tasks
-      if (item.tasksCount) {
-        stats.totalTasks += item.tasksCount;
-      }
-
-      // Count tasks by status from breakdown
+      // Count tasks by status from breakdown (this is the accurate count)
+      // Each task must have a status, so statusBreakdown sum = actual task count
       if (item.statusBreakdown) {
+        const statusSum = 
+          (item.statusBreakdown.sampled_in_queue || 0) +
+          (item.statusBreakdown.in_progress || 0) +
+          (item.statusBreakdown.completed || 0) +
+          (item.statusBreakdown.not_reachable || 0) +
+          (item.statusBreakdown.invalid_number || 0);
+        
+        stats.totalTasks += statusSum;
         stats.tasksSampledInQueue += item.statusBreakdown.sampled_in_queue || 0;
         stats.tasksInProgress += item.statusBreakdown.in_progress || 0;
         stats.tasksCompleted += item.statusBreakdown.completed || 0;
         stats.tasksNotReachable += item.statusBreakdown.not_reachable || 0;
         stats.tasksInvalidNumber += item.statusBreakdown.invalid_number || 0;
+
+        // Validate: tasksCount should equal statusBreakdown sum
+        if (item.tasksCount && item.tasksCount !== statusSum) {
+          stats.tasksWithMismatch++;
+          console.warn(`Activity ${item.activity._id}: tasksCount (${item.tasksCount}) != statusBreakdown sum (${statusSum})`);
+        }
+      } else if (item.tasksCount) {
+        // Fallback: if no statusBreakdown, use tasksCount
+        stats.totalTasks += item.tasksCount;
       }
     });
 
@@ -414,15 +427,23 @@ const ActivitySamplingView: React.FC = () => {
             </div>
             
             {/* Tasks */}
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className={`rounded-xl p-3 border ${
+              statistics.totalTasks !== statistics.farmersSampled 
+                ? 'bg-orange-50 border-orange-200' 
+                : 'bg-slate-50 border-slate-200'
+            }`}>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Tasks</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalTasks}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
+              <p className={`text-[10px] mt-0.5 ${
+                statistics.totalTasks !== statistics.farmersSampled 
+                  ? 'text-orange-600 font-bold' 
+                  : 'text-slate-500'
+              }`}>
                 {statistics.farmersSampled > statistics.totalTasks 
-                  ? `${statistics.farmersSampled - statistics.totalTasks} pending`
-                  : statistics.farmersSampled === statistics.totalTasks
-                  ? 'all created'
-                  : `from ${statistics.farmersSampled} sampled`}
+                  ? `⚠ ${statistics.farmersSampled - statistics.totalTasks} pending (${statistics.farmersSampled} sampled)`
+                  : statistics.farmersSampled < statistics.totalTasks
+                  ? `⚠ ${statistics.totalTasks - statistics.farmersSampled} extra (${statistics.farmersSampled} sampled)`
+                  : `${statistics.farmersSampled} sampled = ${statistics.totalTasks} tasks ✓`}
               </p>
             </div>
             <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
