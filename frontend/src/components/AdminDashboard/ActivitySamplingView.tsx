@@ -217,16 +217,14 @@ const ActivitySamplingView: React.FC = () => {
         stats.farmersSampled += item.samplingAudit.sampledCount;
       }
 
-      // Count tasks by status (this is more accurate than tasksCount)
+      // Count tasks - use tasksCount as source of truth (actual tasks created)
+      // statusBreakdown shows distribution but may not include all tasks
+      if (item.tasksCount) {
+        stats.totalTasks += item.tasksCount;
+      }
+
+      // Count tasks by status from breakdown
       if (item.statusBreakdown) {
-        const activityTasks = 
-          (item.statusBreakdown.sampled_in_queue || 0) +
-          (item.statusBreakdown.in_progress || 0) +
-          (item.statusBreakdown.completed || 0) +
-          (item.statusBreakdown.not_reachable || 0) +
-          (item.statusBreakdown.invalid_number || 0);
-        
-        stats.totalTasks += activityTasks;
         stats.tasksSampledInQueue += item.statusBreakdown.sampled_in_queue || 0;
         stats.tasksInProgress += item.statusBreakdown.in_progress || 0;
         stats.tasksCompleted += item.statusBreakdown.completed || 0;
@@ -419,7 +417,13 @@ const ActivitySamplingView: React.FC = () => {
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Tasks</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalTasks}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">from {statistics.farmersSampled} sampled</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {statistics.farmersSampled > statistics.totalTasks 
+                  ? `${statistics.farmersSampled - statistics.totalTasks} pending`
+                  : statistics.farmersSampled === statistics.totalTasks
+                  ? 'all created'
+                  : `from ${statistics.farmersSampled} sampled`}
+              </p>
             </div>
             <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
               <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Queue</p>
