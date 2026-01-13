@@ -130,7 +130,7 @@ router.post(
  */
 router.get('/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const status = getAIServiceStatus();
+    const status = await getAIServiceStatus();
 
     res.json({
       success: true,

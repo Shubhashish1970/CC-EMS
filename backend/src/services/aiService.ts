@@ -9,6 +9,132 @@ if (!GEMINI_API_KEY) {
 
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
+// Cache for available model
+let cachedModelName: string | null = null;
+let modelCacheExpiry: number = 0;
+const MODEL_CACHE_TTL = 60 * 60 * 1000; // 1 hour cache
+
+/**
+ * List available models and select the best one for generateContent
+ */
+async function getAvailableModel(): Promise<string> {
+  // Return cached model if still valid
+  if (cachedModelName && Date.now() < modelCacheExpiry) {
+    return cachedModelName;
+  }
+
+  if (!genAI || !GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  try {
+    logger.info('Fetching available Gemini models...');
+    
+    // Use REST API to list models
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn('Failed to list models, will try default models', {
+        status: response.status,
+        error: errorText,
+      });
+      // Fallback to common model names
+      return selectBestFromDefaults();
+    }
+
+    const data = await response.json() as { models?: Array<{ name: string; supportedGenerationMethods?: string[]; supportedMethods?: string[] }> };
+    const models = data.models || [];
+
+    logger.info('Available models fetched', { count: models.length });
+
+    // Filter models that support generateContent
+    const supportedModels = models.filter((model: any) => {
+      const supportsGenerateContent = 
+        model.supportedGenerationMethods?.includes('generateContent') ||
+        model.supportedMethods?.includes('generateContent');
+      
+      return supportsGenerateContent && !model.name.includes('embed');
+    });
+
+    if (supportedModels.length === 0) {
+      logger.warn('No models found with generateContent support, using defaults');
+      return selectBestFromDefaults();
+    }
+
+    // Sort models by preference:
+    // 1. Flash models (faster, cheaper)
+    // 2. Pro models (more capable)
+    // 3. Others
+    const sortedModels = supportedModels.sort((a: any, b: any) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      
+      // Prefer flash over pro
+      if (aName.includes('flash') && !bName.includes('flash')) return -1;
+      if (!aName.includes('flash') && bName.includes('flash')) return 1;
+      
+      // Prefer pro over others
+      if (aName.includes('pro') && !bName.includes('pro')) return -1;
+      if (!aName.includes('pro') && bName.includes('pro')) return 1;
+      
+      return 0;
+    });
+
+    const modelFullName = sortedModels[0].name;
+    const selectedModel = modelFullName.split('/').pop() || modelFullName; // Extract model name from full path, fallback to full name
+    
+    if (!selectedModel) {
+      logger.warn('Could not extract model name, using fallback');
+      return selectBestFromDefaults();
+    }
+    
+    logger.info('Selected model', { 
+      model: selectedModel,
+      availableCount: supportedModels.length,
+      modelNames: supportedModels.map((m: any) => m.name.split('/').pop() || m.name),
+    });
+
+    // Cache the result
+    cachedModelName = selectedModel;
+    modelCacheExpiry = Date.now() + MODEL_CACHE_TTL;
+
+    return selectedModel;
+  } catch (error) {
+    logger.error('Error fetching available models', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    // Fallback to default models
+    return selectBestFromDefaults();
+  }
+}
+
+/**
+ * Fallback to default model names if listing fails
+ */
+function selectBestFromDefaults(): string {
+  const defaultModels = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
+    'gemini-pro',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+  ];
+
+  // Return the first one (will be tried and may fail, but better than hardcoding)
+  const selected = defaultModels[0];
+  logger.info('Using default model', { model: selected });
+  return selected;
+}
+
 export interface ExtractedData {
   didAttend?: string | null;
   didRecall?: boolean | null;
@@ -45,6 +171,9 @@ export const extractDataFromNotes = async (
     throw new Error('Notes cannot be empty');
   }
 
+  // Get the best available model dynamically
+  const modelName = await getAvailableModel();
+
   // Use JSON mode for more reliable structured data extraction
   const generationConfig = {
     temperature: 0.1, // Lower temperature for more deterministic responses
@@ -52,9 +181,9 @@ export const extractDataFromNotes = async (
     topK: 40,
   };
 
-  // Use gemini-pro which is the stable model name available in v1beta API
+  // Get model dynamically based on available models
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-pro',
+    model: modelName,
     generationConfig,
   });
 
@@ -162,7 +291,7 @@ Important:
       notesLength: notes.length,
       hasContext: !!context,
       farmerName: context?.farmerName,
-      modelName: 'gemini-pro',
+      modelName: modelName,
     });
 
     const result = await model.generateContent(prompt);
@@ -416,10 +545,11 @@ export const isAIServiceAvailable = (): boolean => {
 /**
  * Get AI service status
  */
-export const getAIServiceStatus = () => {
+export const getAIServiceStatus = async () => {
+  const modelName = cachedModelName || 'not-determined';
   return {
     available: isAIServiceAvailable(),
-    model: 'gemini-pro',
+    model: modelName,
     hasApiKey: !!GEMINI_API_KEY,
   };
 };
