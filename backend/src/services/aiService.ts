@@ -171,8 +171,8 @@ Important:
 
     logger.info('AI extraction successful', {
       fieldsExtracted: Object.keys(validated).length,
-      hasCrops: validated.cropsDiscussed?.length > 0,
-      hasProducts: validated.productsDiscussed?.length > 0,
+      hasCrops: (validated.cropsDiscussed?.length ?? 0) > 0,
+      hasProducts: (validated.productsDiscussed?.length ?? 0) > 0,
     });
 
     return validated;
