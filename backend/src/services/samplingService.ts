@@ -108,7 +108,20 @@ const assignSampledFarmersToAgents = async (
       const farmerId = farmerIds[i];
       const agent = capableAgents[i % capableAgents.length];
 
-      // Create call task
+      // Check if task already exists for this farmer+activity combination
+      const existingTask = await CallTask.findOne({
+        farmerId,
+        activityId,
+      });
+
+      if (existingTask) {
+        logger.warn(
+          `Task already exists for farmer ${farmerId} and activity ${activityId}. Skipping duplicate task creation.`
+        );
+        continue; // Skip creating duplicate task
+      }
+
+      // Create call task only if it doesn't exist
       await CallTask.create({
         farmerId,
         activityId,

@@ -143,7 +143,7 @@ CallTaskSchema.index({ farmerId: 1, createdAt: -1 }); // For farmer history
 CallTaskSchema.index({ scheduledDate: 1 }); // For chronological ordering
 CallTaskSchema.index({ activityId: 1 }); // For activity-based queries
 CallTaskSchema.index({ assignedAgentId: 1, status: 1, scheduledDate: 1 }); // Compound: agent queue with status and date
-CallTaskSchema.index({ activityId: 1, farmerId: 1 }); // Compound: activity + farmer for sampling lookup
+CallTaskSchema.index({ activityId: 1, farmerId: 1 }, { unique: true }); // UNIQUE: Prevent duplicate tasks for same farmer+activity
 CallTaskSchema.index({ createdAt: -1 }); // For recent tasks
 CallTaskSchema.index({ status: 1, scheduledDate: 1 }); // Compound: status + scheduled date for filtering
 
