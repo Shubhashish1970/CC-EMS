@@ -52,8 +52,9 @@ export const extractDataFromNotes = async (
     topK: 40,
   };
 
+  // Use gemini-pro which is the stable model name available in v1beta API
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-1.5-flash',
+    model: 'gemini-pro',
     generationConfig,
   });
 
@@ -161,11 +162,39 @@ Important:
       notesLength: notes.length,
       hasContext: !!context,
       farmerName: context?.farmerName,
+      modelName: 'gemini-pro',
     });
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let text = response.text();
+    
+    // Check for blocked responses or errors
+    if (!response) {
+      throw new Error('No response received from AI service');
+    }
+
+    // Check response candidates for safety blocks
+    const candidates = response.candidates;
+    if (!candidates || candidates.length === 0) {
+      const finishReason = (response as any).promptFeedback?.blockReason || 'UNKNOWN';
+      throw new Error(`AI response was blocked. Reason: ${finishReason}`);
+    }
+
+    // Safely get text with error handling
+    let text: string;
+    try {
+      text = response.text();
+    } catch (error) {
+      logger.error('Failed to extract text from AI response', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        finishReason: (candidates[0] as any)?.finishReason,
+      });
+      throw new Error('Failed to parse AI response. The response may have been blocked.');
+    }
+
+    if (!text || text.trim().length === 0) {
+      throw new Error('Empty response from AI service');
+    }
 
     // Clean JSON response (remove markdown code blocks if present)
     let jsonText = text.trim();
@@ -390,7 +419,7 @@ export const isAIServiceAvailable = (): boolean => {
 export const getAIServiceStatus = () => {
   return {
     available: isAIServiceAvailable(),
-    model: 'gemini-1.5-flash',
+    model: 'gemini-pro',
     hasApiKey: !!GEMINI_API_KEY,
   };
 };

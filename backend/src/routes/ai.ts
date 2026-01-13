@@ -86,29 +86,39 @@ router.post(
       logger.error('AI extraction error', {
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
+        body: req.body, // Log request body for debugging
       });
       
-      // Return user-friendly error message
+      // Map specific errors to appropriate HTTP status codes
+      let statusCode = 500;
+      let userMessage = 'Failed to extract data from notes. Please try again.';
+      
       if (error instanceof Error) {
         if (error.message.includes('GEMINI_API_KEY') || error.message.includes('not configured')) {
-          return res.status(503).json({
-            success: false,
-            error: {
-              message: 'AI service is not available. GEMINI_API_KEY is not configured.',
-            },
-          });
-        }
-        if (error.message.includes('parse') || error.message.includes('JSON')) {
-          return res.status(500).json({
-            success: false,
-            error: {
-              message: 'Failed to parse AI response. Please try again with different notes.',
-            },
-          });
+          statusCode = 503;
+          userMessage = 'AI service is not available. GEMINI_API_KEY is not configured.';
+        } else if (error.message.includes('blocked') || error.message.includes('safety')) {
+          statusCode = 400;
+          userMessage = 'AI response was blocked. Please rephrase your notes.';
+        } else if (error.message.includes('404') || error.message.includes('not found')) {
+          statusCode = 503;
+          userMessage = 'AI service model not available. Please contact administrator.';
+        } else if (error.message.includes('parse') || error.message.includes('JSON')) {
+          statusCode = 500;
+          userMessage = 'Failed to parse AI response. Please try again with different notes.';
+        } else if (error.message.includes('Empty response')) {
+          statusCode = 500;
+          userMessage = 'AI service returned empty response. Please try again.';
         }
       }
       
-      next(error);
+      return res.status(statusCode).json({
+        success: false,
+        error: {
+          message: userMessage,
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        },
+      });
     }
   }
 );
