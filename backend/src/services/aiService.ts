@@ -1,13 +1,42 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../config/logger.js';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Read environment variable at runtime (allows for updates without restart)
+const getGeminiApiKey = (): string | null => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    logger.warn('GEMINI_API_KEY not configured - AI features will be disabled', {
+      envKeys: Object.keys(process.env).filter(k => k.includes('GEMINI') || k.includes('API')).join(', ') || 'none',
+      hasEnvKeys: Object.keys(process.env).length > 0,
+    });
+  } else {
+    logger.info('GEMINI_API_KEY is configured', {
+      keyLength: key.length,
+      keyPrefix: key.substring(0, 10) + '...',
+    });
+  }
+  return key || null;
+};
 
-if (!GEMINI_API_KEY) {
-  logger.warn('GEMINI_API_KEY not configured - AI features will be disabled');
-}
+const GEMINI_API_KEY = getGeminiApiKey();
 
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+// Initialize GoogleGenerativeAI lazily to allow env var updates
+const getGenAI = (): GoogleGenerativeAI | null => {
+  const key = getGeminiApiKey();
+  if (!key) {
+    return null;
+  }
+  try {
+    return new GoogleGenerativeAI(key);
+  } catch (error) {
+    logger.error('Failed to initialize GoogleGenerativeAI', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
+};
+
+const genAI = GEMINI_API_KEY ? getGenAI() : null;
 
 // Cache for available model
 let cachedModelName: string | null = null;
@@ -23,16 +52,27 @@ async function getAvailableModel(): Promise<string> {
     return cachedModelName;
   }
 
-  if (!genAI || !GEMINI_API_KEY) {
+  const currentApiKey = getGeminiApiKey();
+  if (!currentApiKey) {
     throw new Error('Gemini API key not configured');
+  }
+  
+  const currentGenAI = genAI || getGenAI();
+  if (!currentGenAI) {
+    throw new Error('Failed to initialize Gemini AI');
   }
 
   try {
     logger.info('Fetching available Gemini models...');
     
     // Use REST API to list models
+    const currentApiKey = getGeminiApiKey();
+    if (!currentApiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+    
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${currentApiKey}`,
       {
         method: 'GET',
         headers: {
@@ -181,8 +221,14 @@ export const extractDataFromNotes = async (
     topK: 40,
   };
 
+  // Ensure we have a valid genAI instance
+  const activeGenAI = genAI || getGenAI();
+  if (!activeGenAI) {
+    throw new Error('Failed to initialize Gemini AI. Please check GEMINI_API_KEY configuration.');
+  }
+
   // Get model dynamically based on available models
-  const model = genAI.getGenerativeModel({ 
+  const model = activeGenAI.getGenerativeModel({ 
     model: modelName,
     generationConfig,
   });
@@ -539,7 +585,16 @@ const validateAndCleanExtractedData = (
  * Check if AI service is available
  */
 export const isAIServiceAvailable = (): boolean => {
-  return !!genAI;
+  const key = getGeminiApiKey();
+  if (!key) return false;
+  
+  // Try to initialize if not already initialized
+  if (!genAI) {
+    const initialized = getGenAI();
+    return !!initialized;
+  }
+  
+  return true;
 };
 
 /**
@@ -547,9 +602,11 @@ export const isAIServiceAvailable = (): boolean => {
  */
 export const getAIServiceStatus = async () => {
   const modelName = cachedModelName || 'not-determined';
+  const currentApiKey = getGeminiApiKey();
   return {
     available: isAIServiceAvailable(),
     model: modelName,
-    hasApiKey: !!GEMINI_API_KEY,
+    hasApiKey: !!currentApiKey,
+    apiKeyConfigured: !!currentApiKey,
   };
 };
