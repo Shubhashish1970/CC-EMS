@@ -88,6 +88,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const filteredTasks = tasks.filter(task => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
+      !searchQuery || // If no search query, show all
       task.farmer.name.toLowerCase().includes(query) ||
       task.farmer.mobileNumber.includes(query) ||
       task.farmer.location.toLowerCase().includes(query);
@@ -95,7 +96,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     const matchesFilter = 
       filter === 'all' || 
       (filter === 'in_progress' && task.status === 'in_progress') ||
-      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue');
+      (filter === 'sampled_in_queue' && (task.status === 'sampled_in_queue' || task.status === 'in_progress')); // Queue shows both sampled_in_queue and in_progress
     
     return matchesSearch && matchesFilter;
   });
@@ -355,9 +356,17 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
         <div className="bg-white border-t border-slate-200 px-6 py-3">
           <div className="text-center">
             <p className="text-xs text-slate-500">
-              <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
-              {sortedTasks.length !== 1 ? 's' : ''} available
-              {(searchQuery || filter !== 'all') && ` (filtered from ${tasks.length})`}
+              {tasks.length > 0 ? (
+                <>
+                  <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
+                  {sortedTasks.length !== 1 ? 's' : ''} available
+                  {(searchQuery || filter !== 'all') && tasks.length > sortedTasks.length && (
+                    <span> (filtered from {tasks.length})</span>
+                  )}
+                </>
+              ) : (
+                'No contacts available'
+              )}
             </p>
           </div>
         </div>
