@@ -510,19 +510,19 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                         {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && formData.farmerComments && formData.farmerComments.trim() && (
                           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                              <div className="flex items-center justify-between">
-                                <label className="text-sm font-black text-slate-900">
-                                  Farmer Comments
-                                </label>
-                                <span className="text-xs text-slate-500 italic">
-                                  AI-generated summary
-                                </span>
-                              </div>
+                              <label className="text-sm font-black text-slate-900">
+                                Farmer Comments
+                              </label>
                               
-                              {/* Read-only display of AI-generated comments */}
-                              <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 whitespace-pre-wrap">
-                                {formData.farmerComments}
-                              </div>
+                              <textarea
+                                value={formData.farmerComments}
+                                onChange={(e) => {
+                                  setFormData(prev => ({ ...prev, farmerComments: e.target.value }));
+                                }}
+                                className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                                placeholder="3 bullet points summarizing the conversation (20-25 words each)"
+                                rows={6}
+                              />
                               
                               {/* Sentiment Indicator */}
                               {formData.sentiment && formData.sentiment !== 'N/A' && (
