@@ -371,14 +371,15 @@ router.post(
   requirePermission('tasks.submit'),
   [
     body('callStatus').isIn(['Connected', 'Disconnected', 'Not Reachable', 'Invalid Number']).withMessage('Invalid call status'),
-    body('didAttend').optional().isBoolean(),
+    body('didAttend').optional().isIn(['Yes, I attended', 'No, I missed', "Don't recall", 'Identity Wrong', 'Not a Farmer', null]).withMessage('Invalid didAttend value'),
     body('didRecall').optional().isBoolean(),
     body('cropsDiscussed').optional().isArray(),
     body('productsDiscussed').optional().isArray(),
     body('hasPurchased').optional().isBoolean(),
     body('willingToPurchase').optional().isBoolean(),
     body('nonPurchaseReason').optional().isString(),
-    body('agentObservations').optional().isString(),
+    body('farmerComments').optional().isString(),
+    body('sentiment').optional().isIn(['Positive', 'Negative', 'Neutral', 'N/A']).withMessage('Invalid sentiment value'),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -419,7 +420,8 @@ router.post(
         hasPurchased: req.body.hasPurchased ?? null,
         willingToPurchase: req.body.willingToPurchase ?? null,
         nonPurchaseReason: req.body.nonPurchaseReason || '',
-        agentObservations: req.body.agentObservations || '',
+        farmerComments: req.body.farmerComments || '',
+        sentiment: req.body.sentiment || 'N/A',
       };
 
       // Update task with call log

@@ -19,7 +19,8 @@ interface CallInteractionFormProps {
     likelyPurchaseDate?: string;
     nonPurchaseReason: string;
     purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
-    agentObservations: string;
+    farmerComments: string;
+    sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
   };
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   toggleList: (field: 'cropsDiscussed' | 'productsDiscussed', item: string) => void;
@@ -48,6 +49,21 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
   const [masterCrops, setMasterCrops] = useState<string[]>([]);
   const [masterProducts, setMasterProducts] = useState<string[]>([]);
   const [loadingMasterData, setLoadingMasterData] = useState(true);
+  const [isFarmerCommentsEdited, setIsFarmerCommentsEdited] = useState(false);
+  const prevFarmerCommentsRef = useRef<string>('');
+
+  // Detect when farmerComments is auto-filled by AI (contains bullet points and wasn't manually edited)
+  useEffect(() => {
+    const currentComments = formData.farmerComments || '';
+    const prevComments = prevFarmerCommentsRef.current;
+    
+    // If farmerComments changed and contains bullet points (AI format), it's auto-filled
+    if (currentComments !== prevComments && currentComments.includes('•') && !isFarmerCommentsEdited) {
+      setIsFarmerCommentsEdited(false); // Explicitly set to false for auto-filled
+    }
+    
+    prevFarmerCommentsRef.current = currentComments;
+  }, [formData.farmerComments, isFarmerCommentsEdited]);
 
   // Refs for sections that appear conditionally
   const meetingAttendanceRef = useRef<HTMLDivElement>(null);
@@ -501,6 +517,49 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                   </div>
                                 )}
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Farmer Comments Section - After Commercial Conversion */}
+                        {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && (
+                          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-black text-slate-900">
+                                  Farmer Comments
+                                </label>
+                                {formData.farmerComments && (
+                                  <span className="text-xs text-slate-500">
+                                    {isFarmerCommentsEdited ? 'Manually entered' : 'Auto-filled'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <textarea
+                                value={formData.farmerComments}
+                                onChange={(e) => {
+                                  setFormData(prev => ({ ...prev, farmerComments: e.target.value }));
+                                  setIsFarmerCommentsEdited(true);
+                                }}
+                                className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                                placeholder="3 bullet points summarizing the conversation (20-25 words each)"
+                                rows={6}
+                              />
+                              
+                              {/* Sentiment Indicator */}
+                              {formData.sentiment && formData.sentiment !== 'N/A' && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-500">Sentiment:</span>
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                    formData.sentiment === 'Positive' ? 'bg-green-100 text-green-700' :
+                                    formData.sentiment === 'Negative' ? 'bg-red-100 text-red-700' :
+                                    'bg-slate-100 text-slate-700'
+                                  }`}>
+                                    {formData.sentiment}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}

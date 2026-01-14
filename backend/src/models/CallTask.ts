@@ -6,14 +6,15 @@ export type CallStatus = 'Connected' | 'Disconnected' | 'Not Reachable' | 'Inval
 export interface ICallLog {
   timestamp: Date;
   callStatus: CallStatus;
-  didAttend: boolean | null;
+  didAttend: string | null; // Changed from boolean to string enum
   didRecall: boolean | null;
   cropsDiscussed: string[];
   productsDiscussed: string[];
   hasPurchased: boolean | null;
   willingToPurchase: boolean | null;
   nonPurchaseReason: string;
-  agentObservations: string;
+  farmerComments: string; // Replaces agentObservations
+  sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
 }
 
 export interface ICallTask extends Document {
@@ -44,7 +45,8 @@ const CallLogSchema = new Schema<ICallLog>({
     required: true,
   },
   didAttend: {
-    type: Boolean,
+    type: String,
+    enum: ['Yes, I attended', 'No, I missed', "Don't recall", 'Identity Wrong', 'Not a Farmer', null],
     default: null,
   },
   didRecall: {
@@ -71,9 +73,14 @@ const CallLogSchema = new Schema<ICallLog>({
     type: String,
     default: '',
   },
-  agentObservations: {
+  farmerComments: {
     type: String,
     default: '',
+  },
+  sentiment: {
+    type: String,
+    enum: ['Positive', 'Negative', 'Neutral', 'N/A'],
+    default: 'N/A',
   },
 }, { _id: false });
 

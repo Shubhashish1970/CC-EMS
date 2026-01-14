@@ -9,9 +9,10 @@ interface AICopilotPanelProps {
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   isActive: boolean;
   taskData?: any | null;
+  onFarmerCommentsAutoFilled?: () => void; // Callback to reset edit flag
 }
 
-const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, isActive, taskData }) => {
+const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, isActive, taskData, onFarmerCommentsAutoFilled }) => {
   const [scratchpad, setScratchpad] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +45,14 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
         setFormData((prev: any) => ({
           ...prev,
           ...response.data,
+          // Ensure sentiment defaults to N/A if not provided
+          sentiment: response.data.sentiment || 'N/A',
         }));
+        
+        // Reset edit flag if farmerComments was auto-filled
+        if (response.data.farmerComments && onFarmerCommentsAutoFilled) {
+          onFarmerCommentsAutoFilled();
+        }
         
         setSuccess(true);
         showSuccess('Form fields populated successfully! Please review and edit as needed.');
@@ -84,7 +92,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
           <Zap size={18} className="text-green-600" fill="currentColor" />
-          AI Copilot
+          Notetaker
         </h3>
       </div>
 
@@ -130,7 +138,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
           ) : (
             <>
               <Send size={18} />
-              Populate Form via AI
+              Process & Submit Notes
             </>
           )}
         </Button>
@@ -142,7 +150,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
           <span className="text-[10px] font-black uppercase tracking-widest">Compliance Note</span>
         </div>
         <p className="text-[11px] text-yellow-700 leading-normal font-medium italic">
-          PRD 7.4.5: Structured data (buttons) is mandatory. The AI Copilot helps populate them faster but agent verification is required.
+          PRD 7.4.5: Structured data (buttons) is mandatory. The Notetaker helps populate them faster but agent verification is required.
         </p>
       </div>
     </section>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ArrowLeft, CheckCircle, Phone } from 'lucide-react';
+import { X, ArrowLeft, CheckCircle, Phone, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import Button from './shared/Button';
 
@@ -17,7 +17,8 @@ interface CallReviewModalProps {
     likelyPurchaseDate?: string;
     nonPurchaseReason: string;
     purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
-    agentObservations: string;
+    farmerComments: string;
+    sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
   };
   onFinalSubmit: () => Promise<void>;
   isSubmitting: boolean;
@@ -277,14 +278,31 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                 </div>
               )}
 
-              {/* Agent Observations */}
-              {formData.agentObservations && (
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-                    Agent Observations
-                  </h3>
+              {/* Farmer Comments */}
+              {formData.farmerComments && (
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                      Farmer Comments
+                    </h3>
+                    {/* Sentiment Indicator */}
+                    {formData.sentiment && formData.sentiment !== 'N/A' && (
+                      <div className="flex items-center gap-2">
+                        {formData.sentiment === 'Positive' && <TrendingUp size={14} className="text-green-600" />}
+                        {formData.sentiment === 'Negative' && <TrendingDown size={14} className="text-red-600" />}
+                        {formData.sentiment === 'Neutral' && <Minus size={14} className="text-slate-600" />}
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          formData.sentiment === 'Positive' ? 'bg-green-100 text-green-700' :
+                          formData.sentiment === 'Negative' ? 'bg-red-100 text-red-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {formData.sentiment}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-white p-4 rounded-xl border border-slate-200">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{formData.agentObservations}</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{formData.farmerComments}</p>
                   </div>
                 </div>
               )}
@@ -295,10 +313,24 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
               <p className="text-sm text-slate-600">
                 Call status: <span className="font-bold text-slate-900">{formData.callStatus}</span>
               </p>
-              {formData.agentObservations && (
+              {formData.farmerComments && (
                 <div className="mt-4 pt-4 border-t border-slate-200">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Agent Notes</h4>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{formData.agentObservations}</p>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Farmer Comments</h4>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{formData.farmerComments}</p>
+                  {formData.sentiment && formData.sentiment !== 'N/A' && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {formData.sentiment === 'Positive' && <TrendingUp size={12} className="text-green-600" />}
+                      {formData.sentiment === 'Negative' && <TrendingDown size={12} className="text-red-600" />}
+                      {formData.sentiment === 'Neutral' && <Minus size={12} className="text-slate-600" />}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                        formData.sentiment === 'Positive' ? 'bg-green-100 text-green-700' :
+                        formData.sentiment === 'Negative' ? 'bg-red-100 text-red-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {formData.sentiment}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -66,7 +66,8 @@ const AgentWorkspace: React.FC = () => {
     likelyPurchaseDate: undefined as string | undefined,
     nonPurchaseReason: '',
     purchasedProducts: [] as Array<{ product: string; quantity: string; unit: string }>,
-    agentObservations: '',
+    farmerComments: '',
+    sentiment: 'N/A' as 'Positive' | 'Negative' | 'Neutral' | 'N/A',
   });
 
   // Timer for call duration (only when call status is "Connected")
@@ -130,7 +131,8 @@ const AgentWorkspace: React.FC = () => {
         likelyPurchaseDate: undefined,
         nonPurchaseReason: '',
         purchasedProducts: [],
-        agentObservations: '',
+        farmerComments: '',
+        sentiment: 'N/A',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load selected task');
@@ -262,7 +264,8 @@ const AgentWorkspace: React.FC = () => {
             likelyPurchaseDate: undefined,
             nonPurchaseReason: '',
             purchasedProducts: [],
-            agentObservations: '',
+            farmerComments: '',
+            sentiment: 'N/A',
           });
           setCallDuration(0);
           // Clear any previous errors
@@ -333,7 +336,8 @@ const AgentWorkspace: React.FC = () => {
         likelyPurchaseDate: undefined,
         nonPurchaseReason: '',
         purchasedProducts: [],
-        agentObservations: '',
+        farmerComments: '',
+        sentiment: 'N/A',
       });
       setTaskData(null);
       setCallDuration(0);
@@ -546,6 +550,7 @@ const AgentWorkspace: React.FC = () => {
               setFormData={setFormData}
               isActive={activeTab === 'ai'}
               taskData={taskData}
+              onFarmerCommentsAutoFilled={() => {}}
             />
           </div>
 
@@ -556,6 +561,7 @@ const AgentWorkspace: React.FC = () => {
               setFormData={setFormData}
               isActive={activeTab === 'ai'}
               taskData={taskData}
+              onFarmerCommentsAutoFilled={() => {}}
             />
           </div>
 
@@ -582,7 +588,7 @@ const AgentWorkspace: React.FC = () => {
             className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'ai' ? 'text-green-700 bg-green-50' : 'text-slate-400'}`}
           >
             <Zap size={22} fill={activeTab === 'ai' ? 'currentColor' : 'none'} />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Copilot</span>
+            <span className="text-[10px] font-black uppercase tracking-tighter">Notetaker</span>
           </button>
         </div>
       </main>

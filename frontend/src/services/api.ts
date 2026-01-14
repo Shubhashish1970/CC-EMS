@@ -341,7 +341,8 @@ export interface ExtractedData {
   likelyPurchaseDate?: string | undefined;
   nonPurchaseReason?: string;
   purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
-  agentObservations?: string;
+  farmerComments?: string; // 3 bullet points, 20-25 words each
+  sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
 }
 
 export const aiAPI = {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { ArrowLeft, User as UserIcon, Phone, MapPin, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, Phone, MapPin, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import Button from './shared/Button';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel } from '../utils/taskStatusLabels';
@@ -37,14 +37,15 @@ interface Task {
   callLog?: {
     timestamp: string;
     callStatus: string;
-    didAttend?: boolean | null;
+    didAttend?: string | null;
     didRecall?: boolean | null;
     cropsDiscussed?: string[];
     productsDiscussed?: string[];
     hasPurchased?: boolean | null;
     willingToPurchase?: boolean | null;
     nonPurchaseReason?: string;
-    agentObservations?: string;
+    farmerComments?: string;
+    sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
   };
   interactionHistory?: Array<{
     timestamp: string;
@@ -370,10 +371,26 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
                   </div>
                 </div>
               )}
-              {fullTask.callLog.agentObservations && (
-                <div>
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agent Observations</p>
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{fullTask.callLog.agentObservations}</p>
+              {fullTask.callLog.farmerComments && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Farmer Comments</p>
+                    {fullTask.callLog.sentiment && fullTask.callLog.sentiment !== 'N/A' && (
+                      <div className="flex items-center gap-1">
+                        {fullTask.callLog.sentiment === 'Positive' && <TrendingUp size={12} className="text-green-600" />}
+                        {fullTask.callLog.sentiment === 'Negative' && <TrendingDown size={12} className="text-red-600" />}
+                        {fullTask.callLog.sentiment === 'Neutral' && <Minus size={12} className="text-slate-600" />}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          fullTask.callLog.sentiment === 'Positive' ? 'bg-green-100 text-green-700' :
+                          fullTask.callLog.sentiment === 'Negative' ? 'bg-red-100 text-red-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {fullTask.callLog.sentiment}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{fullTask.callLog.farmerComments}</p>
                 </div>
               )}
             </div>

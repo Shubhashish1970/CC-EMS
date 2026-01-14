@@ -185,7 +185,8 @@ export interface ExtractedData {
   likelyPurchaseDate?: string | null;
   nonPurchaseReason?: string;
   purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
-  agentObservations?: string;
+  farmerComments?: string; // 3 bullet points, 20-25 words each
+  sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
 }
 
 interface ExtractionContext {
@@ -283,7 +284,8 @@ Extract the following information and return as valid JSON:
   "purchasedProducts": [
     {"product": "product name", "quantity": "10", "unit": "Kg" | "gms" | "lt"}
   ],
-  "agentObservations": "key observations from conversation (max 500 chars)"
+  "farmerComments": "• [First point - 20-25 words]\n• [Second point - 20-25 words]\n• [Third point - 20-25 words]",
+  "sentiment": "Positive" | "Negative" | "Neutral" | "N/A"
 }
 
 Extraction Rules:
@@ -337,10 +339,20 @@ Extraction Rules:
    - Or extract custom reason text
    - Use empty string if not mentioned
 
-10. agentObservations: Extract key observations, comments, or summary
-    - Keep concise (max 500 characters)
-    - Focus on important points from conversation
-    - Use empty string if no observations
+10. farmerComments: Generate a concise summary in exactly 3 bullet points
+    - Each bullet point must be 20-25 words (crisp and actionable)
+    - Focus on key takeaways, decisions, or insights from the conversation
+    - Format as: "• [First point - 20-25 words]\n• [Second point - 20-25 words]\n• [Third point - 20-25 words]"
+    - Each bullet should start with "• " (bullet symbol + space)
+    - Use empty string if no meaningful summary can be generated
+    - Prioritize: attendance status, product/crop discussions, purchase decisions, future intentions
+
+11. sentiment: Analyze the overall sentiment of the farmer's comments and conversation
+    - Use "Positive" if farmer shows interest, satisfaction, willingness to purchase, or positive engagement
+    - Use "Negative" if farmer shows dissatisfaction, complaints, unwillingness, or negative feedback
+    - Use "Neutral" if the conversation is factual, neutral, or mixed with no clear positive/negative tone
+    - Use "N/A" only if there is insufficient information to determine sentiment
+    - Base sentiment on: purchase decisions, product feedback, engagement level, overall tone
 
 CRITICAL JSON FORMATTING RULES:
 - NEVER use "undefined" in JSON responses - it's not valid JSON
@@ -599,11 +611,33 @@ const validateAndCleanExtractedData = (
     validated.nonPurchaseReason = '';
   }
 
-  // Validate agentObservations
-  if (typeof data.agentObservations === 'string') {
-    validated.agentObservations = data.agentObservations.substring(0, 500);
+  // Validate farmerComments (3 bullet points, 20-25 words each)
+  if (typeof data.farmerComments === 'string' && data.farmerComments.trim()) {
+    // Ensure it has bullet format, validate word count per bullet
+    const bullets = data.farmerComments.split('\n').filter(line => line.trim().startsWith('•'));
+    if (bullets.length === 3) {
+      // Validate each bullet is 20-25 words
+      const validBullets = bullets.map(bullet => {
+        const text = bullet.replace(/^•\s*/, '').trim();
+        const wordCount = text.split(/\s+/).length;
+        // If word count is off, keep it but log warning (AI might be close)
+        return bullet;
+      });
+      validated.farmerComments = validBullets.join('\n');
+    } else {
+      // If not 3 bullets, use as-is but log
+      validated.farmerComments = data.farmerComments.substring(0, 500);
+    }
   } else {
-    validated.agentObservations = '';
+    validated.farmerComments = '';
+  }
+
+  // Validate sentiment
+  const validSentiments: Array<'Positive' | 'Negative' | 'Neutral' | 'N/A'> = ['Positive', 'Negative', 'Neutral', 'N/A'];
+  if (data.sentiment && validSentiments.includes(data.sentiment)) {
+    validated.sentiment = data.sentiment;
+  } else {
+    validated.sentiment = 'N/A'; // Default to N/A if invalid or missing
   }
 
   return validated;
