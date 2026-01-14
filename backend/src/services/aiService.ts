@@ -417,12 +417,16 @@ Important:
       throw new Error('Empty response from AI service');
     }
 
+    // Sanitize JSON to handle any undefined values that might slip through
+    const sanitizedJson = sanitizeJSON(jsonText);
+    
     let extracted: ExtractedData;
     try {
-      extracted = JSON.parse(jsonText) as ExtractedData;
+      extracted = JSON.parse(sanitizedJson) as ExtractedData;
     } catch (parseError) {
       logger.error('JSON parse error', {
-        jsonText: jsonText.substring(0, 500),
+        originalJson: jsonText.substring(0, 500),
+        sanitizedJson: sanitizedJson.substring(0, 500),
         error: parseError instanceof Error ? parseError.message : 'Unknown parse error',
       });
       throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
