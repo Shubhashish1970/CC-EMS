@@ -182,7 +182,7 @@ export interface ExtractedData {
   productsDiscussed?: string[];
   hasPurchased?: boolean | null;
   willingToPurchase?: boolean | null;
-  likelyPurchaseDate?: string | undefined;
+  likelyPurchaseDate?: string | null;
   nonPurchaseReason?: string;
   purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
   agentObservations?: string;
@@ -194,6 +194,22 @@ interface ExtractionContext {
   crops?: string[];
   products?: string[];
   territory?: string;
+}
+
+/**
+ * Sanitize JSON string to handle undefined values and other invalid JSON patterns
+ */
+function sanitizeJSON(jsonString: string): string {
+  // Replace undefined with null (handles : undefined patterns)
+  let sanitized = jsonString.replace(/:\s*undefined\b/g, ': null');
+  
+  // Remove trailing commas before closing braces/brackets
+  sanitized = sanitized.replace(/,(\s*[}\]])/g, '$1');
+  
+  // Remove any remaining undefined references
+  sanitized = sanitized.replace(/undefined/g, 'null');
+  
+  return sanitized;
 }
 
 /**
@@ -262,7 +278,7 @@ Extract the following information and return as valid JSON:
   "productsDiscussed": ["product1", "product2"],
   "hasPurchased": true | false | null,
   "willingToPurchase": true | false | null,
-  "likelyPurchaseDate": "YYYY-MM-DD" | undefined,
+  "likelyPurchaseDate": "YYYY-MM-DD" | null,
   "nonPurchaseReason": "Price" | "Availability" | "Brand preference" | "No requirement" | "Not convinced" | "Other" | "custom text" | "",
   "purchasedProducts": [
     {"product": "product name", "quantity": "10", "unit": "Kg" | "gms" | "lt"}
@@ -314,7 +330,7 @@ Extraction Rules:
 8. likelyPurchaseDate: Extract date for future purchase (only if willingToPurchase is true)
    - Format as YYYY-MM-DD
    - Extract from phrases like "next month", "in 2 weeks", specific dates
-   - Use undefined if not mentioned
+   - Use null if not mentioned (NEVER use undefined - it's invalid JSON)
 
 9. nonPurchaseReason: Extract reason for not purchasing
    - Match to: "Price", "Availability", "Brand preference", "No requirement", "Not convinced", "Other"
@@ -326,9 +342,17 @@ Extraction Rules:
     - Focus on important points from conversation
     - Use empty string if no observations
 
+CRITICAL JSON FORMATTING RULES:
+- NEVER use "undefined" in JSON responses - it's not valid JSON
+- Use null for missing values, not undefined
+- Omit fields entirely if they're not applicable (optional)
+- All values must be valid JSON types: string, number, boolean, null, array, object
+- Example of CORRECT format: {"field": null} or omit the field
+- Example of WRONG format: {"field": undefined} - this will cause parsing errors
+
 Important:
 - Only include fields that are clearly mentioned in the notes
-- Use null/undefined/empty arrays/empty strings for fields not mentioned
+- Use null/empty arrays/empty strings for fields not mentioned
 - Match crop/product names to available options (case-insensitive)
 - Return valid JSON only, no markdown formatting`;
 
