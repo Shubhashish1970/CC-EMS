@@ -96,7 +96,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     const matchesFilter = 
       filter === 'all' || 
       (filter === 'in_progress' && task.status === 'in_progress') ||
-      (filter === 'sampled_in_queue' && (task.status === 'sampled_in_queue' || task.status === 'in_progress')); // Queue shows both sampled_in_queue and in_progress
+      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue'); // Queue shows only sampled_in_queue
     
     return matchesSearch && matchesFilter;
   });

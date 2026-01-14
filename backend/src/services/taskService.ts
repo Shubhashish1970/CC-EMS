@@ -44,9 +44,24 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
       }
       const hasLanguageMatch = agent.languageCapabilities.includes(farmer.preferredLanguage);
       if (!hasLanguageMatch) {
-        logger.warn(`Agent ${agent.email} does not have language capability ${farmer.preferredLanguage} for task ${task._id}`);
+        logger.debug(`Agent ${agent.email} does not have language capability ${farmer.preferredLanguage} for task ${task._id} (status: ${task.status})`);
       }
       return hasLanguageMatch;
+    });
+
+    logger.info(`getAvailableTasksForAgent: Found ${tasks.length} tasks, ${languageFilteredTasks.length} after language filtering for agent ${agent.email}`, {
+      agentId: agent._id.toString(),
+      agentLanguages: agent.languageCapabilities,
+      totalTasks: tasks.length,
+      languageFiltered: languageFilteredTasks.length,
+      statusBreakdown: {
+        sampled_in_queue: tasks.filter(t => t.status === 'sampled_in_queue').length,
+        in_progress: tasks.filter(t => t.status === 'in_progress').length,
+      },
+      languageFilteredStatusBreakdown: {
+        sampled_in_queue: languageFilteredTasks.filter(t => t.status === 'sampled_in_queue').length,
+        in_progress: languageFilteredTasks.filter(t => t.status === 'in_progress').length,
+      },
     });
 
     return languageFilteredTasks;
