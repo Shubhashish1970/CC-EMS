@@ -49,21 +49,6 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
   const [masterCrops, setMasterCrops] = useState<string[]>([]);
   const [masterProducts, setMasterProducts] = useState<string[]>([]);
   const [loadingMasterData, setLoadingMasterData] = useState(true);
-  const [isFarmerCommentsEdited, setIsFarmerCommentsEdited] = useState(false);
-  const prevFarmerCommentsRef = useRef<string>('');
-
-  // Detect when farmerComments is auto-filled by AI (contains bullet points and wasn't manually edited)
-  useEffect(() => {
-    const currentComments = formData.farmerComments || '';
-    const prevComments = prevFarmerCommentsRef.current;
-    
-    // If farmerComments changed and contains bullet points (AI format), it's auto-filled
-    if (currentComments !== prevComments && currentComments.includes('•') && !isFarmerCommentsEdited) {
-      setIsFarmerCommentsEdited(false); // Explicitly set to false for auto-filled
-    }
-    
-    prevFarmerCommentsRef.current = currentComments;
-  }, [formData.farmerComments, isFarmerCommentsEdited]);
 
   // Refs for sections that appear conditionally
   const meetingAttendanceRef = useRef<HTMLDivElement>(null);
@@ -521,31 +506,23 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                           </div>
                         )}
 
-                        {/* Farmer Comments Section - After Commercial Conversion */}
-                        {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && (
+                        {/* Farmer Comments Section - Only visible after AI processing (Process & Submit Notes clicked) */}
+                        {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && formData.farmerComments && formData.farmerComments.trim() && (
                           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
                               <div className="flex items-center justify-between">
                                 <label className="text-sm font-black text-slate-900">
                                   Farmer Comments
                                 </label>
-                                {formData.farmerComments && (
-                                  <span className="text-xs text-slate-500">
-                                    {isFarmerCommentsEdited ? 'Manually entered' : 'Auto-filled'}
-                                  </span>
-                                )}
+                                <span className="text-xs text-slate-500 italic">
+                                  AI-generated summary
+                                </span>
                               </div>
                               
-                              <textarea
-                                value={formData.farmerComments}
-                                onChange={(e) => {
-                                  setFormData(prev => ({ ...prev, farmerComments: e.target.value }));
-                                  setIsFarmerCommentsEdited(true);
-                                }}
-                                className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
-                                placeholder="3 bullet points summarizing the conversation (20-25 words each)"
-                                rows={6}
-                              />
+                              {/* Read-only display of AI-generated comments */}
+                              <div className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 whitespace-pre-wrap">
+                                {formData.farmerComments}
+                              </div>
                               
                               {/* Sentiment Indicator */}
                               {formData.sentiment && formData.sentiment !== 'N/A' && (
