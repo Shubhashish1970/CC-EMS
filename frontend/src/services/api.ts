@@ -326,6 +326,11 @@ export const usersAPI = {
   getUser: async (userId: string) => {
     return apiRequest(`/users/${userId}`);
   },
+
+  // Team Lead: list only own agents (no users.view permission required)
+  getTeamAgents: async () => {
+    return apiRequest('/users/team/agents');
+  },
 };
 
 export const masterDataAPI = {

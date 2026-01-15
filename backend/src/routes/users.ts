@@ -103,6 +103,40 @@ router.get(
   }
 );
 
+// @route   GET /api/users/team/agents
+// @desc    Get active CC agents for the current Team Lead
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/team/agents',
+  requirePermission('tasks.view.team'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const currentUser = req.user!;
+
+      // For team_lead: only own agents. For mis_admin: allow optional teamLeadId filter (future-proof).
+      const teamLeadIdParam = req.query.teamLeadId as string | undefined;
+      const teamLeadId =
+        currentUser.role === 'mis_admin' && teamLeadIdParam ? teamLeadIdParam : currentUser._id.toString();
+
+      const agents = await User.find({
+        role: 'cc_agent',
+        isActive: true,
+        teamLeadId: teamLeadId,
+      })
+        .select('name email employeeId languageCapabilities isActive')
+        .sort({ name: 1 })
+        .lean();
+
+      res.json({
+        success: true,
+        data: { agents },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   POST /api/users
 // @desc    Create new user
 // @access  Private (MIS Admin only)

@@ -168,8 +168,8 @@ const SamplingControlView: React.FC = () => {
   };
 
   const loadAgents = async () => {
-    const res: any = await usersAPI.getUsers({ role: 'cc_agent', isActive: true });
-    const list = res?.data?.users || [];
+    const res: any = await usersAPI.getTeamAgents();
+    const list = res?.data?.agents || [];
     setAgents(list);
   };
 
