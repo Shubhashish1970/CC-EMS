@@ -1,0 +1,47 @@
+name: DB Cleanup - Delete Activities with Officer <number>
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type YES to confirm deletion"
+        required: true
+        default: "NO"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard - require explicit confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
+            echo "❌ Confirmation not provided. Re-run workflow with confirm=YES"
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Dry run (log counts)
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cleanup:officer-number-activities
+
+      - name: Execute delete
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cleanup:officer-number-activities -- --yes
+
