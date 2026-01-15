@@ -1,0 +1,49 @@
+name: DB Migrations - State Language Mapping
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/db-migrations-state-language.yml'
+      - 'backend/src/scripts/seedStateLanguageMapping.ts'
+      - 'backend/src/scripts/migrateFarmerLanguagesFromState.ts'
+      - 'backend/src/models/StateLanguageMapping.ts'
+      - 'backend/src/utils/stateLanguageMapper.ts'
+      - 'backend/src/services/ffaSync.ts'
+      - 'backend/src/models/Activity.ts'
+      - 'backend/src/models/Farmer.ts'
+      - 'backend/src/models/User.ts'
+      - 'backend/package.json'
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Seed State-Language mappings (idempotent)
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run seed:state-language
+
+      - name: Migrate existing activities/farmers to state-based preferredLanguage (idempotent)
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run migrate:farmer-language
+

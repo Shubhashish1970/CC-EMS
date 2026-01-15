@@ -10,6 +10,7 @@ export const AVAILABLE_LANGUAGES = [
   'Bengali',
   'Oriya',
   'English',
+  'Malayalam',
 ] as const;
 
 export type Language = typeof AVAILABLE_LANGUAGES[number];

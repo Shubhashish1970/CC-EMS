@@ -3,6 +3,7 @@ import { Farmer, IFarmer } from '../models/Farmer.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
 import axios, { AxiosError } from 'axios';
+import { getLanguageForState } from '../utils/stateLanguageMapper.js';
 
 interface FFAActivity {
   activityId: string;
@@ -12,6 +13,7 @@ interface FFAActivity {
   officerName: string;
   location: string;
   territory: string;
+  state?: string; // NEW: State field from FFA API (optional during transition)
   crops?: string[];
   products?: string[];
   farmers: FFAFarmer[];
@@ -22,7 +24,7 @@ interface FFAFarmer {
   name: string;
   mobileNumber: string;
   location: string;
-  preferredLanguage: string;
+  // preferredLanguage: string; // REMOVED - will be derived from state
   territory: string;
   crops?: string[];
   photoUrl?: string;
@@ -152,6 +154,19 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
  */
 const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
   try {
+    // Determine state (prefer FFA `state`, fallback to territory parsing for backward compatibility)
+    const resolvedState = (ffaActivity.state && ffaActivity.state.trim())
+      ? ffaActivity.state.trim()
+      : (ffaActivity.territory ? ffaActivity.territory.replace(/\s+Zone$/i, '').trim() : '');
+
+    if (!resolvedState) {
+      throw new Error(`Activity ${ffaActivity.activityId} is missing both state and territory (cannot resolve state)`);
+    }
+
+    if (!ffaActivity.state || !ffaActivity.state.trim()) {
+      logger.warn(`[FFA SYNC] Activity ${ffaActivity.activityId} missing state in payload; derived state from territory as "${resolvedState}"`);
+    }
+
     // Upsert activity
     const activity = await Activity.findOneAndUpdate(
       { activityId: ffaActivity.activityId },
@@ -163,6 +178,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
         officerName: ffaActivity.officerName,
         location: ffaActivity.location,
         territory: ffaActivity.territory,
+        state: resolvedState, // Store resolved state
         crops: ffaActivity.crops || [],
         products: ffaActivity.products || [],
         syncedAt: new Date(),
@@ -173,15 +189,19 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     // Sync farmers for this activity
     const farmerIds: mongoose.Types.ObjectId[] = [];
     
+    // Get language for state (once per activity)
+    const preferredLanguage = await getLanguageForState(resolvedState);
+    logger.debug(`[FFA SYNC] Activity ${ffaActivity.activityId} in state "${resolvedState}" mapped to language "${preferredLanguage}"`);
+    
     for (const ffaFarmer of ffaActivity.farmers) {
-      // Upsert farmer
+      // Upsert farmer - preferredLanguage now derived from state
       const farmer = await Farmer.findOneAndUpdate(
         { mobileNumber: ffaFarmer.mobileNumber },
         {
           name: ffaFarmer.name,
           mobileNumber: ffaFarmer.mobileNumber,
           location: ffaFarmer.location,
-          preferredLanguage: ffaFarmer.preferredLanguage,
+          preferredLanguage: preferredLanguage, // Derived from state, not from FFA API
           territory: ffaFarmer.territory,
           photoUrl: ffaFarmer.photoUrl,
         },
@@ -195,7 +215,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     activity.farmerIds = farmerIds;
     await activity.save();
 
-    logger.info(`[FFA SYNC] Synced activity: ${ffaActivity.activityId} with ${farmerIds.length} farmers`);
+    logger.info(`[FFA SYNC] Synced activity: ${ffaActivity.activityId} (${resolvedState}) with ${farmerIds.length} farmers (language: ${preferredLanguage})`);
 
     return activity;
   } catch (error) {

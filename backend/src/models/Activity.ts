@@ -8,6 +8,7 @@ export interface IActivity extends Document {
   officerName: string;
   location: string;
   territory: string;
+  state?: string; // State where activity was conducted (optional for backward compatibility)
   farmerIds: mongoose.Types.ObjectId[];
   crops: string[]; // Crops discussed in the activity
   products: string[]; // NACL products discussed in the activity
@@ -54,6 +55,11 @@ const ActivitySchema = new Schema<IActivity>(
       required: [true, 'Territory is required'],
       trim: true,
     },
+    state: {
+      type: String,
+      required: false, // Optional for backward compatibility, migration will populate
+      trim: true,
+    },
     farmerIds: [{
       type: Schema.Types.ObjectId,
       ref: 'Farmer',
@@ -84,6 +90,8 @@ ActivitySchema.index({ officerId: 1 }); // For officer filtering
 ActivitySchema.index({ type: 1 }); // For activity type filtering
 ActivitySchema.index({ type: 1, date: -1 }); // Compound: type + date for common query pattern
 ActivitySchema.index({ territory: 1, date: -1 }); // Compound: territory + date for filtering
+ActivitySchema.index({ state: 1 }); // For state filtering
+ActivitySchema.index({ state: 1, date: -1 }); // Compound: state + date for filtering
 ActivitySchema.index({ syncedAt: -1 }); // For sync monitoring
 ActivitySchema.index({ farmerIds: 1 }); // For farmer lookup in activities
 

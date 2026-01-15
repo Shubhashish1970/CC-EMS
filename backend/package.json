@@ -11,12 +11,14 @@
     "type-check": "tsc --noEmit",
     "seed:admin": "tsx src/scripts/seedAdmin.ts",
     "seed:agent": "tsx src/scripts/seedAgent.ts",
+    "seed:state-language": "tsx src/scripts/seedStateLanguageMapping.ts",
     "create:test-task": "tsx src/scripts/createTestTask.ts",
     "create:test-data": "tsx src/scripts/createTestData.ts",
     "update:task-dates": "tsx src/scripts/updateTaskDates.ts",
     "test:admin": "tsx src/scripts/testAdminService.ts",
     "update:emails": "tsx src/scripts/updateUserEmails.ts",
-    "migrate:status": "tsx src/scripts/migratePendingToSampledInQueue.ts"
+    "migrate:status": "tsx src/scripts/migratePendingToSampledInQueue.ts",
+    "migrate:farmer-language": "tsx src/scripts/migrateFarmerLanguagesFromState.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
