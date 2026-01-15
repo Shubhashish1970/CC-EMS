@@ -4,6 +4,10 @@ import { requirePermission } from '../middleware/rbac.js';
 import { syncFFAData, getSyncStatus } from '../services/ffaSync.js';
 import { Activity } from '../models/Activity.js';
 import { Farmer } from '../models/Farmer.js';
+import { CallTask } from '../models/CallTask.js';
+import { SamplingAudit } from '../models/SamplingAudit.js';
+import { CoolingPeriod } from '../models/CoolingPeriod.js';
+import { SamplingConfig } from '../models/SamplingConfig.js';
 import logger from '../config/logger.js';
 
 const router = express.Router();
@@ -198,15 +202,27 @@ router.post(
     try {
       logger.info('Clearing all FFA data...');
       
-      const farmerResult = await Farmer.deleteMany({});
+      // DEV SAFE RESET (Option A):
+      // Delete operational/synced data, preserve users/master data.
+      const taskResult = await CallTask.deleteMany({});
+      const auditResult = await SamplingAudit.deleteMany({});
+      const coolingResult = await CoolingPeriod.deleteMany({});
+      const samplingConfigResult = await SamplingConfig.deleteMany({});
       const activityResult = await Activity.deleteMany({});
+      const farmerResult = await Farmer.deleteMany({});
       
-      logger.info(`Cleared ${farmerResult.deletedCount} farmers and ${activityResult.deletedCount} activities`);
+      logger.info(
+        `Cleared ${farmerResult.deletedCount} farmers, ${activityResult.deletedCount} activities, ${taskResult.deletedCount} tasks`
+      );
 
       res.json({
         success: true,
-        message: 'FFA data cleared successfully',
+        message: 'Dev operational data cleared successfully',
         data: {
+          tasksDeleted: taskResult.deletedCount,
+          samplingAuditsDeleted: auditResult.deletedCount,
+          coolingPeriodsDeleted: coolingResult.deletedCount,
+          samplingConfigsDeleted: samplingConfigResult.deletedCount,
           farmersDeleted: farmerResult.deletedCount,
           activitiesDeleted: activityResult.deletedCount,
         },

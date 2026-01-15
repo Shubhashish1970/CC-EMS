@@ -1,0 +1,42 @@
+name: DB Reset (Dev) - Operational Data Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to confirm deletion of operational data (activities, farmers, tasks, sampling audit, cooling periods, sampling config). Users/master data will be preserved.'
+        required: true
+        default: 'NO'
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
+            echo "❌ Confirmation missing. Re-run workflow and type YES."
+            exit 1
+          fi
+          echo "✅ Confirmation received. Proceeding with dev operational reset."
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Reset operational data (dev safe)
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run reset:dev-operational-data
+

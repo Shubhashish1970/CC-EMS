@@ -19,7 +19,8 @@
     "update:emails": "tsx src/scripts/updateUserEmails.ts",
     "migrate:status": "tsx src/scripts/migratePendingToSampledInQueue.ts",
     "migrate:farmer-language": "tsx src/scripts/migrateFarmerLanguagesFromState.ts",
-    "cleanup:officer-number-activities": "tsx src/scripts/deleteActivitiesWithOfficerNumber.ts"
+    "cleanup:officer-number-activities": "tsx src/scripts/deleteActivitiesWithOfficerNumber.ts",
+    "reset:dev-operational-data": "tsx src/scripts/resetDevOperationalData.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
