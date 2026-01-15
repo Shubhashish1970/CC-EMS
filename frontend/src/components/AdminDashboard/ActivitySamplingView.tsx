@@ -778,7 +778,13 @@ const ActivitySamplingView: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <MapPin size={14} />
-                            <span>{item.activity.location} • {item.activity.territory}</span>
+                            <span>
+                              {item.activity.location}
+                              {' • '}
+                              {(item.activity as any).territoryName || item.activity.territory}
+                              {(item.activity as any).zoneName ? ` • ${(item.activity as any).zoneName}` : ''}
+                              {(item.activity as any).buName ? ` • ${(item.activity as any).buName}` : ''}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <UsersIcon size={14} />

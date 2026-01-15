@@ -4,7 +4,9 @@ import { CallTask } from '../models/CallTask.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
 
 /**
- * Deletes activities that look like bad/test data where the FDA/officer is "Officer <number>".
+ * Deletes activities that look like bad/test data where:
+ * - FDA/officer is "Officer <number>" OR
+ * - location is "Location <number>"
  *
  * Safety:
  * - Defaults to DRY RUN.
@@ -24,6 +26,7 @@ const args = process.argv.slice(2);
 const isYes = args.includes('--yes');
 
 const OFFICER_NUMBER_REGEX = /^Officer\s+\d+$/i;
+const LOCATION_NUMBER_REGEX = /^Location\s+\d+$/i;
 
 async function main() {
   console.log(`🔌 Connecting to MongoDB...`);
@@ -31,8 +34,13 @@ async function main() {
   console.log(`✅ Connected`);
 
   const activities = await Activity.find(
-    { officerName: { $regex: OFFICER_NUMBER_REGEX } },
-    { _id: 1, activityId: 1, officerName: 1, date: 1 }
+    {
+      $or: [
+        { officerName: { $regex: OFFICER_NUMBER_REGEX } },
+        { location: { $regex: LOCATION_NUMBER_REGEX } },
+      ],
+    },
+    { _id: 1, activityId: 1, officerName: 1, location: 1, date: 1 }
   ).lean();
 
   console.log(`\n🔍 Matched activities: ${activities.length}`);
@@ -40,7 +48,7 @@ async function main() {
   if (preview.length > 0) {
     console.log(`Preview (first ${preview.length}):`);
     for (const a of preview) {
-      console.log(`- ${a._id} | ${a.activityId} | ${a.officerName} | ${new Date(a.date as any).toISOString()}`);
+      console.log(`- ${a._id} | ${a.activityId} | ${a.officerName} | ${a.location} | ${new Date(a.date as any).toISOString()}`);
     }
   }
 
