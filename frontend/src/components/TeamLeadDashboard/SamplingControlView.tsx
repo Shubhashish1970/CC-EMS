@@ -155,11 +155,11 @@ const SamplingControlView: React.FC = () => {
     }
   };
 
-  const handleApplyEligibility = async () => {
+  const handleChooseActivityTypeToSample = async () => {
     setIsLoading(true);
     try {
       await samplingAPI.applyEligibility(eligibleTypes);
-      toast.showSuccess('Eligibility applied');
+      toast.showSuccess('Activity type selection applied');
       await loadConfig();
       await loadActivities();
     } catch (e: any) {
@@ -354,12 +354,12 @@ const SamplingControlView: React.FC = () => {
               Save Config
             </button>
             <button
-              onClick={handleApplyEligibility}
+              onClick={handleChooseActivityTypeToSample}
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black"
             >
               <Filter size={18} />
-              Apply Eligibility (Not Eligible)
+              Choose Activity Type to Sample
             </button>
           </div>
         </div>
