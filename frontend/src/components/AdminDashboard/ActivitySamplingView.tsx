@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
 import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3 } from 'lucide-react';
@@ -73,39 +73,91 @@ const ActivitySamplingView: React.FC = () => {
     dateFrom: '',
     dateTo: '',
   });
-  const [dateRange, setDateRange] = useState(''); // dd/mm/yyyy - dd/mm/yyyy
+  type DateRangePreset =
+    | 'Custom'
+    | 'Today'
+    | 'Yesterday'
+    | 'This week (Sun - Today)'
+    | 'Last 7 days'
+    | 'Last week (Sun - Sat)'
+    | 'Last 28 days'
+    | 'Last 30 days';
 
-  const parseDateDDMMYYYY = (raw: string): string | null => {
-    const m = raw.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (!m) return null;
-    const dd = Number(m[1]);
-    const mm = Number(m[2]);
-    const yyyy = Number(m[3]);
-    if (yyyy < 2000 || yyyy > 2100) return null;
-    if (mm < 1 || mm > 12) return null;
-    if (dd < 1 || dd > 31) return null;
-    // Convert to ISO (YYYY-MM-DD) for backend
-    const iso = `${String(yyyy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
-    return iso;
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 28 days');
+  const [draftStart, setDraftStart] = useState(''); // YYYY-MM-DD
+  const [draftEnd, setDraftEnd] = useState(''); // YYYY-MM-DD
+  const datePickerRef = useRef<HTMLDivElement | null>(null);
+
+  const toISODate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
-  const applyDateRange = (value: string) => {
-    const cleaned = value.replace(/\s+/g, ' ').trim();
-    const parts = cleaned.split(/\s*(?:-|to)\s*/i).map(s => s.trim()).filter(Boolean);
-    if (parts.length === 0) {
-      setFilters((prev) => ({ ...prev, dateFrom: '', dateTo: '' }));
-      return;
+  const formatPretty = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const end = new Date(today);
+    const start = new Date(today);
+
+    const day = today.getDay(); // 0=Sun
+
+    switch (preset) {
+      case 'Today':
+        return { start: toISODate(today), end: toISODate(today) };
+      case 'Yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        return { start: toISODate(y), end: toISODate(y) };
+      }
+      case 'This week (Sun - Today)': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - day);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last 7 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 6);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last week (Sun - Sat)': {
+        const lastSat = new Date(today);
+        lastSat.setDate(lastSat.getDate() - (day + 1));
+        const lastSun = new Date(lastSat);
+        lastSun.setDate(lastSun.getDate() - 6);
+        return { start: toISODate(lastSun), end: toISODate(lastSat) };
+      }
+      case 'Last 28 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 27);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last 30 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 29);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Custom':
+      default:
+        return { start: filters.dateFrom || toISODate(start), end: filters.dateTo || toISODate(end) };
     }
-    if (parts.length === 1) {
-      const iso = parseDateDDMMYYYY(parts[0]);
-      if (!iso) return;
-      setFilters((prev) => ({ ...prev, dateFrom: iso, dateTo: iso }));
-      return;
-    }
-    const fromIso = parseDateDDMMYYYY(parts[0]);
-    const toIso = parseDateDDMMYYYY(parts[1]);
-    if (!fromIso || !toIso) return;
-    setFilters((prev) => ({ ...prev, dateFrom: fromIso, dateTo: toIso }));
+  };
+
+  const syncDraftFromFilters = () => {
+    const start = filters.dateFrom || getPresetRange(selectedPreset).start;
+    const end = filters.dateTo || getPresetRange(selectedPreset).end;
+    setDraftStart(start);
+    setDraftEnd(end);
   };
 
   const territoryOptions = useMemo(() => {
@@ -137,6 +189,19 @@ const ActivitySamplingView: React.FC = () => {
     }
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }, [activities]);
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [isDatePickerOpen]);
 
   const fetchActivities = async (page: number = 1) => {
     setIsLoading(true);
@@ -464,17 +529,128 @@ const ActivitySamplingView: React.FC = () => {
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Date Range
                 </label>
-                <input
-                  type="text"
-                  value={dateRange}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setDateRange(v);
-                    applyDateRange(v);
-                  }}
-                  placeholder="dd/mm/yyyy - dd/mm/yyyy"
-                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDatePickerOpen((prev) => {
+                        const next = !prev;
+                        if (!prev && next) {
+                          syncDraftFromFilters();
+                        }
+                        return next;
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
+                  >
+                    <span className="truncate">
+                      {selectedPreset}
+                      {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
+                    </span>
+                    <span className="text-slate-400 font-black">▾</span>
+                  </button>
+
+                  {isDatePickerOpen && (
+                    <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                      <div className="flex">
+                        {/* Presets */}
+                        <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                          {([
+                            'Custom',
+                            'Today',
+                            'Yesterday',
+                            'This week (Sun - Today)',
+                            'Last 7 days',
+                            'Last week (Sun - Sat)',
+                            'Last 28 days',
+                            'Last 30 days',
+                          ] as DateRangePreset[]).map((p) => {
+                            const isActive = selectedPreset === p;
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPreset(p);
+                                  const { start, end } = getPresetRange(p);
+                                  setDraftStart(start);
+                                  setDraftEnd(end);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                                  isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Date inputs */}
+                        <div className="flex-1 p-4">
+                          <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="flex-1">
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                Start date
+                              </p>
+                              <input
+                                type="date"
+                                value={draftStart}
+                                onChange={(e) => {
+                                  setSelectedPreset('Custom');
+                                  setDraftStart(e.target.value);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                End date
+                              </p>
+                              <input
+                                type="date"
+                                value={draftEnd}
+                                onChange={(e) => {
+                                  setSelectedPreset('Custom');
+                                  setDraftEnd(e.target.value);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsDatePickerOpen(false);
+                                // revert draft to current filters
+                                syncDraftFromFilters();
+                              }}
+                              className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilters((prev) => ({
+                                  ...prev,
+                                  dateFrom: draftStart || '',
+                                  dateTo: draftEnd || '',
+                                }));
+                                setIsDatePickerOpen(false);
+                              }}
+                              className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
