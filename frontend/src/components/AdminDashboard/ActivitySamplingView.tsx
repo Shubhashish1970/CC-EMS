@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
 import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3 } from 'lucide-react';
@@ -73,6 +73,70 @@ const ActivitySamplingView: React.FC = () => {
     dateFrom: '',
     dateTo: '',
   });
+  const [dateRange, setDateRange] = useState(''); // dd/mm/yyyy - dd/mm/yyyy
+
+  const parseDateDDMMYYYY = (raw: string): string | null => {
+    const m = raw.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+    if (yyyy < 2000 || yyyy > 2100) return null;
+    if (mm < 1 || mm > 12) return null;
+    if (dd < 1 || dd > 31) return null;
+    // Convert to ISO (YYYY-MM-DD) for backend
+    const iso = `${String(yyyy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+    return iso;
+  };
+
+  const applyDateRange = (value: string) => {
+    const cleaned = value.replace(/\s+/g, ' ').trim();
+    const parts = cleaned.split(/\s*(?:-|to)\s*/i).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) {
+      setFilters((prev) => ({ ...prev, dateFrom: '', dateTo: '' }));
+      return;
+    }
+    if (parts.length === 1) {
+      const iso = parseDateDDMMYYYY(parts[0]);
+      if (!iso) return;
+      setFilters((prev) => ({ ...prev, dateFrom: iso, dateTo: iso }));
+      return;
+    }
+    const fromIso = parseDateDDMMYYYY(parts[0]);
+    const toIso = parseDateDDMMYYYY(parts[1]);
+    if (!fromIso || !toIso) return;
+    setFilters((prev) => ({ ...prev, dateFrom: fromIso, dateTo: toIso }));
+  };
+
+  const territoryOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const item of activities) {
+      const a: any = (item as any)?.activity;
+      const t = (a?.territoryName || a?.territory || '').trim();
+      if (t) values.add(t);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [activities]);
+
+  const zoneOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const item of activities) {
+      const a: any = (item as any)?.activity;
+      const z = (a?.zoneName || '').trim();
+      if (z) values.add(z);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [activities]);
+
+  const buOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const item of activities) {
+      const a: any = (item as any)?.activity;
+      const b = (a?.buName || '').trim();
+      if (b) values.add(b);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [activities]);
 
   const fetchActivities = async (page: number = 1) => {
     setIsLoading(true);
@@ -311,8 +375,8 @@ const ActivitySamplingView: React.FC = () => {
 
         {/* Filters */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Activity Type
@@ -320,7 +384,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.activityType}
                   onChange={(e) => setFilters({ ...filters, activityType: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">All Types</option>
                   <option value="Field Day">Field Day</option>
@@ -335,28 +399,52 @@ const ActivitySamplingView: React.FC = () => {
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Territory
                 </label>
-                <input
-                  type="text"
+                <select
                   value={filters.territory}
                   onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                  placeholder="Filter by territory"
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">All Territories</option>
+                  {territoryOptions.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Zone
                 </label>
-                <input
-                  type="text"
-                  value={(filters as any).zone}
-                  onChange={(e) => setFilters({ ...(filters as any), zone: e.target.value } as any)}
-                  placeholder="Filter by zone"
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <select
+                  value={filters.zone}
+                  onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">All Zones</option>
+                  {zoneOptions.map((z) => (
+                    <option key={z} value={z}>{z}</option>
+                  ))}
+                </select>
               </div>
 
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  BU
+                </label>
+                <select
+                  value={filters.bu}
+                  onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">All BUs</option>
+                  {buOptions.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Sampling Status
@@ -364,7 +452,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.samplingStatus}
                   onChange={(e) => setFilters({ ...filters, samplingStatus: e.target.value as any })}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">All Statuses</option>
                   <option value="sampled">Sampled</option>
@@ -372,45 +460,20 @@ const ActivitySamplingView: React.FC = () => {
                   <option value="partial">Partial</option>
                 </select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                  BU
+                  Date Range
                 </label>
                 <input
                   type="text"
-                  value={(filters as any).bu}
-                  onChange={(e) => setFilters({ ...(filters as any), bu: e.target.value } as any)}
-                  placeholder="Filter by BU"
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Date From
-                </label>
-                <input
-                  type="date"
-                  value={filters.dateFrom}
-                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Date To
-                </label>
-                <input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={dateRange}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDateRange(v);
+                    applyDateRange(v);
+                  }}
+                  placeholder="dd/mm/yyyy - dd/mm/yyyy"
+                  className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
             </div>
