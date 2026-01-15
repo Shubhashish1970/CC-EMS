@@ -264,6 +264,9 @@ const createActivities = async (
     const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
     const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
     const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
+    const activityState = firstFarmer ? (firstFarmer.territory || '').replace(/\s+Zone$/i, '').trim() : (activityTerritory || '').replace(/\s+Zone$/i, '').trim();
+    const zoneName = ['North Zone', 'South Zone', 'East Zone', 'West Zone'][i % 4];
+    const buName = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'][i % 3];
     
     // Create activity
     const activity = new Activity({
@@ -274,6 +277,10 @@ const createActivities = async (
       officerName: officerName,
       location: activityLocation,
       territory: activityTerritory,
+      territoryName: activityTerritory,
+      state: activityState,
+      zoneName,
+      buName,
       farmerIds: selectedFarmers,
       crops: CROPS.slice(0, Math.min((i % 4) + 2, CROPS.length)), // 2-5 crops per activity
       products: PRODUCTS.slice(0, Math.min((i % 3) + 1, PRODUCTS.length)), // 1-3 products per activity

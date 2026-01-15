@@ -22,6 +22,10 @@ const INDIAN_STATES = [
   'Odisha', 'Telangana', 'Kerala', 'Jharkhand', 'Assam', 'Punjab', 'Haryana'
 ];
 
+// Simple synthetic mapping for BU/Zone/Territory to support Activity API v2 fields in mock
+const BUSINESS_UNITS = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'];
+const ZONES = ['North Zone', 'South Zone', 'East Zone', 'West Zone'];
+
 const INDIAN_DISTRICTS: Record<string, string[]> = {
   'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', 'Meerut', 'Ghaziabad'],
   'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Thane'],
@@ -186,6 +190,46 @@ const generateIndianLocation = (index: number, language: string): { state: strin
   return { state, district, village, territory };
 };
 
+const getBUForState = (state: string): string => {
+  // Synthetic but stable mapping to keep data consistent
+  const hash = state.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return BUSINESS_UNITS[hash % BUSINESS_UNITS.length];
+};
+
+const getZoneForState = (state: string): string => {
+  const hash = state.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return ZONES[hash % ZONES.length];
+};
+
+const generateFieldSalesHierarchy = (index: number) => {
+  // Synthetic hierarchy values for mock payload
+  const fda = {
+    empCode: `FDA-${String(index).padStart(4, '0')}`,
+    name: INDIAN_OFFICER_NAMES[index % INDIAN_OFFICER_NAMES.length],
+  };
+  const tm = {
+    empCode: `TM-${String(index % 300).padStart(4, '0')}`,
+    name: `TM ${INDIAN_OFFICER_NAMES[(index + 7) % INDIAN_OFFICER_NAMES.length]}`,
+  };
+  const rm = {
+    empCode: `RM-${String(index % 120).padStart(4, '0')}`,
+    name: `RM ${INDIAN_OFFICER_NAMES[(index + 13) % INDIAN_OFFICER_NAMES.length]}`,
+  };
+  const zm = {
+    empCode: `ZM-${String(index % 40).padStart(3, '0')}`,
+    name: `ZM ${INDIAN_OFFICER_NAMES[(index + 19) % INDIAN_OFFICER_NAMES.length]}`,
+  };
+  const buHead = {
+    empCode: `BUH-${String(index % 12).padStart(3, '0')}`,
+    name: `BU Head ${INDIAN_OFFICER_NAMES[(index + 23) % INDIAN_OFFICER_NAMES.length]}`,
+  };
+  const rdm = {
+    empCode: `RDM-${String(index % 50).padStart(3, '0')}`,
+    name: `RDM ${INDIAN_OFFICER_NAMES[(index + 29) % INDIAN_OFFICER_NAMES.length]}`,
+  };
+  return { fda, tm, rm, zm, buHead, rdm };
+};
+
 const generateFarmerName = (index: number, language: string): string => {
   const names = INDIAN_NAMES[language] || INDIAN_NAMES['Hindi'];
   return names[index % names.length];
@@ -220,9 +264,12 @@ const generateSampleData = () => {
       .sort(() => Math.random() - 0.5)
       .slice(0, 1 + Math.floor(Math.random() * 3));
 
-    // Get officer name
-    const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
-    const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
+    // Generate field sales hierarchy (FDA is the activity officer in our backend)
+    const hierarchy = generateFieldSalesHierarchy(i);
+    const officerName = hierarchy.fda.name;
+    const officerId = hierarchy.fda.empCode;
+    const buName = getBUForState(state);
+    const zoneName = getZoneForState(state);
 
     const activity = {
       activityId: `FFA-ACT-${1000 + i}`,
@@ -233,6 +280,12 @@ const generateSampleData = () => {
       location: village, // Use village name as location
       territory: territory, // State-based territory
       state: state, // NEW: Add state field directly
+      territoryName: territory,
+      zoneName: zoneName,
+      buName: buName,
+      tmEmpCode: hierarchy.tm.empCode,
+      tmName: hierarchy.tm.name,
+      fieldSalesHierarchy: hierarchy,
       crops: activityCrops,
       products: activityProducts,
       farmers: [] as any[],

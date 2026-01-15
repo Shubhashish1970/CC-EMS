@@ -26,6 +26,8 @@ router.get(
   [
     query('activityType').optional().isString(),
     query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
     query('samplingStatus').optional().isIn(['sampled', 'not_sampled', 'partial']),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
@@ -45,6 +47,8 @@ router.get(
       const {
         activityType,
         territory,
+        zone,
+        bu,
         samplingStatus,
         dateFrom,
         dateTo,
@@ -59,6 +63,8 @@ router.get(
       const result = await getActivitiesWithSampling({
         activityType: activityType as string,
         territory: territory as string,
+        zone: zone as string,
+        bu: bu as string,
         samplingStatus: samplingStatus as 'sampled' | 'not_sampled' | 'partial',
         dateFrom: dateFromParsed,
         dateTo: dateToParsed,

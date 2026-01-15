@@ -114,8 +114,17 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                     <User size={12} className="text-slate-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Field Officer</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">FDA</p>
                     <p className="text-xs font-bold text-slate-800">{taskData.activity.officer}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-white rounded-lg border border-slate-200">
+                    <User size={12} className="text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">TM</p>
+                    <p className="text-xs font-bold text-slate-800">{taskData.activity.tm || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -142,7 +151,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">State</p>
-                    <p className="text-xs font-bold text-slate-800">{taskData.activity.state || taskData.activity.territory?.replace(/\s+Zone$/, '').trim() || 'N/A'}</p>
+                    <p className="text-xs font-bold text-slate-800">{taskData.activity.state || 'N/A'}</p>
                   </div>
                 </div>
               </div>

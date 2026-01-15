@@ -34,6 +34,7 @@ interface TaskData {
     type: string;
     date: string;
     officer: string;
+    tm?: string;
     location: string; // village
     territory?: string;
     state?: string;
@@ -109,6 +110,7 @@ const AgentWorkspace: React.FC = () => {
           type: selectedTask.activity.type,
           date: selectedTask.activity.date,
           officer: selectedTask.activity.officerName,
+          tm: selectedTask.activity.tmName || '',
           location: selectedTask.activity.location,
           territory: selectedTask.activity.territory,
           state: selectedTask.activity.state,

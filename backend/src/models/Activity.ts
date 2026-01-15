@@ -7,8 +7,18 @@ export interface IActivity extends Document {
   officerId: string;
   officerName: string;
   location: string;
-  territory: string;
-  state?: string; // State where activity was conducted (optional for backward compatibility)
+  // Geo hierarchy (Activity API v2)
+  // Note: We keep legacy `territory` for backward compatibility but prefer `territoryName`.
+  territory: string; // legacy / display fallback
+  territoryName?: string;
+  zoneName?: string;
+  buName?: string;
+  state?: string; // Source-of-truth for language derivation (required once Activity API v2 is stable)
+
+  // Field Sales hierarchy (Activity API v2)
+  // Note: `officerId`/`officerName` represent FDA; we store TM separately.
+  tmEmpCode?: string;
+  tmName?: string;
   farmerIds: mongoose.Types.ObjectId[];
   crops: string[]; // Crops discussed in the activity
   products: string[]; // NACL products discussed in the activity
@@ -55,10 +65,35 @@ const ActivitySchema = new Schema<IActivity>(
       required: [true, 'Territory is required'],
       trim: true,
     },
+    territoryName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    zoneName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    buName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     state: {
       type: String,
       required: false, // Optional for backward compatibility, migration will populate
       trim: true,
+    },
+    tmEmpCode: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    tmName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     farmerIds: [{
       type: Schema.Types.ObjectId,
@@ -86,12 +121,16 @@ const ActivitySchema = new Schema<IActivity>(
 ActivitySchema.index({ activityId: 1 }, { unique: true });
 ActivitySchema.index({ date: -1 }); // For date range queries and sorting by date
 ActivitySchema.index({ territory: 1 }); // For territory filtering
+ActivitySchema.index({ territoryName: 1 }); // For territory filtering (preferred)
 ActivitySchema.index({ officerId: 1 }); // For officer filtering
 ActivitySchema.index({ type: 1 }); // For activity type filtering
 ActivitySchema.index({ type: 1, date: -1 }); // Compound: type + date for common query pattern
 ActivitySchema.index({ territory: 1, date: -1 }); // Compound: territory + date for filtering
+ActivitySchema.index({ territoryName: 1, date: -1 }); // Compound: territoryName + date for filtering
 ActivitySchema.index({ state: 1 }); // For state filtering
 ActivitySchema.index({ state: 1, date: -1 }); // Compound: state + date for filtering
+ActivitySchema.index({ zoneName: 1 }); // For zone filtering
+ActivitySchema.index({ buName: 1 }); // For BU filtering
 ActivitySchema.index({ syncedAt: -1 }); // For sync monitoring
 ActivitySchema.index({ farmerIds: 1 }); // For farmer lookup in activities
 

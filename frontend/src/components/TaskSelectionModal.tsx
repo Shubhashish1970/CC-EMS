@@ -15,8 +15,10 @@ interface Task {
     type: string;
     date: string;
     officerName: string;
+    tmName?: string;
     location: string;
     territory: string;
+    state?: string;
     crops?: string[];
     products?: string[];
   };
@@ -319,6 +321,16 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                         <MapPin size={12} className="text-slate-400 flex-shrink-0" />
                         <span className="text-xs text-slate-600 truncate">
                           {task.farmer.location}
+                        </span>
+                      </div>
+
+                      {/* Field context - FDA/TM/Territory/State */}
+                      <div className="mt-1">
+                        <span className="text-[11px] text-slate-500 font-medium truncate block">
+                          FDA: {task.activity.officerName}
+                          {task.activity.tmName ? ` • TM: ${task.activity.tmName}` : ''}
+                          {task.activity.territory ? ` • ${task.activity.territory}` : ''}
+                          {task.activity.state ? ` • ${task.activity.state}` : ''}
                         </span>
                       </div>
                     </div>

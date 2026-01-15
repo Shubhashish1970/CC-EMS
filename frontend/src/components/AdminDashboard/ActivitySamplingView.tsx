@@ -67,6 +67,8 @@ const ActivitySamplingView: React.FC = () => {
   const [filters, setFilters] = useState({
     activityType: '',
     territory: '',
+    zone: '',
+    bu: '',
     samplingStatus: '' as 'sampled' | 'not_sampled' | 'partial' | '',
     dateFrom: '',
     dateTo: '',
@@ -111,7 +113,7 @@ const ActivitySamplingView: React.FC = () => {
   useEffect(() => {
     fetchActivities(1);
     fetchSyncStatus();
-  }, [filters.activityType, filters.territory, filters.samplingStatus, filters.dateFrom, filters.dateTo]);
+  }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo]);
 
   const fetchSyncStatus = async () => {
     try {
@@ -344,6 +346,19 @@ const ActivitySamplingView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  Zone
+                </label>
+                <input
+                  type="text"
+                  value={(filters as any).zone}
+                  onChange={(e) => setFilters({ ...(filters as any), zone: e.target.value } as any)}
+                  placeholder="Filter by zone"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Sampling Status
                 </label>
                 <select
@@ -356,6 +371,21 @@ const ActivitySamplingView: React.FC = () => {
                   <option value="not_sampled">Not Sampled</option>
                   <option value="partial">Partial</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                  BU
+                </label>
+                <input
+                  type="text"
+                  value={(filters as any).bu}
+                  onChange={(e) => setFilters({ ...(filters as any), bu: e.target.value } as any)}
+                  placeholder="Filter by BU"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
               </div>
             </div>
 

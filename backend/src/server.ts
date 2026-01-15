@@ -638,7 +638,7 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       return names[index % names.length];
     };
 
-    const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string } => {
+    const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string; zoneName: string; buName: string } => {
       const languageStateMap: Record<string, string[]> = {
         'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
         'Telugu': ['Andhra Pradesh', 'Telangana'],
@@ -654,8 +654,10 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       const district = districts[index % districts.length];
       const village = INDIAN_VILLAGES[index % INDIAN_VILLAGES.length];
       const territory = `${state} Zone`;
+      const zoneName = ['North Zone', 'South Zone', 'East Zone', 'West Zone'][index % 4];
+      const buName = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'][index % 3];
       
-      return { state, district, village, territory };
+      return { state, district, village, territory, zoneName, buName };
     };
 
     // Find agent user
@@ -678,13 +680,13 @@ app.post('/api/debug/create-test-data', async (req, res) => {
       
       if (!farmer) {
         const language = LANGUAGES[i % LANGUAGES.length];
-        const { state, district, village, territory } = generateIndianLocation(existingFarmerCount + i, language);
+        const { state: farmerState, district, village, territory } = generateIndianLocation(existingFarmerCount + i, language);
         const farmerName = generateFarmerName(existingFarmerCount + i, language);
         
         farmer = new Farmer({
           name: farmerName,
           mobileNumber,
-          location: `${village}, ${district}, ${state}`,
+          location: `${village}, ${district}, ${farmerState}`,
           preferredLanguage: language,
           territory: territory,
         });
@@ -710,6 +712,9 @@ app.post('/api/debug/create-test-data', async (req, res) => {
         const firstFarmer = await Farmer.findById(selectedFarmers[0]);
         const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
         const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
+        const activityState = activityTerritory ? activityTerritory.replace(/\s+Zone$/i, '').trim() : '';
+        const zoneName = ['North Zone', 'South Zone', 'East Zone', 'West Zone'][i % 4];
+        const buName = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'][i % 3];
         const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
         const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
         
@@ -721,6 +726,10 @@ app.post('/api/debug/create-test-data', async (req, res) => {
           officerName: officerName,
           location: activityLocation,
           territory: activityTerritory,
+          territoryName: activityTerritory,
+          zoneName,
+          buName,
+          state: activityState,
           farmerIds: selectedFarmers,
           crops: CROPS.slice(0, Math.min((i % 4) + 2, CROPS.length)), // 2-5 crops per activity
           products: PRODUCTS.slice(0, Math.min((i % 3) + 1, PRODUCTS.length)), // 1-3 products per activity

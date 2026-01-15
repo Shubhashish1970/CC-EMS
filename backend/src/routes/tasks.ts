@@ -60,9 +60,12 @@ router.get(
           activity: {
             type: activity?.type || 'Unknown',
             date: activity?.date || task.createdAt,
-            officerName: activity?.officerName || 'Unknown',
+            // Agent-facing: FDA + TM + Territory + State
+            officerName: activity?.officerName || 'Unknown', // FDA
+            tmName: activity?.tmName || '',
             location: activity?.location || 'Unknown',
-            territory: activity?.territory || 'Unknown',
+            territory: activity?.territoryName || activity?.territory || 'Unknown',
+            state: activity?.state || '',
             crops: Array.isArray(activity?.crops) ? activity.crops : (activity?.crops ? [activity.crops] : []),
             products: Array.isArray(activity?.products) ? activity.products : (activity?.products ? [activity.products] : []),
           },
@@ -100,7 +103,7 @@ router.post(
       // Get and verify task
       const task = await CallTask.findById(taskId)
         .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-        .populate('activityId', 'type date officerName location territory crops products');
+        .populate('activityId', 'type date officerName tmName location territory territoryName state crops products');
 
       if (!task) {
         const error: AppError = new Error('Task not found');
@@ -130,14 +133,15 @@ router.post(
 
       // Format activity data
       const activity = task.activityId as any;
-      // Parse territory to extract state (format: "State Zone" -> "State")
-      const territory = activity?.territory || 'Unknown';
-      const state = territory.replace(/\s+Zone$/, '').trim() || territory;
+      // State should come from Activity API v2; keep legacy fallback only if state missing.
+      const territory = activity?.territoryName || activity?.territory || 'Unknown';
+      const state = activity?.state || (territory !== 'Unknown' ? territory.replace(/\s+Zone$/, '').trim() : '');
       
       const activityData = activity ? {
         type: activity.type || 'Unknown',
         date: activity.date || new Date(),
         officerName: activity.officerName || 'Unknown',
+        tmName: activity.tmName || '',
         location: activity.location || 'Unknown', // village
         territory: territory,
         state: state,
@@ -185,14 +189,15 @@ router.get(
 
       // Ensure activity data includes crops and products
       const activity = task.activityId as any;
-      // Parse territory to extract state (format: "State Zone" -> "State")
-      const territory = activity?.territory || 'Unknown';
-      const state = territory.replace(/\s+Zone$/, '').trim() || territory;
+      // State should come from Activity API v2; keep legacy fallback only if state missing.
+      const territory = activity?.territoryName || activity?.territory || 'Unknown';
+      const state = activity?.state || (territory !== 'Unknown' ? territory.replace(/\s+Zone$/, '').trim() : '');
       
       const activityData = activity ? {
         type: activity.type || 'Unknown',
         date: activity.date || new Date(),
         officerName: activity.officerName || 'Unknown',
+        tmName: activity.tmName || '',
         location: activity.location || 'Unknown', // village
         territory: territory,
         state: state,

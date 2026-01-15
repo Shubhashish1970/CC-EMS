@@ -9,10 +9,15 @@ interface FFAActivity {
   activityId: string;
   type: string;
   date: string;
-  officerId: string;
-  officerName: string;
+  officerId: string; // FDA empCode
+  officerName: string; // FDA name
   location: string;
-  territory: string;
+  territory: string; // legacy / fallback
+  territoryName?: string; // Activity API v2 preferred
+  zoneName?: string;
+  buName?: string;
+  tmEmpCode?: string;
+  tmName?: string;
   state?: string; // NEW: State field from FFA API (optional during transition)
   crops?: string[];
   products?: string[];
@@ -25,7 +30,7 @@ interface FFAFarmer {
   mobileNumber: string;
   location: string;
   // preferredLanguage: string; // REMOVED - will be derived from state
-  territory: string;
+  territory?: string; // optional; if missing we'll use activity territoryName/territory
   crops?: string[];
   photoUrl?: string;
 }
@@ -155,6 +160,7 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
 const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
   try {
     // Determine state (prefer FFA `state`, fallback to territory parsing for backward compatibility)
+    // NOTE: In steady state, Activity API v2 must always provide `state`.
     const resolvedState = (ffaActivity.state && ffaActivity.state.trim())
       ? ffaActivity.state.trim()
       : (ffaActivity.territory ? ffaActivity.territory.replace(/\s+Zone$/i, '').trim() : '');
@@ -178,7 +184,12 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
         officerName: ffaActivity.officerName,
         location: ffaActivity.location,
         territory: ffaActivity.territory,
+        territoryName: (ffaActivity.territoryName || ffaActivity.territory || '').trim(),
+        zoneName: (ffaActivity.zoneName || '').trim(),
+        buName: (ffaActivity.buName || '').trim(),
         state: resolvedState, // Store resolved state
+        tmEmpCode: (ffaActivity.tmEmpCode || '').trim(),
+        tmName: (ffaActivity.tmName || '').trim(),
         crops: ffaActivity.crops || [],
         products: ffaActivity.products || [],
         syncedAt: new Date(),
@@ -194,6 +205,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     logger.debug(`[FFA SYNC] Activity ${ffaActivity.activityId} in state "${resolvedState}" mapped to language "${preferredLanguage}"`);
     
     for (const ffaFarmer of ffaActivity.farmers) {
+      const resolvedFarmerTerritory = (ffaFarmer.territory || ffaActivity.territoryName || ffaActivity.territory || '').trim();
       // Upsert farmer - preferredLanguage now derived from state
       const farmer = await Farmer.findOneAndUpdate(
         { mobileNumber: ffaFarmer.mobileNumber },
@@ -202,7 +214,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
           mobileNumber: ffaFarmer.mobileNumber,
           location: ffaFarmer.location,
           preferredLanguage: preferredLanguage, // Derived from state, not from FFA API
-          territory: ffaFarmer.territory,
+          territory: resolvedFarmerTerritory || 'Unknown',
           photoUrl: ffaFarmer.photoUrl,
         },
         { upsert: true, new: true }

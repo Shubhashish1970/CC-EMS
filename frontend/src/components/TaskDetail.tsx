@@ -25,6 +25,10 @@ interface Task {
     officerName: string;
     location: string;
     territory: string;
+    tmName?: string;
+    state?: string;
+    zoneName?: string;
+    buName?: string;
     crops?: string[];
     products?: string[];
   };
@@ -269,8 +273,12 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
               <p className="text-sm font-medium text-slate-700">{formatDate(fullTask.activityId.date)}</p>
             </div>
             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Field Officer</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">FDA</p>
               <p className="text-sm font-medium text-slate-700">{fullTask.activityId.officerName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">TM</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.tmName || 'N/A'}</p>
             </div>
             <div>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Location</p>
@@ -279,6 +287,10 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
             <div>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Territory</p>
               <p className="text-sm font-medium text-slate-700">{fullTask.activityId.territory}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</p>
+              <p className="text-sm font-medium text-slate-700">{fullTask.activityId.state || 'N/A'}</p>
             </div>
             {fullTask.activityId.crops && fullTask.activityId.crops.length > 0 && (
               <div>

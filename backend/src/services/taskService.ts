@@ -31,7 +31,8 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
       status: { $in: ['sampled_in_queue', 'in_progress'] },
     })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-      .populate('activityId', 'type date officerName location territory crops products')
+      // Agent view needs: FDA (officerName), TM, Territory, State (+ optional legacy territory)
+      .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
       .limit(50); // Reasonable limit
 
@@ -85,7 +86,7 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
       scheduledDate: { $lte: new Date() }, // Only tasks that are due
     })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-      .populate('activityId', 'type date officerName location territory crops products')
+      .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
       .limit(1);
 
@@ -97,7 +98,7 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
         scheduledDate: { $lte: new Date() },
       })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-      .populate('activityId', 'type date officerName location territory crops products')
+      .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 })
       .limit(1);
     }

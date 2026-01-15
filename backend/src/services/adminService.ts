@@ -89,6 +89,8 @@ export interface AgentQueueDetail {
       date: Date;
       officerName: string;
       territory: string;
+      zone?: string;
+      bu?: string;
     };
     status: TaskStatus;
     scheduledDate: Date;
@@ -103,6 +105,8 @@ export interface AgentQueueDetail {
 export const getActivitiesWithSampling = async (filters?: {
   activityType?: string;
   territory?: string;
+  zone?: string;
+  bu?: string;
   samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
   dateFrom?: Date;
   dateTo?: Date;
@@ -121,6 +125,8 @@ export const getActivitiesWithSampling = async (filters?: {
     const {
       activityType,
       territory,
+      zone,
+      bu,
       samplingStatus,
       dateFrom,
       dateTo,
@@ -136,7 +142,17 @@ export const getActivitiesWithSampling = async (filters?: {
       activityQuery.type = activityType;
     }
     if (territory) {
-      activityQuery.territory = territory;
+      // Prefer territoryName (v2) but support legacy territory
+      activityQuery.$or = [
+        { territoryName: territory },
+        { territory: territory },
+      ];
+    }
+    if (zone) {
+      activityQuery.zoneName = zone;
+    }
+    if (bu) {
+      activityQuery.buName = bu;
     }
     if (dateFrom || dateTo) {
       activityQuery.date = {};
@@ -618,7 +634,7 @@ export const getAgentQueue = async (
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
     })
       .populate('farmerId', 'name mobileNumber preferredLanguage location')
-      .populate('activityId', 'type date officerName territory')
+      .populate('activityId', 'type date officerName territory territoryName zoneName buName')
       .sort({ scheduledDate: 1 }); // Chronologically ordered
 
     // Calculate status breakdown
@@ -655,7 +671,9 @@ export const getAgentQueue = async (
           type: activity?.type || 'Unknown',
           date: activity?.date || task.createdAt,
           officerName: activity?.officerName || 'Unknown',
-          territory: activity?.territory || 'Unknown',
+          territory: activity?.territoryName || activity?.territory || 'Unknown',
+          zone: activity?.zoneName || '',
+          bu: activity?.buName || '',
         },
         status: task.status,
         scheduledDate: task.scheduledDate,
