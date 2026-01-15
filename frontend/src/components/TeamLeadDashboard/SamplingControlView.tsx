@@ -29,7 +29,6 @@ const SamplingControlView: React.FC = () => {
 
   const [activityFilters, setActivityFilters] = useState({
     lifecycleStatus: 'active' as LifecycleStatus,
-    type: '',
     dateFrom: '',
     dateTo: '',
     page: 1,
@@ -152,7 +151,6 @@ const SamplingControlView: React.FC = () => {
   const loadActivities = async () => {
     const res: any = await samplingAPI.listActivities({
       lifecycleStatus: activityFilters.lifecycleStatus,
-      type: activityFilters.type || undefined,
       dateFrom: activityFilters.dateFrom || undefined,
       dateTo: activityFilters.dateTo || undefined,
       page: activityFilters.page,
@@ -182,7 +180,6 @@ const SamplingControlView: React.FC = () => {
     setBulkAssignAgentId('');
     setActivityFilters({
       lifecycleStatus: 'active',
-      type: '',
       dateFrom: '',
       dateTo: '',
       page: 1,
@@ -219,7 +216,7 @@ const SamplingControlView: React.FC = () => {
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activityFilters.lifecycleStatus, activityFilters.type, activityFilters.dateFrom, activityFilters.dateTo, activityFilters.page, activityFilters.limit]);
+  }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo, activityFilters.page, activityFilters.limit]);
 
   const allSelectedOnPage = useMemo(() => {
     if (!activities.length) return false;
@@ -516,7 +513,7 @@ const SamplingControlView: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
             <select
@@ -528,19 +525,6 @@ const SamplingControlView: React.FC = () => {
               <option value="inactive">Inactive</option>
               <option value="not_eligible">Not Eligible</option>
               <option value="sampled">Sampled</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Type</label>
-            <select
-              value={activityFilters.type}
-              onChange={(e) => setActivityFilters((p) => ({ ...p, type: e.target.value, page: 1 }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
-            >
-              <option value="">All</option>
-              {ALL_ACTIVITY_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
             </select>
           </div>
           <div className="md:col-span-2">
