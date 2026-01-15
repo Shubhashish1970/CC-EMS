@@ -75,6 +75,22 @@ const SamplingControlView: React.FC = () => {
     setAgents(list);
   };
 
+  const handleResetSelections = () => {
+    // Clear any checked rows and reset filters back to defaults
+    setSelectedActivityIds(new Set());
+    setSelectedUnassignedTaskIds(new Set());
+    setBulkAssignAgentId('');
+    setActivityFilters({
+      lifecycleStatus: 'active',
+      type: '',
+      dateFrom: '',
+      dateTo: '',
+      page: 1,
+      limit: 20,
+    });
+    toast.showSuccess('Selections cleared');
+  };
+
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -372,6 +388,15 @@ const SamplingControlView: React.FC = () => {
             <p className="text-sm text-slate-600">Select activities and run sampling or reactivate</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleResetSelections}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
+              title="Clear selections and reset filters"
+            >
+              <RotateCcw size={16} />
+              Reset
+            </button>
             <button
               onClick={handleRunSampling}
               disabled={isLoading || selectionCount === 0}
