@@ -25,13 +25,18 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_ca
 const args = process.argv.slice(2);
 const isYes = args.includes('--yes');
 
-const OFFICER_NUMBER_REGEX = /^Officer\s+\d+$/i;
-const LOCATION_NUMBER_REGEX = /^Location\s+\d+$/i;
+// Match values like:
+// - "Officer 1"
+// - "Officer: Officer 2"
+// - "Location 3"
+const OFFICER_NUMBER_REGEX = /^\s*(?:Officer\s*:\s*)?Officer\s+\d+\s*$/i;
+const LOCATION_NUMBER_REGEX = /^\s*Location\s+\d+\s*$/i;
 
 async function main() {
   console.log(`🔌 Connecting to MongoDB...`);
   await mongoose.connect(MONGODB_URI);
   console.log(`✅ Connected`);
+  console.log(`🔎 Connected DB: ${mongoose.connection.name} @ ${mongoose.connection.host}`);
 
   const activities = await Activity.find(
     {
