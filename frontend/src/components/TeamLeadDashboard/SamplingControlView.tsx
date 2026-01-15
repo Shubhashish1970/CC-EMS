@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square } from 'lucide-react';
 import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -6,6 +6,15 @@ import { useToast } from '../../context/ToastContext';
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
 
 const ALL_ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'] as const;
+type DateRangePreset =
+  | 'Custom'
+  | 'Today'
+  | 'Yesterday'
+  | 'This week (Sun - Today)'
+  | 'Last 7 days'
+  | 'Last week (Sun - Sat)'
+  | 'Last 28 days'
+  | 'Last 30 days';
 
 const SamplingControlView: React.FC = () => {
   const toast = useToast();
@@ -26,6 +35,97 @@ const SamplingControlView: React.FC = () => {
     page: 1,
     limit: 20,
   });
+
+  // Date range dropdown (same UX as Admin Activity Sampling)
+  const datePickerRef = useRef<HTMLDivElement | null>(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Custom');
+  const [draftStart, setDraftStart] = useState('');
+  const [draftEnd, setDraftEnd] = useState('');
+
+  const toISO = (d: Date) => d.toISOString().split('T')[0];
+
+  const formatPretty = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
+    const today = new Date();
+    const end = new Date(today);
+    const start = new Date(today);
+
+    const startOfWeekSunday = (dt: Date) => {
+      const d = new Date(dt);
+      const day = d.getDay(); // 0=Sun
+      d.setDate(d.getDate() - day);
+      return d;
+    };
+
+    switch (preset) {
+      case 'Today': {
+        return { start: toISO(today), end: toISO(today) };
+      }
+      case 'Yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        return { start: toISO(y), end: toISO(y) };
+      }
+      case 'This week (Sun - Today)': {
+        const s = startOfWeekSunday(today);
+        return { start: toISO(s), end: toISO(today) };
+      }
+      case 'Last 7 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 6);
+        return { start: toISO(s), end: toISO(today) };
+      }
+      case 'Last week (Sun - Sat)': {
+        const thisSun = startOfWeekSunday(today);
+        const lastSun = new Date(thisSun);
+        lastSun.setDate(lastSun.getDate() - 7);
+        const lastSat = new Date(thisSun);
+        lastSat.setDate(lastSat.getDate() - 1);
+        return { start: toISO(lastSun), end: toISO(lastSat) };
+      }
+      case 'Last 28 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 27);
+        return { start: toISO(s), end: toISO(today) };
+      }
+      case 'Last 30 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 29);
+        return { start: toISO(s), end: toISO(today) };
+      }
+      case 'Custom':
+      default: {
+        return { start: activityFilters.dateFrom || '', end: activityFilters.dateTo || '' };
+      }
+    }
+  };
+
+  const syncDraftFromFilters = () => {
+    setDraftStart(activityFilters.dateFrom || '');
+    setDraftEnd(activityFilters.dateTo || '');
+  };
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDatePickerOpen]);
 
   const [activities, setActivities] = useState<any[]>([]);
   const [activityPagination, setActivityPagination] = useState<any>(null);
@@ -443,28 +543,129 @@ const SamplingControlView: React.FC = () => {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date From</label>
-            <div className="relative">
-              <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={activityFilters.dateFrom}
-                onChange={(e) => setActivityFilters((p) => ({ ...p, dateFrom: e.target.value, page: 1 }))}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date To</label>
-            <div className="relative">
-              <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={activityFilters.dateTo}
-                onChange={(e) => setActivityFilters((p) => ({ ...p, dateTo: e.target.value, page: 1 }))}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm"
-              />
+          <div className="md:col-span-2">
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+            <div className="relative" ref={datePickerRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDatePickerOpen((prev) => {
+                    const next = !prev;
+                    if (!prev && next) {
+                      syncDraftFromFilters();
+                    }
+                    return next;
+                  });
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
+              >
+                <span className="truncate">
+                  {selectedPreset}
+                  {activityFilters.dateFrom && activityFilters.dateTo
+                    ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
+                    : ''}
+                </span>
+                <span className="text-slate-400 font-black">▾</span>
+              </button>
+
+              {isDatePickerOpen && (
+                <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="flex">
+                    <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                      {([
+                        'Custom',
+                        'Today',
+                        'Yesterday',
+                        'This week (Sun - Today)',
+                        'Last 7 days',
+                        'Last week (Sun - Sat)',
+                        'Last 28 days',
+                        'Last 30 days',
+                      ] as DateRangePreset[]).map((p) => {
+                        const isActive = selectedPreset === p;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPreset(p);
+                              const { start, end } = getPresetRange(p);
+                              setDraftStart(start);
+                              setDraftEnd(end);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                              isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex-1 p-4">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex-1">
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            Start date
+                          </p>
+                          <input
+                            type="date"
+                            value={draftStart}
+                            onChange={(e) => {
+                              setSelectedPreset('Custom');
+                              setDraftStart(e.target.value);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            End date
+                          </p>
+                          <input
+                            type="date"
+                            value={draftEnd}
+                            onChange={(e) => {
+                              setSelectedPreset('Custom');
+                              setDraftEnd(e.target.value);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDatePickerOpen(false);
+                            syncDraftFromFilters();
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivityFilters((prev) => ({
+                              ...prev,
+                              page: 1,
+                              dateFrom: draftStart || '',
+                              dateTo: draftEnd || '',
+                            }));
+                            setIsDatePickerOpen(false);
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
