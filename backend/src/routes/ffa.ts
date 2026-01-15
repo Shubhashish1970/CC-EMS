@@ -2,7 +2,6 @@ import express, { Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 import { syncFFAData, getSyncStatus } from '../services/ffaSync.js';
-import { sampleAllActivities } from '../services/samplingService.js';
 import { Activity } from '../models/Activity.js';
 import { Farmer } from '../models/Farmer.js';
 import logger from '../config/logger.js';
@@ -34,24 +33,10 @@ router.post(
       
       const result = await syncFFAData(fullSync);
 
-      // Automatically trigger sampling for newly synced activities
-      let samplingResult = null;
-      if (result.activitiesSynced > 0) {
-        try {
-          logger.info('Auto-triggering sampling after FFA sync...');
-          samplingResult = await sampleAllActivities();
-          logger.info(`Sampling completed: ${samplingResult.activitiesProcessed} activities processed, ${samplingResult.totalTasksCreated} tasks created`);
-        } catch (samplingError) {
-          logger.error('Auto-sampling after sync failed:', samplingError);
-          // Don't fail the sync if sampling fails
-        }
-      }
-
       // Convert Date objects to ISO strings for JSON serialization
       const responseData = {
         ...result,
         lastSyncDate: result.lastSyncDate ? result.lastSyncDate.toISOString() : undefined,
-        sampling: samplingResult,
       };
 
       // Handle skipped syncs (no new data or too soon)
@@ -70,7 +55,7 @@ router.post(
 
       res.json({
         success: true,
-        message: `FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}${samplingResult ? `. Sampling: ${samplingResult.totalTasksCreated} tasks created` : ''}`,
+        message: `FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}`,
         data: responseData,
       });
     } catch (error) {

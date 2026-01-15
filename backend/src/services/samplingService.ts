@@ -3,140 +3,108 @@ import { Farmer } from '../models/Farmer.js';
 import { CallTask } from '../models/CallTask.js';
 import { CoolingPeriod } from '../models/CoolingPeriod.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
-import { User } from '../models/User.js';
+import { SamplingConfig } from '../models/SamplingConfig.js';
 import { reservoirSampling, calculateSampleSize } from '../utils/reservoirSampling.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
 
-interface SamplingConfig {
-  defaultPercentage: number;
-  activityTypePercentages: Record<string, number>;
-  coolingPeriodDays: number;
-}
-
-const DEFAULT_SAMPLING_CONFIG: SamplingConfig = {
-  defaultPercentage: 7, // 7% default (between 5-10%)
+const DEFAULT_CONFIG_SEED = {
+  key: 'default' as const,
+  isActive: true,
+  activityCoolingDays: 5,
+  farmerCoolingDays: 30,
+  defaultPercentage: 10,
   activityTypePercentages: {
     'Field Day': 10,
-    'Group Meeting': 8,
-    'Demo Visit': 6,
-    'OFM': 5,
+    'Group Meeting': 10,
+    'Demo Visit': 10,
+    'OFM': 10,
+    'Other': 10,
   },
-  coolingPeriodDays: 30,
+  eligibleActivityTypes: [] as string[], // empty => all eligible
+};
+
+const getActiveSamplingConfig = async () => {
+  const existing = await SamplingConfig.findOne({ key: 'default' });
+  if (existing) {
+    return existing;
+  }
+  const created = await SamplingConfig.create(DEFAULT_CONFIG_SEED);
+  return created;
 };
 
 /**
  * Check if farmer is in cooling period
  */
-const isInCoolingPeriod = async (farmerId: mongoose.Types.ObjectId): Promise<boolean> => {
-  const coolingPeriod = await CoolingPeriod.findOne({
-    farmerId,
-    expiresAt: { $gt: new Date() }, // Not expired
-  });
-
-  return !!coolingPeriod;
+const isFarmerInCoolingWindow = (lastCallDate: Date, farmerCoolingDays: number): boolean => {
+  if (!lastCallDate || !(lastCallDate instanceof Date) || isNaN(lastCallDate.getTime())) {
+    return false;
+  }
+  const expiresAt = new Date(lastCallDate);
+  expiresAt.setDate(expiresAt.getDate() + farmerCoolingDays);
+  return expiresAt.getTime() > Date.now();
 };
 
-/**
- * Get eligible farmers for sampling (excluding those in cooling period)
- */
 const getEligibleFarmers = async (
-  farmerIds: mongoose.Types.ObjectId[]
+  farmerIds: mongoose.Types.ObjectId[],
+  farmerCoolingDays: number
 ): Promise<mongoose.Types.ObjectId[]> => {
-  const eligibleFarmers: mongoose.Types.ObjectId[] = [];
+  if (!farmerIds || farmerIds.length === 0) return [];
 
-  for (const farmerId of farmerIds) {
-    const inCoolingPeriod = await isInCoolingPeriod(farmerId);
-    if (!inCoolingPeriod) {
-      eligibleFarmers.push(farmerId);
+  const cooling = await CoolingPeriod.find({
+    farmerId: { $in: farmerIds },
+  }).select('farmerId lastCallDate').lean();
+
+  const blocked = new Set<string>();
+  for (const entry of cooling) {
+    if (entry?.farmerId && entry?.lastCallDate) {
+      const inCooling = isFarmerInCoolingWindow(new Date(entry.lastCallDate), farmerCoolingDays);
+      if (inCooling) {
+        blocked.add(entry.farmerId.toString());
+      }
     }
   }
 
-  return eligibleFarmers;
+  return farmerIds.filter((id) => !blocked.has(id.toString()));
 };
 
-/**
- * Auto-assign sampled farmers to agents based on language
- */
-const assignSampledFarmersToAgents = async (
+const isActivityPastCoolingGate = (activityDate: Date, activityCoolingDays: number): boolean => {
+  const gate = new Date(activityDate);
+  gate.setDate(gate.getDate() + activityCoolingDays);
+  return Date.now() >= gate.getTime();
+};
+
+const isActivityTypeEligible = (activityType: string, eligibleTypes: string[]): boolean => {
+  if (!eligibleTypes || eligibleTypes.length === 0) return true; // empty => all eligible
+  return eligibleTypes.includes(activityType);
+};
+
+const createUnassignedTasksForFarmers = async (
   sampledFarmerIds: mongoose.Types.ObjectId[],
   activityId: mongoose.Types.ObjectId,
   scheduledDate: Date
 ): Promise<number> => {
-  let assignedCount = 0;
+  let created = 0;
 
-  // Get all active CC agents
-  const agents = await User.find({
-    role: 'cc_agent',
-    isActive: true,
-  });
-
-  if (agents.length === 0) {
-    logger.warn('No active CC agents found for task assignment');
-    return 0;
-  }
-
-  // Get farmers with their preferred languages
-  const farmers = await Farmer.find({
-    _id: { $in: sampledFarmerIds },
-  });
-
-  // Group farmers by language
-  const farmersByLanguage: Record<string, mongoose.Types.ObjectId[]> = {};
-  for (const farmer of farmers) {
-    const lang = farmer.preferredLanguage;
-    if (!farmersByLanguage[lang]) {
-      farmersByLanguage[lang] = [];
-    }
-    farmersByLanguage[lang].push(farmer._id);
-  }
-
-  // Assign tasks to agents based on language capabilities
-  for (const [language, farmerIds] of Object.entries(farmersByLanguage)) {
-    // Find agents with this language capability
-    const capableAgents = agents.filter(agent =>
-      agent.languageCapabilities.includes(language)
-    );
-
-    if (capableAgents.length === 0) {
-      logger.warn(`No agents found with language capability: ${language}`);
+  for (const farmerId of sampledFarmerIds) {
+    const existingTask = await CallTask.findOne({ farmerId, activityId }).select('_id').lean();
+    if (existingTask) {
       continue;
     }
 
-    // Distribute farmers evenly among capable agents
-    for (let i = 0; i < farmerIds.length; i++) {
-      const farmerId = farmerIds[i];
-      const agent = capableAgents[i % capableAgents.length];
-
-      // Check if task already exists for this farmer+activity combination
-      const existingTask = await CallTask.findOne({
-        farmerId,
-        activityId,
-      });
-
-      if (existingTask) {
-        logger.warn(
-          `Task already exists for farmer ${farmerId} and activity ${activityId}. Skipping duplicate task creation.`
-        );
-        continue; // Skip creating duplicate task
-      }
-
-      // Create call task only if it doesn't exist
-      await CallTask.create({
-        farmerId,
-        activityId,
-        status: 'sampled_in_queue',
-        retryCount: 0,
-        assignedAgentId: agent._id,
-        scheduledDate,
-        interactionHistory: [],
-      });
-
-      assignedCount++;
-    }
+    await CallTask.create({
+      farmerId,
+      activityId,
+      status: 'unassigned',
+      retryCount: 0,
+      assignedAgentId: null,
+      scheduledDate,
+      interactionHistory: [],
+    });
+    created++;
   }
 
-  return assignedCount;
+  return created;
 };
 
 /**
@@ -144,18 +112,68 @@ const assignSampledFarmersToAgents = async (
  */
 export const sampleAndCreateTasks = async (
   activityId: string,
-  samplingPercentage?: number
+  samplingPercentage?: number,
+  options?: {
+    runByUserId?: string;
+    forceRun?: boolean; // ignore activityCoolingDays gate (still respects lifecycle status)
+    scheduledDate?: Date; // defaults to now (Team Lead run time)
+  }
 ): Promise<{
+  skipped?: boolean;
+  skipReason?: string;
   totalFarmers: number;
   eligibleFarmers: number;
   sampledCount: number;
   tasksCreated: number;
+  activityLifecycleStatus?: string;
 }> => {
   try {
+    const config = await getActiveSamplingConfig();
     const activity = await Activity.findById(activityId).populate('farmerIds');
     
     if (!activity) {
       throw new Error('Activity not found');
+    }
+
+    // Only sample Active activities
+    if (activity.lifecycleStatus && activity.lifecycleStatus !== 'active') {
+      return {
+        skipped: true,
+        skipReason: `Provide only Active activities for sampling (current: ${activity.lifecycleStatus})`,
+        totalFarmers: activity.farmerIds?.length || 0,
+        eligibleFarmers: 0,
+        sampledCount: 0,
+        tasksCreated: 0,
+        activityLifecycleStatus: activity.lifecycleStatus,
+      };
+    }
+
+    // Type eligibility gate
+    if (!isActivityTypeEligible(activity.type, config.eligibleActivityTypes || [])) {
+      // Keep as active; Team Lead can apply eligibility bulk action separately to mark not_eligible.
+      return {
+        skipped: true,
+        skipReason: `Activity type "${activity.type}" is not eligible per Sampling Control`,
+        totalFarmers: activity.farmerIds?.length || 0,
+        eligibleFarmers: 0,
+        sampledCount: 0,
+        tasksCreated: 0,
+        activityLifecycleStatus: activity.lifecycleStatus || 'active',
+      };
+    }
+
+    // Activity cooling gate (unless forceRun)
+    const shouldCheckGate = !options?.forceRun;
+    if (shouldCheckGate && !isActivityPastCoolingGate(activity.date, config.activityCoolingDays)) {
+      return {
+        skipped: true,
+        skipReason: `Activity is within activityCoolingDays=${config.activityCoolingDays}`,
+        totalFarmers: activity.farmerIds?.length || 0,
+        eligibleFarmers: 0,
+        sampledCount: 0,
+        tasksCreated: 0,
+        activityLifecycleStatus: activity.lifecycleStatus || 'active',
+      };
     }
 
     const totalFarmers = activity.farmerIds.length;
@@ -167,42 +185,36 @@ export const sampleAndCreateTasks = async (
         eligibleFarmers: 0,
         sampledCount: 0,
         tasksCreated: 0,
+        activityLifecycleStatus: activity.lifecycleStatus || 'active',
       };
     }
 
     // Get sampling percentage (use activity type specific or default)
-    const config = DEFAULT_SAMPLING_CONFIG;
     const percentage = samplingPercentage || 
       config.activityTypePercentages[activity.type] || 
       config.defaultPercentage;
 
     // Get eligible farmers (not in cooling period)
     const eligibleFarmerIds = await getEligibleFarmers(
-      activity.farmerIds as mongoose.Types.ObjectId[]
+      activity.farmerIds as mongoose.Types.ObjectId[],
+      config.farmerCoolingDays
     );
 
     if (eligibleFarmerIds.length === 0) {
-      logger.warn(`No eligible farmers for activity ${activityId} (all in cooling period)`);
-      return {
-        totalFarmers,
-        eligibleFarmers: 0,
-        sampledCount: 0,
-        tasksCreated: 0,
-      };
+      logger.warn(`No eligible farmers for activity ${activityId} (all in farmer cooling window)`);
     }
 
     // Calculate sample size
-    const sampleSize = calculateSampleSize(eligibleFarmerIds.length, percentage);
+    const sampleSize = eligibleFarmerIds.length > 0 ? calculateSampleSize(eligibleFarmerIds.length, percentage) : 0;
 
     // Perform reservoir sampling
-    const sampledFarmerIds = reservoirSampling(eligibleFarmerIds, sampleSize);
+    const sampledFarmerIds = sampleSize > 0 ? reservoirSampling(eligibleFarmerIds, sampleSize) : [];
 
-    // Calculate scheduled date (default: 5 days after activity date)
-    const scheduledDate = new Date(activity.date);
-    scheduledDate.setDate(scheduledDate.getDate() + 5);
+    // Scheduled date is the Team Lead run date (now) unless provided
+    const scheduledDate = options?.scheduledDate ? new Date(options.scheduledDate) : new Date();
 
     // Create call tasks for sampled farmers
-    const tasksCreated = await assignSampledFarmersToAgents(
+    const tasksCreated = await createUnassignedTasksForFarmers(
       sampledFarmerIds,
       activity._id,
       scheduledDate
@@ -215,14 +227,24 @@ export const sampleAndCreateTasks = async (
         {
           farmerId,
           lastCallDate: new Date(),
-          coolingPeriodDays: config.coolingPeriodDays,
-          expiresAt: new Date(Date.now() + config.coolingPeriodDays * 24 * 60 * 60 * 1000),
+          coolingPeriodDays: config.farmerCoolingDays,
+          expiresAt: new Date(Date.now() + config.farmerCoolingDays * 24 * 60 * 60 * 1000),
         },
         { upsert: true, new: true }
       );
     }
 
+    // Update activity lifecycle status based on sampledCount
+    const now = new Date();
+    const newLifecycleStatus = sampledFarmerIds.length > 0 ? 'sampled' : 'inactive';
+    activity.lifecycleStatus = newLifecycleStatus as any;
+    activity.lifecycleUpdatedAt = now;
+    activity.lastSamplingRunAt = now;
+    await activity.save();
+
     // Log sampling audit
+    // We keep "latest audit per activity" to support manual resampling without schema/index migrations.
+    await SamplingAudit.deleteOne({ activityId: activity._id });
     await SamplingAudit.create({
       activityId: activity._id,
       samplingPercentage: percentage,
@@ -233,11 +255,16 @@ export const sampleAndCreateTasks = async (
         eligibleFarmers: eligibleFarmerIds.length,
         tasksCreated,
         activityType: activity.type,
+        activityCoolingDays: config.activityCoolingDays,
+        farmerCoolingDays: config.farmerCoolingDays,
+        eligibleActivityTypes: config.eligibleActivityTypes,
+        scheduledDate,
+        runByUserId: options?.runByUserId || null,
       },
     });
 
     logger.info(
-      `Sampling completed for activity ${activityId}: ${sampledFarmerIds.length}/${eligibleFarmerIds.length} sampled (${percentage}%), ${tasksCreated} tasks created`
+      `Sampling completed for activity ${activityId}: ${sampledFarmerIds.length}/${eligibleFarmerIds.length} sampled (${percentage}%), ${tasksCreated} tasks created (unassigned)`
     );
 
     return {
@@ -245,6 +272,7 @@ export const sampleAndCreateTasks = async (
       eligibleFarmers: eligibleFarmerIds.length,
       sampledCount: sampledFarmerIds.length,
       tasksCreated,
+      activityLifecycleStatus: newLifecycleStatus,
     };
   } catch (error) {
     logger.error(`Error sampling activity ${activityId}:`, error);
@@ -265,21 +293,26 @@ export const sampleAllActivities = async (): Promise<{
   let totalTasksCreated = 0;
 
   try {
-    // Find activities that haven't been sampled yet (no sampling audit exists)
-    const sampledActivityIds = await SamplingAudit.distinct('activityId');
-    
-    const unsampledActivities = await Activity.find({
-      _id: { $nin: sampledActivityIds },
+    const config = await getActiveSamplingConfig();
+    // Find Active activities only; Team Lead-triggered bulk sampling may still call this.
+    const activeActivities = await Activity.find({
+      lifecycleStatus: 'active',
       farmerIds: { $exists: true, $ne: [] },
     });
 
-    logger.info(`Found ${unsampledActivities.length} unsampled activities`);
+    logger.info(`Found ${activeActivities.length} active activities`);
 
-    for (const activity of unsampledActivities) {
+    for (const activity of activeActivities) {
       try {
+        // Skip types that are not eligible
+        if (!isActivityTypeEligible(activity.type, config.eligibleActivityTypes || [])) {
+          continue;
+        }
         const result = await sampleAndCreateTasks(activity._id.toString());
-        activitiesProcessed++;
-        totalTasksCreated += result.tasksCreated;
+        if (!result.skipped) {
+          activitiesProcessed++;
+          totalTasksCreated += result.tasksCreated;
+        }
       } catch (error) {
         const errorMsg = `Failed to sample activity ${activity._id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         errors.push(errorMsg);

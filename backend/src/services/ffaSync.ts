@@ -177,24 +177,30 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     const activity = await Activity.findOneAndUpdate(
       { activityId: ffaActivity.activityId },
       {
-        activityId: ffaActivity.activityId,
-        type: ffaActivity.type,
-        date: new Date(ffaActivity.date),
-        officerId: ffaActivity.officerId,
-        officerName: ffaActivity.officerName,
-        location: ffaActivity.location,
-        territory: ffaActivity.territory,
-        territoryName: (ffaActivity.territoryName || ffaActivity.territory || '').trim(),
-        zoneName: (ffaActivity.zoneName || '').trim(),
-        buName: (ffaActivity.buName || '').trim(),
-        state: resolvedState, // Store resolved state
-        tmEmpCode: (ffaActivity.tmEmpCode || '').trim(),
-        tmName: (ffaActivity.tmName || '').trim(),
-        crops: ffaActivity.crops || [],
-        products: ffaActivity.products || [],
-        syncedAt: new Date(),
+        $set: {
+          activityId: ffaActivity.activityId,
+          type: ffaActivity.type,
+          date: new Date(ffaActivity.date),
+          officerId: ffaActivity.officerId,
+          officerName: ffaActivity.officerName,
+          location: ffaActivity.location,
+          territory: ffaActivity.territory,
+          territoryName: (ffaActivity.territoryName || ffaActivity.territory || '').trim(),
+          zoneName: (ffaActivity.zoneName || '').trim(),
+          buName: (ffaActivity.buName || '').trim(),
+          state: resolvedState, // Store resolved state
+          tmEmpCode: (ffaActivity.tmEmpCode || '').trim(),
+          tmName: (ffaActivity.tmName || '').trim(),
+          crops: ffaActivity.crops || [],
+          products: ffaActivity.products || [],
+          syncedAt: new Date(),
+        },
+        $setOnInsert: {
+          lifecycleStatus: 'active',
+          lifecycleUpdatedAt: new Date(),
+        },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
     // Sync farmers for this activity

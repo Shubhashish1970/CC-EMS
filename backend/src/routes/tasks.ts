@@ -9,6 +9,7 @@ import {
   getAvailableTasksForAgent,
   getPendingTasks,
   getTeamTasks,
+  getUnassignedTasks,
   assignTaskToAgent,
   updateTaskStatus,
 } from '../services/taskService.js';
@@ -112,7 +113,7 @@ router.post(
       }
 
       // Verify task is assigned to this agent
-      if (task.assignedAgentId.toString() !== agentId) {
+      if (!task.assignedAgentId || task.assignedAgentId.toString() !== agentId) {
         const error: AppError = new Error('Task not assigned to you');
         error.statusCode = 403;
         throw error;
@@ -282,7 +283,7 @@ router.get(
   '/team',
   requirePermission('tasks.view.team'),
   [
-    query('status').optional().isIn(['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('status').optional().isIn(['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
     query('page').optional().isInt({ min: 1 }),
@@ -331,6 +332,40 @@ router.get(
 // @desc    Get task by ID
 // @access  Private
 router.get(
+  '/unassigned',
+  requirePermission('tasks.view.team'),
+  [
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { dateFrom, dateTo, page, limit } = req.query;
+      const result = await getUnassignedTasks({
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get(
   '/:id',
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -352,7 +387,7 @@ router.get(
       }
 
       // Check permissions: CC Agent can only view own tasks
-      if (userRole === 'cc_agent' && task.assignedAgentId.toString() !== userId) {
+      if (userRole === 'cc_agent' && (!task.assignedAgentId || task.assignedAgentId.toString() !== userId)) {
         const error: AppError = new Error('Access denied');
         error.statusCode = 403;
         throw error;
@@ -408,7 +443,7 @@ router.post(
       }
 
       // Verify task is assigned to this agent
-      if (task.assignedAgentId.toString() !== agentId) {
+      if (!task.assignedAgentId || task.assignedAgentId.toString() !== agentId) {
         const error: AppError = new Error('Task not assigned to you');
         error.statusCode = 403;
         throw error;

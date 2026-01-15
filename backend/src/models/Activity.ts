@@ -4,6 +4,9 @@ export interface IActivity extends Document {
   activityId: string; // FFA App activity ID
   type: string;
   date: Date;
+  lifecycleStatus?: 'active' | 'sampled' | 'inactive' | 'not_eligible';
+  lifecycleUpdatedAt?: Date;
+  lastSamplingRunAt?: Date;
   officerId: string;
   officerName: string;
   location: string;
@@ -44,6 +47,20 @@ const ActivitySchema = new Schema<IActivity>(
     date: {
       type: Date,
       required: [true, 'Activity date is required'],
+    },
+    lifecycleStatus: {
+      type: String,
+      enum: ['active', 'sampled', 'inactive', 'not_eligible'],
+      default: 'active',
+      index: true,
+    },
+    lifecycleUpdatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    lastSamplingRunAt: {
+      type: Date,
+      default: null,
     },
     officerId: {
       type: String,
@@ -133,6 +150,7 @@ ActivitySchema.index({ zoneName: 1 }); // For zone filtering
 ActivitySchema.index({ buName: 1 }); // For BU filtering
 ActivitySchema.index({ syncedAt: -1 }); // For sync monitoring
 ActivitySchema.index({ farmerIds: 1 }); // For farmer lookup in activities
+ActivitySchema.index({ lifecycleStatus: 1, date: -1 }); // For sampling control list views
 
 export const Activity = mongoose.model<IActivity>('Activity', ActivitySchema);
 

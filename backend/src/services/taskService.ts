@@ -180,6 +180,60 @@ export const getPendingTasks = async (filters?: {
 };
 
 /**
+ * Get unassigned tasks (Team Lead / Admin)
+ * These tasks are created by sampling and must be assigned by Team Lead (manual or auto later).
+ */
+export const getUnassignedTasks = async (filters?: {
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+  page?: number;
+  limit?: number;
+}) => {
+  try {
+    const { dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
+    const skip = (page - 1) * limit;
+
+    const query: any = { status: 'unassigned' };
+
+    if (dateFrom || dateTo) {
+      query.scheduledDate = {};
+      if (dateFrom) {
+        const fromDate = typeof dateFrom === 'string' ? new Date(dateFrom) : dateFrom;
+        fromDate.setHours(0, 0, 0, 0);
+        query.scheduledDate.$gte = fromDate;
+      }
+      if (dateTo) {
+        const toDate = typeof dateTo === 'string' ? new Date(dateTo) : dateTo;
+        toDate.setHours(23, 59, 59, 999);
+        query.scheduledDate.$lte = toDate;
+      }
+    }
+
+    const tasks = await CallTask.find(query)
+      .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+      .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
+      .sort({ scheduledDate: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await CallTask.countDocuments(query);
+
+    return {
+      tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    logger.error('Error fetching unassigned tasks:', error);
+    throw error;
+  }
+};
+
+/**
  * Get team tasks (for Team Lead)
  */
 export const getTeamTasks = async (teamLeadId: string, filters?: {

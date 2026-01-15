@@ -1,9 +1,10 @@
-export type TaskStatus = 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+export type TaskStatus = 'unassigned' | 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
 
 /**
  * Display labels for task statuses
  */
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  unassigned: 'Unassigned',
   sampled_in_queue: 'Sampled - in queue',
   in_progress: 'In Progress',
   completed: 'Completed',

@@ -315,6 +315,7 @@ export const getActivitiesWithSampling = async (filters?: {
 
       // Calculate status breakdown
       const statusBreakdown = {
+        unassigned: 0,
         sampled_in_queue: 0,
         in_progress: 0,
         completed: 0,
@@ -330,15 +331,15 @@ export const getActivitiesWithSampling = async (filters?: {
 
       for (const task of activityTasks) {
         // Update status breakdown - ensure all tasks are counted
-        const taskStatus = task.status || 'sampled_in_queue'; // Default to sampled_in_queue if missing
-        const statusKey = taskStatus === 'sampled_in_queue' ? 'sampled_in_queue' : taskStatus;
+        const taskStatus = task.status || 'unassigned'; // Default to unassigned if missing
+        const statusKey = taskStatus;
         
         if (statusBreakdown.hasOwnProperty(statusKey)) {
           statusBreakdown[statusKey as keyof typeof statusBreakdown]++;
         } else {
-          // If status is not in breakdown, log warning and count as sampled_in_queue
-          logger.warn(`Task ${task._id} has unknown status: ${taskStatus}, counting as sampled_in_queue`);
-          statusBreakdown.sampled_in_queue++;
+          // If status is not in breakdown, log warning and count as unassigned
+          logger.warn(`Task ${task._id} has unknown status: ${taskStatus}, counting as unassigned`);
+          statusBreakdown.unassigned++;
         }
 
         // Group by agent
@@ -543,6 +544,9 @@ export const getAgentQueues = async (filters?: {
     >();
 
     for (const task of tasks) {
+      if (!task.assignedAgentId) {
+        continue;
+      }
       const agentIdStr = task.assignedAgentId.toString();
       if (!tasksByAgent.has(agentIdStr)) {
         tasksByAgent.set(agentIdStr, {

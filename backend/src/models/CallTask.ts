@@ -1,6 +1,12 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type TaskStatus = 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+export type TaskStatus =
+  | 'unassigned'
+  | 'sampled_in_queue'
+  | 'in_progress'
+  | 'completed'
+  | 'not_reachable'
+  | 'invalid_number';
 export type CallStatus = 'Connected' | 'Disconnected' | 'Not Reachable' | 'Invalid Number';
 
 export interface ICallLog {
@@ -22,7 +28,7 @@ export interface ICallTask extends Document {
   activityId: mongoose.Types.ObjectId;
   status: TaskStatus;
   retryCount: number;
-  assignedAgentId: mongoose.Types.ObjectId;
+  assignedAgentId?: mongoose.Types.ObjectId | null;
   scheduledDate: Date;
   callLog?: ICallLog;
   interactionHistory: Array<{
@@ -91,7 +97,7 @@ const InteractionHistorySchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
+    enum: ['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
     required: true,
   },
   notes: {
@@ -114,8 +120,8 @@ const CallTaskSchema = new Schema<ICallTask>(
     },
     status: {
       type: String,
-      enum: ['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
-      default: 'sampled_in_queue',
+      enum: ['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
+      default: 'unassigned',
     },
     retryCount: {
       type: Number,
@@ -124,7 +130,8 @@ const CallTaskSchema = new Schema<ICallTask>(
     assignedAgentId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Assigned agent ID is required'],
+      required: false,
+      default: null,
     },
     scheduledDate: {
       type: Date,
@@ -153,6 +160,7 @@ CallTaskSchema.index({ assignedAgentId: 1, status: 1, scheduledDate: 1 }); // Co
 CallTaskSchema.index({ activityId: 1, farmerId: 1 }, { unique: true }); // UNIQUE: Prevent duplicate tasks for same farmer+activity
 CallTaskSchema.index({ createdAt: -1 }); // For recent tasks
 CallTaskSchema.index({ status: 1, scheduledDate: 1 }); // Compound: status + scheduled date for filtering
+CallTaskSchema.index({ status: 1, scheduledDate: 1, createdAt: -1 }); // For unassigned management
 
 export const CallTask = mongoose.model<ICallTask>('CallTask', CallTaskSchema);
 

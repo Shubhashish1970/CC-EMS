@@ -1,6 +1,5 @@
 import cron from 'node-cron';
 import { syncFFAData } from '../services/ffaSync.js';
-import { sampleAllActivities } from '../services/samplingService.js';
 import logger from '../config/logger.js';
 
 /**
@@ -21,20 +20,6 @@ export const setupCronJobs = (): void => {
     timezone: 'Asia/Kolkata',
   });
 
-  // Sampling: Run every 2 hours at minute 30 (after FFA sync)
-  cron.schedule('30 */2 * * *', async () => {
-    try {
-      logger.info('Starting scheduled sampling...');
-      const result = await sampleAllActivities();
-      logger.info(`Scheduled sampling completed: ${result.activitiesProcessed} activities, ${result.totalTasksCreated} tasks created`);
-    } catch (error) {
-      logger.error('Scheduled sampling failed:', error);
-    }
-  }, {
-    scheduled: true,
-    timezone: 'Asia/Kolkata',
-  });
-
-  logger.info('Cron jobs scheduled: FFA sync (hourly), Sampling (every 2 hours)');
+  logger.info('Cron jobs scheduled: FFA sync (hourly)');
 };
 

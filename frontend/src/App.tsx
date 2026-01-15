@@ -10,6 +10,7 @@ import ModuleSelection from './components/ModuleSelection';
 import AgentWorkspace from './components/AgentWorkspace';
 import TaskList from './components/TaskList';
 import AdminDashboardContainer from './components/AdminDashboard/AdminDashboardContainer';
+import TeamLeadDashboardContainer from './components/TeamLeadDashboard/TeamLeadDashboardContainer';
 
 // Component that routes based on user role
 const AppContent: React.FC = () => {
@@ -27,7 +28,7 @@ const AppContent: React.FC = () => {
 
   // Team Leads see Task Management
   if (user?.role === 'team_lead') {
-    return <TaskList />;
+    return <TeamLeadDashboardContainer />;
   }
 
   // Other roles (Sales Head, Marketing Head) - for now show Task List

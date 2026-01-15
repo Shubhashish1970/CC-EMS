@@ -49,6 +49,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     'dashboard.call_centre.own',
     'dashboard.call_centre.team',
     'reports.daily',
+    'config.sampling',
   ],
   mis_admin: [
     'tasks.view.own',

@@ -181,6 +181,17 @@ export const tasksAPI = {
     return apiRequest(`/tasks/team${query ? `?${query}` : ''}`);
   },
 
+  getUnassignedTasks: async (filters?: { dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+
+    const query = params.toString();
+    return apiRequest(`/tasks/unassigned${query ? `?${query}` : ''}`);
+  },
+
   reassignTask: async (taskId: string, agentId: string) => {
     return apiRequest(`/tasks/${taskId}/reassign`, {
       method: 'PUT',
@@ -210,6 +221,71 @@ export const tasksAPI = {
     return apiRequest('/tasks/bulk/status', {
       method: 'PUT',
       body: JSON.stringify({ taskIds, status, notes }),
+    });
+  },
+};
+
+// Sampling Control API (Team Lead)
+export const samplingAPI = {
+  getConfig: async () => {
+    return apiRequest('/sampling/config');
+  },
+  updateConfig: async (payload: {
+    activityCoolingDays?: number;
+    farmerCoolingDays?: number;
+    defaultPercentage?: number;
+    activityTypePercentages?: Record<string, number>;
+    eligibleActivityTypes?: string[];
+  }) => {
+    return apiRequest('/sampling/config', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+  listActivities: async (filters?: {
+    lifecycleStatus?: 'active' | 'sampled' | 'inactive' | 'not_eligible';
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.lifecycleStatus) params.append('lifecycleStatus', filters.lifecycleStatus);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+    const query = params.toString();
+    return apiRequest(`/sampling/activities${query ? `?${query}` : ''}`);
+  },
+  applyEligibility: async (eligibleActivityTypes: string[]) => {
+    return apiRequest('/sampling/apply-eligibility', {
+      method: 'POST',
+      body: JSON.stringify({ eligibleActivityTypes }),
+    });
+  },
+  reactivate: async (payload: {
+    confirm: 'YES';
+    activityIds?: string[];
+    fromStatus?: 'inactive' | 'not_eligible' | 'sampled';
+    deleteExistingTasks?: boolean;
+    deleteExistingAudit?: boolean;
+  }) => {
+    return apiRequest('/sampling/reactivate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  runSampling: async (payload: {
+    activityIds?: string[];
+    samplingPercentage?: number;
+    forceRun?: boolean;
+  }) => {
+    return apiRequest('/sampling/run', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   },
 };

@@ -4,6 +4,7 @@ import { TaskStatus } from '../models/CallTask.js';
  * Display labels for task statuses
  */
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  unassigned: 'Unassigned',
   sampled_in_queue: 'Sampled - in queue',
   in_progress: 'In Progress',
   completed: 'Completed',
