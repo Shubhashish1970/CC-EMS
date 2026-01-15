@@ -280,6 +280,9 @@ export const samplingAPI = {
   },
   runSampling: async (payload: {
     activityIds?: string[];
+    lifecycleStatus?: 'active' | 'sampled' | 'inactive' | 'not_eligible';
+    dateFrom?: string;
+    dateTo?: string;
     samplingPercentage?: number;
     forceRun?: boolean;
   }) => {

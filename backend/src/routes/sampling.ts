@@ -199,6 +199,8 @@ router.post(
     body('confirm').isIn(['YES']).withMessage('Type YES to confirm'),
     body('activityIds').optional().isArray(),
     body('fromStatus').optional().isIn(['inactive', 'not_eligible', 'sampled']),
+    body('dateFrom').optional().isISO8601(),
+    body('dateTo').optional().isISO8601(),
     body('deleteExistingTasks').optional().isBoolean(),
     body('deleteExistingAudit').optional().isBoolean(),
   ],
@@ -212,9 +214,17 @@ router.post(
         });
       }
 
-      const { activityIds, fromStatus, deleteExistingTasks, deleteExistingAudit } = req.body as any;
+      const { activityIds, fromStatus, dateFrom, dateTo, deleteExistingTasks, deleteExistingAudit } = req.body as any;
       const query: any = {};
+      // Default: reactivate the current filtered lifecycle bucket
       if (fromStatus) query.lifecycleStatus = fromStatus;
+      if (dateFrom || dateTo) {
+        query.date = {};
+        if (dateFrom) query.date.$gte = new Date(dateFrom);
+        if (dateTo) query.date.$lte = new Date(dateTo);
+      }
+
+      // Prefer explicit IDs if provided; otherwise reactivate all matching filters
       if (activityIds && Array.isArray(activityIds) && activityIds.length > 0) {
         query._id = { $in: activityIds };
       }
@@ -253,6 +263,9 @@ router.post(
   requirePermission('config.sampling'),
   [
     body('activityIds').optional().isArray(),
+    body('lifecycleStatus').optional().isIn(['active', 'sampled', 'inactive', 'not_eligible']),
+    body('dateFrom').optional().isISO8601(),
+    body('dateTo').optional().isISO8601(),
     body('samplingPercentage').optional().isFloat({ min: 1, max: 100 }),
     body('forceRun').optional().isBoolean(),
   ],
@@ -267,11 +280,39 @@ router.post(
       }
 
       const authUserId = (req as any).user?._id?.toString();
-      const { activityIds, samplingPercentage, forceRun } = req.body as any;
+      const { activityIds, lifecycleStatus, dateFrom, dateTo, samplingPercentage, forceRun } = req.body as any;
 
-      const ids: string[] = Array.isArray(activityIds) && activityIds.length > 0
-        ? activityIds
-        : (await Activity.find({ lifecycleStatus: 'active' }).select('_id').lean()).map(a => a._id.toString());
+      const MAX_BULK = 5000;
+      let matchedCount = 0;
+
+      let ids: string[] = [];
+      if (Array.isArray(activityIds) && activityIds.length > 0) {
+        ids = activityIds;
+        matchedCount = activityIds.length;
+      } else {
+        // Default to Active activities if no status is provided
+        const q: any = {
+          lifecycleStatus: lifecycleStatus || 'active',
+        };
+        if (dateFrom || dateTo) {
+          q.date = {};
+          if (dateFrom) q.date.$gte = new Date(dateFrom);
+          if (dateTo) q.date.$lte = new Date(dateTo);
+        }
+
+        matchedCount = await Activity.countDocuments(q);
+
+        const docs = await Activity.find(q)
+          .select('_id')
+          .sort({ date: -1 })
+          .limit(MAX_BULK)
+          .lean();
+        ids = docs.map((a) => a._id.toString());
+      }
+
+      if (matchedCount > MAX_BULK) {
+        logger.warn('Sampling run truncated by safety cap', { matchedCount, processed: ids.length, MAX_BULK });
+      }
 
       logger.info('Sampling run requested', { requestedCount: ids.length, forceRun: !!forceRun });
 
@@ -298,7 +339,8 @@ router.post(
         success: true,
         message: 'Sampling run completed',
         data: {
-          requested: ids.length,
+          matched: matchedCount,
+          processed: ids.length,
           sampledActivities,
           inactiveActivities,
           skipped,

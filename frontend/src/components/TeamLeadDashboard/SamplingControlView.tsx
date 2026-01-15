@@ -128,14 +128,13 @@ const SamplingControlView: React.FC = () => {
 
   const [activities, setActivities] = useState<any[]>([]);
   const [activityPagination, setActivityPagination] = useState<any>(null);
-  const [selectedActivityIds, setSelectedActivityIds] = useState<Set<string>>(new Set());
 
   const [unassignedTasks, setUnassignedTasks] = useState<any[]>([]);
   const [selectedUnassignedTaskIds, setSelectedUnassignedTaskIds] = useState<Set<string>>(new Set());
   const [agents, setAgents] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [bulkAssignAgentId, setBulkAssignAgentId] = useState<string>('');
 
-  const selectionCount = selectedActivityIds.size;
+  const totalMatchingActivities = Number(activityPagination?.total || 0);
 
   const loadConfig = async () => {
     const res: any = await samplingAPI.getConfig();
@@ -158,7 +157,6 @@ const SamplingControlView: React.FC = () => {
     });
     setActivities(res?.data?.activities || []);
     setActivityPagination(res?.data?.pagination || null);
-    setSelectedActivityIds(new Set());
   };
 
   const loadUnassigned = async () => {
@@ -175,7 +173,6 @@ const SamplingControlView: React.FC = () => {
 
   const handleResetSelections = () => {
     // Clear any checked rows and reset filters back to defaults
-    setSelectedActivityIds(new Set());
     setSelectedUnassignedTaskIds(new Set());
     setBulkAssignAgentId('');
     setActivityFilters({
@@ -218,27 +215,7 @@ const SamplingControlView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo, activityFilters.page, activityFilters.limit]);
 
-  const allSelectedOnPage = useMemo(() => {
-    if (!activities.length) return false;
-    return activities.every((a) => selectedActivityIds.has(a._id));
-  }, [activities, selectedActivityIds]);
-
-  const toggleSelectAllOnPage = () => {
-    const next = new Set(selectedActivityIds);
-    if (allSelectedOnPage) {
-      for (const a of activities) next.delete(a._id);
-    } else {
-      for (const a of activities) next.add(a._id);
-    }
-    setSelectedActivityIds(next);
-  };
-
-  const toggleActivitySelection = (id: string) => {
-    const next = new Set(selectedActivityIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedActivityIds(next);
-  };
+  // Note: Activities selection removed. Sampling runs on ALL activities matching current filters.
 
   const toggleEligibilityType = (type: string) => {
     const set = new Set(eligibleTypes);
@@ -283,14 +260,20 @@ const SamplingControlView: React.FC = () => {
   };
 
   const handleRunSampling = async () => {
-    if (selectionCount === 0) {
-      toast.showError('Select at least one activity');
+    if (totalMatchingActivities === 0) {
+      toast.showError('No activities match the current filters');
       return;
     }
     setIsLoading(true);
     try {
-      const res: any = await samplingAPI.runSampling({ activityIds: Array.from(selectedActivityIds) });
-      toast.showSuccess(`Sampling done. Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`);
+      const res: any = await samplingAPI.runSampling({
+        lifecycleStatus: activityFilters.lifecycleStatus,
+        dateFrom: activityFilters.dateFrom || undefined,
+        dateTo: activityFilters.dateTo || undefined,
+      });
+      toast.showSuccess(
+        `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
+      );
       await loadActivities();
       await loadUnassigned();
     } catch (e: any) {
@@ -301,22 +284,24 @@ const SamplingControlView: React.FC = () => {
   };
 
   const handleReactivateSelected = async () => {
-    if (selectionCount === 0) {
-      toast.showError('Select at least one activity');
+    if (totalMatchingActivities === 0) {
+      toast.showError('No activities match the current filters');
       return;
     }
-    const confirm = window.prompt('Type YES to confirm reactivating selected activities to Active');
+    const confirm = window.prompt('Type YES to confirm reactivating ALL matching activities to Active');
     if (confirm !== 'YES') return;
 
     setIsLoading(true);
     try {
       await samplingAPI.reactivate({
         confirm: 'YES',
-        activityIds: Array.from(selectedActivityIds),
+        fromStatus: activityFilters.lifecycleStatus,
+        dateFrom: activityFilters.dateFrom || undefined,
+        dateTo: activityFilters.dateTo || undefined,
         deleteExistingTasks: true,
         deleteExistingAudit: true,
       });
-      toast.showSuccess('Reactivated selected activities');
+      toast.showSuccess('Reactivated activities');
       await loadActivities();
       await loadUnassigned();
     } catch (e: any) {
@@ -496,19 +481,19 @@ const SamplingControlView: React.FC = () => {
             </button>
             <button
               onClick={handleRunSampling}
-              disabled={isLoading || selectionCount === 0}
+              disabled={isLoading || totalMatchingActivities === 0 || activityFilters.lifecycleStatus !== 'active'}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
             >
               <Play size={16} />
-              Run Sampling ({selectionCount})
+              Run Sampling (All {totalMatchingActivities})
             </button>
             <button
               onClick={handleReactivateSelected}
-              disabled={isLoading || selectionCount === 0}
+              disabled={isLoading || totalMatchingActivities === 0 || activityFilters.lifecycleStatus === 'active'}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
             >
               <RotateCcw size={16} />
-              Reactivate ({selectionCount})
+              Reactivate (All {totalMatchingActivities})
             </button>
           </div>
         </div>
@@ -656,29 +641,16 @@ const SamplingControlView: React.FC = () => {
 
         <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
           <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={toggleSelectAllOnPage}
-              className="flex items-center gap-2 text-sm font-black text-slate-700"
-            >
-              {allSelectedOnPage ? <CheckSquare size={16} /> : <Square size={16} />}
-              Select page
-            </button>
+            <div className="text-sm font-black text-slate-700">
+              Showing {activities.length} of {activityPagination?.total ?? 0}
+            </div>
             <div className="text-xs text-slate-500">
-              {activityPagination?.total ?? 0} total
+              Use Run Sampling / Reactivate to operate on all matching activities.
             </div>
           </div>
           <div className="divide-y divide-slate-100">
             {activities.map((a) => (
               <div key={a._id} className="px-4 py-3 flex items-start justify-between gap-4">
-                <button
-                  type="button"
-                  onClick={() => toggleActivitySelection(a._id)}
-                  className="mt-1"
-                  title="Select"
-                >
-                  {selectedActivityIds.has(a._id) ? <CheckSquare size={18} className="text-green-700" /> : <Square size={18} className="text-slate-400" />}
-                </button>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-black text-slate-900">{a.type}</span>
