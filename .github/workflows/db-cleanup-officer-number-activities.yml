@@ -14,7 +14,13 @@ jobs:
     steps:
       - name: Guard - require explicit confirmation
         run: |
-          if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
+          CONFIRM_INPUT="${{ github.event.inputs.confirm }}"
+          # Note: "Re-run jobs" doesn't provide workflow_dispatch inputs; default to YES as requested.
+          if [ -z "$CONFIRM_INPUT" ]; then
+            CONFIRM_INPUT="YES"
+          fi
+
+          if [ "$CONFIRM_INPUT" != "YES" ]; then
             echo "❌ Confirmation not provided. Re-run workflow with confirm=YES"
             exit 1
           fi
