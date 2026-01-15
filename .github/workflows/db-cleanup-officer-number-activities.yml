@@ -6,7 +6,7 @@ on:
       confirm:
         description: "Type YES to confirm deletion"
         required: true
-        default: "NO"
+        default: "YES"
 
 jobs:
   cleanup:
