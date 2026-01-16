@@ -699,7 +699,6 @@ const TaskDashboardView: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Agent</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Employee ID</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Languages</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Assigned</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
@@ -716,15 +715,16 @@ const TaskDashboardView: React.FC = () => {
                   <td className="px-4 py-3 text-xs font-bold text-slate-700">
                     {(Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).join(', ') || '—'}
                   </td>
-                  <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress}</td>
-                  <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen}</td>
+                  <td className="px-4 py-3 font-black text-slate-900">
+                    {Number(a.sampledInQueue || 0) + Number(a.inProgress || 0)}
+                  </td>
                 </tr>
               ))}
               {!agentRows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={7}>
+                  <td className="px-4 py-6 text-slate-600" colSpan={6}>
                     No agents found for this Team Lead.
                   </td>
                 </tr>
