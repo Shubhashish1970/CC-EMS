@@ -27,6 +27,19 @@ type LatestRun = {
   errorCount?: number;
 };
 
+type SortKey =
+  | 'type'
+  | 'totalActivities'
+  | 'active'
+  | 'sampled'
+  | 'inactive'
+  | 'notEligible'
+  | 'farmersTotal'
+  | 'sampledFarmers'
+  | 'tasksCreated'
+  | 'unassignedTasks';
+type SortDir = 'asc' | 'desc';
+
 const SamplingControlView: React.FC = () => {
   const toast = useToast();
 
@@ -34,6 +47,7 @@ const SamplingControlView: React.FC = () => {
   const [config, setConfig] = useState<any>(null);
   const [latestRun, setLatestRun] = useState<LatestRun | null>(null);
   const [isReactivateConfirmOpen, setIsReactivateConfirmOpen] = useState(false);
+  const [byTypeSort, setByTypeSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
   const [activityCoolingDays, setActivityCoolingDays] = useState<number>(5);
@@ -489,6 +503,63 @@ const SamplingControlView: React.FC = () => {
     return eligibleTypes.join(', ');
   }, [eligibleTypes]);
 
+  // Stable row order: by default keep a fixed type order so positions never jump on refresh.
+  const TYPE_ORDER: string[] = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
+  const typeRank = (t: string) => {
+    const idx = TYPE_ORDER.indexOf(t);
+    return idx === -1 ? 999 : idx;
+  };
+
+  const sortedByTypeRows = useMemo(() => {
+    const rows: any[] = Array.isArray(stats?.byType) ? [...stats.byType] : [];
+    const decorated = rows.map((row, idx) => ({ row, idx }));
+
+    const getNum = (v: any) => (typeof v === 'number' ? v : Number(v || 0));
+
+    const cmp = (a: any, b: any) => {
+      // Default: fixed order only (no sorting selected)
+      if (!byTypeSort) {
+        const ar = typeRank(a.row.type);
+        const br = typeRank(b.row.type);
+        if (ar !== br) return ar - br;
+        return a.idx - b.idx;
+      }
+
+      const { key, dir } = byTypeSort;
+      let diff = 0;
+
+      if (key === 'type') {
+        diff = typeRank(a.row.type) - typeRank(b.row.type);
+      } else {
+        diff = getNum(a.row[key]) - getNum(b.row[key]);
+      }
+
+      if (diff !== 0) return dir === 'asc' ? diff : -diff;
+
+      // Tie-breaker: fixed type order, then original index (stable)
+      const ar = typeRank(a.row.type);
+      const br = typeRank(b.row.type);
+      if (ar !== br) return ar - br;
+      return a.idx - b.idx;
+    };
+
+    decorated.sort(cmp);
+    return decorated.map((d) => d.row);
+  }, [stats, byTypeSort]);
+
+  const toggleByTypeSort = (key: SortKey) => {
+    setByTypeSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: 'desc' };
+      if (prev.dir === 'desc') return { key, dir: 'asc' };
+      return null; // third click resets to fixed default order
+    });
+  };
+
+  const sortIndicator = (key: SortKey) => {
+    if (!byTypeSort || byTypeSort.key !== key) return '';
+    return byTypeSort.dir === 'asc' ? ' ▲' : ' ▼';
+  };
+
   return (
     <div className="space-y-6">
       <Modal
@@ -888,20 +959,60 @@ const SamplingControlView: React.FC = () => {
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-white border-b border-slate-200">
                 <tr className="text-left">
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Total</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Active</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Sampled</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Inactive</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Not Eligible</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Total</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Sampled</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tasks</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('type')}>
+                        Type{sortIndicator('type')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('totalActivities')}>
+                        Total{sortIndicator('totalActivities')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('active')}>
+                        Active{sortIndicator('active')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('sampled')}>
+                        Sampled{sortIndicator('sampled')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('inactive')}>
+                        Inactive{sortIndicator('inactive')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('notEligible')}>
+                        Not Eligible{sortIndicator('notEligible')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('farmersTotal')}>
+                        Farmers Total{sortIndicator('farmersTotal')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('sampledFarmers')}>
+                        Farmers Sampled{sortIndicator('sampledFarmers')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('tasksCreated')}>
+                        Tasks{sortIndicator('tasksCreated')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                      <button type="button" className="hover:text-slate-700" onClick={() => toggleByTypeSort('unassignedTasks')}>
+                        Unassigned{sortIndicator('unassignedTasks')}
+                      </button>
+                    </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(stats?.byType || []).map((row: any) => (
+                  {sortedByTypeRows.map((row: any) => (
                   <tr key={row.type} className="bg-white">
                     <td className="px-4 py-3 font-black text-slate-900">{row.type}</td>
                     <td className="px-4 py-3 font-bold text-slate-700">{row.totalActivities}</td>
@@ -915,7 +1026,7 @@ const SamplingControlView: React.FC = () => {
                     <td className="px-4 py-3 font-bold text-slate-700">{row.unassignedTasks}</td>
                   </tr>
                 ))}
-                {(!stats?.byType || stats.byType.length === 0) && (
+                  {(!sortedByTypeRows || sortedByTypeRows.length === 0) && (
                   <tr>
                     <td className="px-4 py-6 text-slate-600" colSpan={10}>
                       No activities found in this date range.
