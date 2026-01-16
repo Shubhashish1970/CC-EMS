@@ -18,7 +18,9 @@ export interface ICallLog {
   productsDiscussed: string[];
   hasPurchased: boolean | null;
   willingToPurchase: boolean | null;
+  likelyPurchaseDate: string;
   nonPurchaseReason: string;
+  purchasedProducts: Array<{ product: string; quantity: string; unit: string }>;
   farmerComments: string; // Replaces agentObservations
   sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
 }
@@ -75,9 +77,23 @@ const CallLogSchema = new Schema<ICallLog>({
     type: Boolean,
     default: null,
   },
+  likelyPurchaseDate: {
+    type: String,
+    default: '',
+  },
   nonPurchaseReason: {
     type: String,
     default: '',
+  },
+  purchasedProducts: {
+    type: [
+      {
+        product: { type: String, default: '' },
+        quantity: { type: String, default: '' },
+        unit: { type: String, default: 'kg' },
+      },
+    ],
+    default: [],
   },
   farmerComments: {
     type: String,
