@@ -21,7 +21,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
 
   const tabs = [
     { id: 'sampling' as const, label: 'Sampling Control', icon: Sliders },
-    { id: 'tasks' as const, label: 'Task Management', icon: List },
+    { id: 'tasks' as const, label: 'Task Allocation', icon: List },
   ];
 
   return (
