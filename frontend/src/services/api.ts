@@ -291,6 +291,14 @@ export const samplingAPI = {
       body: JSON.stringify(payload),
     });
   },
+
+  getSummary: async (filters?: { dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/sampling/summary${query ? `?${query}` : ''}`);
+  },
 };
 
 // Users API (for MIS Admin)

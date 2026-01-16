@@ -18,6 +18,151 @@ router.use(authenticate);
 // Sampling Control (Team Lead + MIS Admin)
 // ============================================================================
 
+// @route   GET /api/sampling/summary
+// @desc    Quick sampling dashboard summary for date range (counts by activity type + lifecycle, sampled farmers, tasks)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/summary',
+  requirePermission('config.sampling'),
+  [
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { dateFrom, dateTo } = req.query as any;
+
+      const match: any = {};
+      if (dateFrom || dateTo) {
+        match.date = {};
+        if (dateFrom) match.date.$gte = new Date(dateFrom);
+        if (dateTo) match.date.$lte = new Date(dateTo);
+      }
+
+      // Aggregate per activity type + lifecycle status with joined sampling audit and tasks
+      const byType = await Activity.aggregate([
+        { $match: match },
+        {
+          $lookup: {
+            from: 'samplingaudits',
+            localField: '_id',
+            foreignField: 'activityId',
+            as: 'audit',
+          },
+        },
+        {
+          $lookup: {
+            from: 'calltasks',
+            localField: '_id',
+            foreignField: 'activityId',
+            as: 'tasks',
+          },
+        },
+        {
+          $addFields: {
+            sampledCount: {
+              $ifNull: [{ $arrayElemAt: ['$audit.sampledCount', 0] }, 0],
+            },
+            tasksCount: { $size: '$tasks' },
+          },
+        },
+        {
+          $group: {
+            _id: { type: '$type', lifecycleStatus: '$lifecycleStatus' },
+            activities: { $sum: 1 },
+            farmersSampled: { $sum: '$sampledCount' },
+            tasksTotal: { $sum: '$tasksCount' },
+          },
+        },
+      ]);
+
+      // Normalize into a nice payload
+      const types = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
+      const statuses = ['active', 'sampled', 'inactive', 'not_eligible'];
+
+      const byTypeMap = new Map<
+        string,
+        {
+          type: string;
+          activitiesTotal: number;
+          byLifecycle: Record<string, number>;
+          farmersSampled: number;
+          tasksTotal: number;
+        }
+      >();
+
+      for (const t of types) {
+        byTypeMap.set(t, {
+          type: t,
+          activitiesTotal: 0,
+          byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0])),
+          farmersSampled: 0,
+          tasksTotal: 0,
+        });
+      }
+
+      // Also allow unknown types to pass through
+      const ensureType = (t: string) => {
+        if (!byTypeMap.has(t)) {
+          byTypeMap.set(t, {
+            type: t,
+            activitiesTotal: 0,
+            byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0])),
+            farmersSampled: 0,
+            tasksTotal: 0,
+          });
+        }
+      };
+
+      let totals = {
+        activitiesTotal: 0,
+        byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0] as const)),
+        farmersSampled: 0,
+        tasksTotal: 0,
+      } as any;
+
+      for (const row of byType) {
+        const type = row?._id?.type || 'Unknown';
+        const lifecycleStatus = row?._id?.lifecycleStatus || 'active';
+        ensureType(type);
+
+        const entry = byTypeMap.get(type)!;
+        entry.byLifecycle[lifecycleStatus] = (entry.byLifecycle[lifecycleStatus] || 0) + (row.activities || 0);
+        entry.activitiesTotal += row.activities || 0;
+        entry.farmersSampled += row.farmersSampled || 0;
+        entry.tasksTotal += row.tasksTotal || 0;
+
+        totals.byLifecycle[lifecycleStatus] = (totals.byLifecycle[lifecycleStatus] || 0) + (row.activities || 0);
+        totals.activitiesTotal += row.activities || 0;
+        totals.farmersSampled += row.farmersSampled || 0;
+        totals.tasksTotal += row.tasksTotal || 0;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          dateRange: {
+            dateFrom: dateFrom ? new Date(dateFrom).toISOString().split('T')[0] : '',
+            dateTo: dateTo ? new Date(dateTo).toISOString().split('T')[0] : '',
+          },
+          totals,
+          byType: Array.from(byTypeMap.values()).filter((x) => x.activitiesTotal > 0),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/sampling/activities
 // @desc    List activities by lifecycle status (Sampling Control)
 // @access  Private (Team Lead, MIS Admin)
