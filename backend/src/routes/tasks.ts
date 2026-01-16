@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult, query } from 'express-validator';
 import { CallTask, ICallLog, TaskStatus } from '../models/CallTask.js';
 import { User } from '../models/User.js';
+import { Farmer } from '../models/Farmer.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/rbac.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -375,20 +376,18 @@ router.get(
         role: 'cc_agent',
         isActive: true,
       })
-        .select('_id name email employeeId')
+        .select('_id name email employeeId languageCapabilities')
         .sort({ name: 1 })
         .lean();
 
       const agentIds = agents.map((a) => a._id);
-
-      const farmersCollection = (await import('../models/Farmer.js')).Farmer.collection.name;
 
       // 1) Unassigned tasks by farmer preferredLanguage
       const byLanguageRaw = await CallTask.aggregate([
         { $match: { status: 'unassigned', ...dateMatch } },
         {
           $lookup: {
-            from: farmersCollection,
+            from: Farmer.collection.name,
             localField: 'farmerId',
             foreignField: '_id',
             as: 'farmer',
@@ -456,6 +455,7 @@ router.get(
           name: a.name,
           email: a.email,
           employeeId: a.employeeId,
+          languageCapabilities: Array.isArray((a as any).languageCapabilities) ? (a as any).languageCapabilities : [],
           sampledInQueue: c.sampled_in_queue,
           inProgress: c.in_progress,
           totalOpen: c.sampled_in_queue + c.in_progress,
@@ -472,6 +472,137 @@ router.get(
             totalUnassigned,
           },
           agentWorkload,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/tasks/allocate
+// @desc    Allocate unassigned tasks for a language to capable agents (round-robin); sets status to sampled_in_queue
+// @access  Private (Team Lead, MIS Admin)
+router.post(
+  '/allocate',
+  requirePermission('tasks.reassign'),
+  [
+    body('language').isString().notEmpty(),
+    body('count').optional().isInt({ min: 1, max: 500 }),
+    body('dateFrom').optional().isISO8601().toDate(),
+    body('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const { language, count = 100, dateFrom, dateTo } = req.body as any;
+
+      // Find capable agents under this team lead
+      const agents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+        languageCapabilities: language,
+      })
+        .select('_id name email')
+        .sort({ name: 1 })
+        .lean();
+
+      if (!agents.length) {
+        return res.status(400).json({
+          success: false,
+          error: { message: `No active agents found with language capability "${language}"` },
+        });
+      }
+
+      const dateMatch: any = {};
+      if (dateFrom || dateTo) {
+        dateMatch.scheduledDate = {};
+        if (dateFrom) {
+          const d = new Date(dateFrom);
+          d.setHours(0, 0, 0, 0);
+          dateMatch.scheduledDate.$gte = d;
+        }
+        if (dateTo) {
+          const d = new Date(dateTo);
+          d.setHours(23, 59, 59, 999);
+          dateMatch.scheduledDate.$lte = d;
+        }
+      }
+
+      // Find unassigned tasks for farmers of this language
+      const taskRows = await CallTask.aggregate([
+        { $match: { status: 'unassigned', ...dateMatch } },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: '$farmer' },
+        { $match: { 'farmer.preferredLanguage': language } },
+        { $sort: { scheduledDate: 1, createdAt: 1 } },
+        { $limit: Number(count) },
+        { $project: { _id: 1 } },
+      ]);
+
+      const taskIds = taskRows.map((r: any) => r._id);
+      if (!taskIds.length) {
+        return res.json({
+          success: true,
+          message: 'No unassigned tasks found for this language',
+          data: { requested: Number(count), allocated: 0 },
+        });
+      }
+
+      // Round-robin assignment across capable agents
+      const STATUS_UNASSIGNED: TaskStatus = 'unassigned';
+      const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
+
+      const bulkOps = taskIds.map((taskId: any, idx: number) => {
+        const agent = agents[idx % agents.length];
+        return {
+          updateOne: {
+            filter: { _id: taskId, status: STATUS_UNASSIGNED },
+            update: {
+              $set: {
+                assignedAgentId: agent._id,
+                status: STATUS_QUEUED,
+              },
+              $push: {
+                interactionHistory: {
+                  timestamp: new Date(),
+                  status: STATUS_QUEUED,
+                  notes: `Allocated by Team Lead (auto) to ${agent.email}`,
+                },
+              },
+            },
+          },
+        };
+      });
+
+      const result = await CallTask.bulkWrite(bulkOps as any, { ordered: false });
+
+      res.json({
+        success: true,
+        message: 'Tasks allocated successfully',
+        data: {
+          language,
+          requested: Number(count),
+          matchedTasks: taskIds.length,
+          allocated: result.modifiedCount || 0,
+          agentsUsed: agents.map((a) => ({ agentId: a._id.toString(), name: a.name, email: a.email })),
         },
       });
     } catch (error) {

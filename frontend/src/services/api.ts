@@ -198,6 +198,18 @@ export const tasksAPI = {
     const query = params.toString();
     return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
   },
+  allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string }) => {
+    // Allocation can update many tasks; allow longer timeout
+    return apiRequest(
+      '/tasks/allocate',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      undefined,
+      60000
+    );
+  },
 
   reassignTask: async (taskId: string, agentId: string) => {
     return apiRequest(`/tasks/${taskId}/reassign`, {

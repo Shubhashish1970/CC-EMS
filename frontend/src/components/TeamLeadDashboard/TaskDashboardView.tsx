@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar, RefreshCw } from 'lucide-react';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import Modal from '../shared/Modal';
 
 type DateRangePreset =
   | 'Custom'
@@ -32,6 +33,9 @@ const TaskDashboardView: React.FC = () => {
   const [data, setData] = useState<any>(null);
 
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '' });
+  const [allocLanguage, setAllocLanguage] = useState<string>('');
+  const [allocCount, setAllocCount] = useState<number>(0);
+  const [isAllocConfirmOpen, setIsAllocConfirmOpen] = useState(false);
 
   // Date range dropdown (same UX as Sampling Dashboard)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -154,12 +158,63 @@ const TaskDashboardView: React.FC = () => {
     return rows;
   }, [data]);
 
+  const unassignedTotalByLanguage = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of unassignedRows as any[]) {
+      map.set(r.language, Number(r.unassigned || 0));
+    }
+    return map;
+  }, [unassignedRows]);
+
   const agentRows = useMemo(() => {
     const rows = Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
     // stable order: name asc (backend already sorts by name, but keep stable)
     rows.sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
     return rows;
   }, [data]);
+
+  // Preselect the first language with unassigned tasks once data is loaded
+  useEffect(() => {
+    if (allocLanguage) return;
+    const first = (unassignedRows as any[]).find((r) => Number(r.unassigned || 0) > 0);
+    if (first?.language) setAllocLanguage(first.language);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unassignedRows]);
+
+  const openAllocateConfirm = () => {
+    if (!allocLanguage) {
+      toast.showError('Select a language to allocate');
+      return;
+    }
+    const available = Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
+    if (available <= 0) {
+      toast.showError('No unassigned tasks for the selected language');
+      return;
+    }
+    setIsAllocConfirmOpen(true);
+  };
+
+  const confirmAllocate = async () => {
+    const available = Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
+    const requested = allocCount && allocCount > 0 ? Math.min(allocCount, available) : available;
+
+    setIsAllocConfirmOpen(false);
+    setIsLoading(true);
+    try {
+      await tasksAPI.allocate({
+        language: allocLanguage,
+        count: requested,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      toast.showSuccess(`Allocated ${requested} task(s) for ${allocLanguage}`);
+      await loadDashboard();
+    } catch (e: any) {
+      toast.showError(e.message || 'Failed to allocate tasks');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -175,6 +230,49 @@ const TaskDashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <Modal
+        isOpen={isAllocConfirmOpen}
+        onClose={() => setIsAllocConfirmOpen(false)}
+        title="Confirm Allocation"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 font-medium">
+            Auto-allocate{' '}
+            <span className="font-black">
+              {allocCount && allocCount > 0
+                ? Math.min(allocCount, Number(unassignedTotalByLanguage.get(allocLanguage) || 0))
+                : Number(unassignedTotalByLanguage.get(allocLanguage) || 0)}
+            </span>{' '}
+            unassigned task(s) for <span className="font-black">{allocLanguage}</span> to capable agents?
+          </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs text-slate-700 font-bold">
+              Allocation will distribute tasks round-robin across agents who have this language capability and move tasks to{' '}
+              <span className="font-black">Sampled-in-queue</span>.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsAllocConfirmOpen(false)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmAllocate}
+              className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
+              disabled={isLoading}
+            >
+              Yes
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -317,6 +415,51 @@ const TaskDashboardView: React.FC = () => {
           </div>
         </div>
 
+        {/* Allocation controls */}
+        <div className="mt-4 flex flex-col md:flex-row md:items-end gap-3 md:justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:max-w-3xl">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Language</label>
+              <select
+                value={allocLanguage}
+                onChange={(e) => setAllocLanguage(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+              >
+                <option value="">Select language</option>
+                {unassignedRows
+                  .filter((r: any) => Number(r.unassigned || 0) > 0)
+                  .map((r: any) => (
+                    <option key={r.language} value={r.language}>
+                      {r.language} ({r.unassigned})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+                Count (optional)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={allocCount}
+                onChange={(e) => setAllocCount(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+                placeholder="0 = All"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={openAllocateConfirm}
+                disabled={isLoading || !allocLanguage || Number(unassignedTotalByLanguage.get(allocLanguage) || 0) === 0}
+                className="w-full px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
+              >
+                Auto-Allocate
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
           <table className="min-w-[520px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -347,7 +490,7 @@ const TaskDashboardView: React.FC = () => {
       {/* Agent workload */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-black text-slate-900">Agent Workload</h3>
-        <p className="text-sm text-slate-600 mt-1">Counts for Sampled-in-queue and In-progress (assigned workload)</p>
+        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress</p>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
           <table className="min-w-[780px] w-full text-sm">
@@ -355,6 +498,7 @@ const TaskDashboardView: React.FC = () => {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Agent</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Employee ID</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Assigned</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
@@ -368,6 +512,7 @@ const TaskDashboardView: React.FC = () => {
                     <div className="text-xs text-slate-500">{a.email}</div>
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.employeeId}</td>
+                  <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress}</td>
                   <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen}</td>
@@ -375,7 +520,7 @@ const TaskDashboardView: React.FC = () => {
               ))}
               {!agentRows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={5}>
+                  <td className="px-4 py-6 text-slate-600" colSpan={6}>
                     No agents found for this Team Lead.
                   </td>
                 </tr>
