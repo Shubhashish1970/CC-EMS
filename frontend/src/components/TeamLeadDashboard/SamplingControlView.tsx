@@ -333,7 +333,7 @@ const SamplingControlView: React.FC = () => {
       });
       // Requirement: if a type is not selected, activities of that type should move to Not Eligible.
       await samplingAPI.applyEligibility(eligibleTypes);
-      toast.showSuccess('Sampling config saved and eligibility applied');
+      toast.showSuccess('Saved & applied');
       await loadConfig();
       await loadStats();
     } catch (e: any) {
@@ -343,19 +343,7 @@ const SamplingControlView: React.FC = () => {
     }
   };
 
-  const handleChooseActivityTypeToSample = async () => {
-    setIsLoading(true);
-    try {
-      await samplingAPI.applyEligibility(eligibleTypes);
-      toast.showSuccess('Activity type selection applied');
-      await loadConfig();
-      await loadStats();
-    } catch (e: any) {
-      toast.showError(e.message || 'Failed to apply eligibility');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Note: Save & Apply is the single action (save config + apply eligibility).
 
   const handleRunSampling = async () => {
     if (totalMatchingByLifecycle === 0) {
@@ -619,15 +607,7 @@ const SamplingControlView: React.FC = () => {
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-green-700 hover:bg-green-800 text-white font-black"
             >
               <Save size={18} />
-              Save Config
-            </button>
-            <button
-              onClick={handleChooseActivityTypeToSample}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black"
-            >
-              <Filter size={18} />
-              Choose Activity Type to Sample
+              Save & Apply
             </button>
           </div>
         </div>
