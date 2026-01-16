@@ -16,6 +16,66 @@ type DateRangePreset =
   | 'Last 28 days'
   | 'Last 30 days';
 
+type SamplingRunStatus = 'running' | 'completed' | 'failed';
+type LatestRun = {
+  _id: string;
+  status: SamplingRunStatus;
+  matched?: number;
+  processed?: number;
+  tasksCreatedTotal?: number;
+  errorCount?: number;
+};
+
+const RunStatusInline: React.FC<{
+  loadLatestRunStatus: () => Promise<LatestRun | null>;
+  isLoading: boolean;
+}> = ({ loadLatestRunStatus, isLoading }) => {
+  const [run, setRun] = useState<LatestRun | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    let timer: any = null;
+
+    const tick = async () => {
+      try {
+        const r = await loadLatestRunStatus();
+        if (mounted) setRun(r);
+      } catch {
+        // ignore
+      }
+    };
+
+    tick();
+
+    const shouldPoll = isLoading || run?.status === 'running';
+    if (shouldPoll) {
+      timer = setInterval(tick, 2000);
+    }
+
+    return () => {
+      mounted = false;
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, run?.status]);
+
+  if (!run) return <span>Latest run: none</span>;
+
+  const statusLabel =
+    run.status === 'running' ? 'Running' : run.status === 'completed' ? 'Completed' : 'Failed';
+
+  const parts = [
+    `Latest run: ${statusLabel}`,
+    typeof run.processed === 'number' && typeof run.matched === 'number'
+      ? `Processed ${run.processed}/${run.matched}`
+      : null,
+    typeof run.tasksCreatedTotal === 'number' ? `Tasks ${run.tasksCreatedTotal}` : null,
+    typeof run.errorCount === 'number' && run.errorCount > 0 ? `Errors ${run.errorCount}` : null,
+  ].filter(Boolean);
+
+  return <span>{parts.join(' • ')}</span>;
+};
+
 const SamplingControlView: React.FC = () => {
   const toast = useToast();
 
@@ -168,6 +228,11 @@ const SamplingControlView: React.FC = () => {
     setStats(res?.data || null);
   };
 
+  const loadLatestRunStatus = async () => {
+    const res: any = await samplingAPI.getLatestRunStatus();
+    return res?.data?.run || null;
+  };
+
   const loadUnassigned = async () => {
     const res: any = await tasksAPI.getUnassignedTasks({ page: 1, limit: 50 });
     setUnassignedTasks(res?.data?.tasks || []);
@@ -284,7 +349,27 @@ const SamplingControlView: React.FC = () => {
       await loadStats();
       await loadUnassigned();
     } catch (e: any) {
-      toast.showError(e.message || 'Failed to run sampling');
+      // If the request timed out on the client, keep polling status instead of showing a hard error
+      const msg = e?.message || 'Failed to run sampling';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('timed out')) {
+        toast.showSuccess('Sampling is still running. Keeping this screen active and checking status...');
+        // Keep loading state; polling will stop when run completes, then refresh
+        const waitForCompletion = async () => {
+          for (let i = 0; i < 180; i++) { // ~6 minutes max
+            const run = await loadLatestRunStatus();
+            if (run && run.status !== 'running') {
+              await loadStats();
+              await loadUnassigned();
+              return;
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+          toast.showError('Sampling is taking longer than expected. Please refresh and check again.');
+        };
+        await waitForCompletion();
+      } else {
+        toast.showError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -509,6 +594,12 @@ const SamplingControlView: React.FC = () => {
               Reactivate (All {totalMatchingByLifecycle})
             </button>
           </div>
+        </div>
+
+        {/* Latest run status */}
+        <div className="mt-2 text-xs text-slate-500">
+          {/* This stays lightweight; details are pulled from the backend tracker */}
+          <RunStatusInline loadLatestRunStatus={loadLatestRunStatus} isLoading={isLoading} />
         </div>
 
         {/* Filters (move here; no per-activity sampling selection needed) */}

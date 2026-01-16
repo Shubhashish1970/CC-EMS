@@ -7,7 +7,9 @@ import { SamplingAudit } from '../models/SamplingAudit.js';
 import { Activity } from '../models/Activity.js';
 import { SamplingConfig } from '../models/SamplingConfig.js';
 import { CallTask } from '../models/CallTask.js';
+import { SamplingRun } from '../models/SamplingRun.js';
 import logger from '../config/logger.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -406,6 +408,7 @@ router.post(
     body('dateTo').optional().isISO8601(),
     body('samplingPercentage').optional().isFloat({ min: 1, max: 100 }),
     body('forceRun').optional().isBoolean(),
+    body('includeResults').optional().isBoolean(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -418,7 +421,7 @@ router.post(
       }
 
       const authUserId = (req as any).user?._id?.toString();
-      const { activityIds, lifecycleStatus, dateFrom, dateTo, samplingPercentage, forceRun } = req.body as any;
+      const { activityIds, lifecycleStatus, dateFrom, dateTo, samplingPercentage, forceRun, includeResults } = req.body as any;
 
       const MAX_BULK = 5000;
       let matchedCount = 0;
@@ -454,38 +457,136 @@ router.post(
 
       logger.info('Sampling run requested', { requestedCount: ids.length, forceRun: !!forceRun });
 
+      const shouldIncludeResults = includeResults === true; // default false to avoid huge payloads/timeouts
       const results: any[] = [];
       let tasksCreatedTotal = 0;
       let sampledActivities = 0;
       let inactiveActivities = 0;
       let skipped = 0;
+      const errorsList: string[] = [];
 
-      for (const id of ids) {
-        const r = await sampleAndCreateTasks(id, samplingPercentage, {
-          runByUserId: authUserId,
+      // Create a run tracker so the UI can poll status/progress
+      const runDoc = await SamplingRun.create({
+        createdByUserId: authUserId ? new mongoose.Types.ObjectId(authUserId) : null,
+        status: 'running',
+        startedAt: new Date(),
+        filters: {
+          lifecycleStatus: lifecycleStatus || 'active',
+          dateFrom: dateFrom ? new Date(dateFrom) : null,
+          dateTo: dateTo ? new Date(dateTo) : null,
+          samplingPercentage: samplingPercentage ?? null,
           forceRun: !!forceRun,
-          scheduledDate: new Date(),
-        });
-        results.push({ activityId: id, ...r });
-        tasksCreatedTotal += r.tasksCreated || 0;
-        if (r.skipped) skipped++;
-        if (r.activityLifecycleStatus === 'sampled') sampledActivities++;
-        if (r.activityLifecycleStatus === 'inactive') inactiveActivities++;
+        },
+        matched: matchedCount,
+        processed: 0,
+        tasksCreatedTotal: 0,
+        sampledActivities: 0,
+        inactiveActivities: 0,
+        skipped: 0,
+        errorCount: 0,
+        lastProgressAt: new Date(),
+        errorMessages: [],
+      });
+
+      const runId = runDoc._id.toString();
+
+      let processed = 0;
+      for (const id of ids) {
+        try {
+          const r = await sampleAndCreateTasks(id, samplingPercentage, {
+            runByUserId: authUserId,
+            forceRun: !!forceRun,
+            scheduledDate: new Date(),
+          });
+          if (shouldIncludeResults) {
+            results.push({ activityId: id, ...r });
+          }
+          tasksCreatedTotal += r.tasksCreated || 0;
+          if (r.skipped) skipped++;
+          if (r.activityLifecycleStatus === 'sampled') sampledActivities++;
+          if (r.activityLifecycleStatus === 'inactive') inactiveActivities++;
+        } catch (e: any) {
+          const msg = `Failed activity ${id}: ${e?.message || 'Unknown error'}`;
+          errorsList.push(msg);
+          logger.error(msg, e);
+        } finally {
+          processed++;
+          // Persist progress every 5 activities (or at end) to reduce DB writes
+          if (processed % 5 === 0 || processed === ids.length) {
+            await SamplingRun.updateOne(
+              { _id: runDoc._id },
+              {
+                $set: {
+                  processed,
+                  tasksCreatedTotal,
+                  sampledActivities,
+                  inactiveActivities,
+                  skipped,
+                  errorCount: errorsList.length,
+                  lastProgressAt: new Date(),
+                  lastActivityId: id,
+                  ...(errorsList.length ? { errorMessages: errorsList.slice(-50) } : {}),
+                },
+              }
+            );
+          }
+        }
       }
+
+      const finalStatus = errorsList.length > 0 && processed === 0 ? 'failed' : 'completed';
+      await SamplingRun.updateOne(
+        { _id: runDoc._id },
+        {
+          $set: {
+            status: finalStatus,
+            finishedAt: new Date(),
+            processed,
+            tasksCreatedTotal,
+            sampledActivities,
+            inactiveActivities,
+            skipped,
+            errorCount: errorsList.length,
+            lastProgressAt: new Date(),
+            errorMessages: errorsList.slice(-50),
+          },
+        }
+      );
 
       res.json({
         success: true,
         message: 'Sampling run completed',
         data: {
+          runId,
           matched: matchedCount,
           processed: ids.length,
           sampledActivities,
           inactiveActivities,
           skipped,
           tasksCreatedTotal,
-          results,
+          errorCount: errorsList.length,
+          errors: errorsList.slice(-10),
+          ...(shouldIncludeResults ? { results } : {}),
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/sampling/run-status/latest
+// @desc    Latest sampling run status for the current user (for UI polling)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/run-status/latest',
+  requirePermission('config.sampling'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUserId = (req as any).user?._id;
+      const run = await SamplingRun.findOne({ createdByUserId: authUserId })
+        .sort({ startedAt: -1 })
+        .lean();
+      res.json({ success: true, data: { run: run || null } });
     } catch (error) {
       next(error);
     }

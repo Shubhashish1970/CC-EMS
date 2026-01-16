@@ -267,11 +267,15 @@ export const samplingAPI = {
     const query = params.toString();
     return apiRequest(`/sampling/stats${query ? `?${query}` : ''}`);
   },
+  getLatestRunStatus: async () => {
+    return apiRequest('/sampling/run-status/latest');
+  },
   applyEligibility: async (eligibleActivityTypes: string[]) => {
+    // Can take time if updating many activities; allow longer timeout
     return apiRequest('/sampling/apply-eligibility', {
       method: 'POST',
       body: JSON.stringify({ eligibleActivityTypes }),
-    });
+    }, undefined, 60000);
   },
   reactivate: async (payload: {
     confirm: 'YES';
@@ -280,10 +284,11 @@ export const samplingAPI = {
     deleteExistingTasks?: boolean;
     deleteExistingAudit?: boolean;
   }) => {
+    // Bulk reactivation can take time if deleting tasks/audits; allow longer timeout
     return apiRequest('/sampling/reactivate', {
       method: 'POST',
       body: JSON.stringify(payload),
-    });
+    }, undefined, 180000);
   },
   runSampling: async (payload: {
     activityIds?: string[];
@@ -293,10 +298,11 @@ export const samplingAPI = {
     samplingPercentage?: number;
     forceRun?: boolean;
   }) => {
+    // Sampling can run longer than default 8s; allow a longer timeout
     return apiRequest('/sampling/run', {
       method: 'POST',
       body: JSON.stringify(payload),
-    });
+    }, undefined, 300000);
   },
 };
 
