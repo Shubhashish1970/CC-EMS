@@ -62,7 +62,23 @@ const UserManagementView: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        let filteredUsers = response.data.users || [];
+        let filteredUsers = (response.data.users || []).map((u: any) => {
+          // Backend populates teamLeadId (as an object) not "teamLead". Normalize for UI.
+          const populatedLead =
+            u?.teamLeadId && typeof u.teamLeadId === 'object'
+              ? {
+                  _id: u.teamLeadId._id,
+                  name: u.teamLeadId.name,
+                  email: u.teamLeadId.email,
+                }
+              : undefined;
+
+          return {
+            ...u,
+            teamLead: u.teamLead || populatedLead,
+            teamLeadId: populatedLead?._id || (typeof u.teamLeadId === 'string' ? u.teamLeadId : u.teamLeadId?._id),
+          };
+        });
 
         // Apply search filter
         if (filters.search.trim()) {
@@ -99,7 +115,7 @@ const UserManagementView: React.FC = () => {
 
       if (response.success && response.data) {
         setTeamLeads(
-          (response.data.users || []).map((user: User) => ({
+          (response.data.users || []).map((user: any) => ({
             _id: user._id,
             name: user.name,
             email: user.email,
