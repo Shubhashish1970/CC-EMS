@@ -1039,13 +1039,6 @@ const SamplingControlView: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h3 className="text-lg font-black text-slate-900">Task Insights</h3>
-        <p className="text-sm text-slate-600 mt-1">
-          Task listing has been removed from this page. Use <span className="font-black">Task Management</span> tab to view the Task Dashboard.
-        </p>
-      </div>
-
       {/* Keep config reference to avoid unused warning */}
       <div className="hidden">{config ? lifecycleLabel('active') : ''}{totalActivities}</div>
     </div>
