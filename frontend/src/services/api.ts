@@ -447,13 +447,12 @@ export const ffaAPI = {
   },
 
   importExcel: async (file: File) => {
-    const apiUrl = getApiUrl();
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
 
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${apiUrl}/ffa/import-excel`, {
+    const res = await fetch(`${API_BASE_URL}/ffa/import-excel`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       body: formData,
@@ -468,10 +467,9 @@ export const ffaAPI = {
   },
 
   downloadExcelTemplate: async () => {
-    const apiUrl = getApiUrl();
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
 
-    const res = await fetch(`${apiUrl}/ffa/excel-template`, {
+    const res = await fetch(`${API_BASE_URL}/ffa/excel-template`, {
       method: 'GET',
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
