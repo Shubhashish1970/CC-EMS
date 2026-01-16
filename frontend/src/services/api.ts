@@ -260,6 +260,13 @@ export const samplingAPI = {
     const query = params.toString();
     return apiRequest(`/sampling/activities${query ? `?${query}` : ''}`);
   },
+  getStats: async (filters?: { dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/sampling/stats${query ? `?${query}` : ''}`);
+  },
   applyEligibility: async (eligibleActivityTypes: string[]) => {
     return apiRequest('/sampling/apply-eligibility', {
       method: 'POST',
@@ -290,14 +297,6 @@ export const samplingAPI = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-  },
-
-  getSummary: async (filters?: { dateFrom?: string; dateTo?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
-    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
-    const query = params.toString();
-    return apiRequest(`/sampling/summary${query ? `?${query}` : ''}`);
   },
 };
 

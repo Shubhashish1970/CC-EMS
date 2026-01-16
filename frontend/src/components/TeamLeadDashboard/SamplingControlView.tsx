@@ -128,6 +128,7 @@ const SamplingControlView: React.FC = () => {
 
   const [activities, setActivities] = useState<any[]>([]);
   const [activityPagination, setActivityPagination] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
 
   const [unassignedTasks, setUnassignedTasks] = useState<any[]>([]);
   const [selectedUnassignedTaskIds, setSelectedUnassignedTaskIds] = useState<Set<string>>(new Set());
@@ -135,7 +136,6 @@ const SamplingControlView: React.FC = () => {
   const [bulkAssignAgentId, setBulkAssignAgentId] = useState<string>('');
 
   const totalMatchingActivities = Number(activityPagination?.total || 0);
-  const [summary, setSummary] = useState<any>(null);
 
   const loadConfig = async () => {
     const res: any = await samplingAPI.getConfig();
@@ -160,12 +160,12 @@ const SamplingControlView: React.FC = () => {
     setActivityPagination(res?.data?.pagination || null);
   };
 
-  const loadSummary = async () => {
-    const res: any = await samplingAPI.getSummary({
+  const loadStats = async () => {
+    const res: any = await samplingAPI.getStats({
       dateFrom: activityFilters.dateFrom || undefined,
       dateTo: activityFilters.dateTo || undefined,
     });
-    setSummary(res?.data || null);
+    setStats(res?.data || null);
   };
 
   const loadUnassigned = async () => {
@@ -198,7 +198,7 @@ const SamplingControlView: React.FC = () => {
     const init = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadConfig(), loadActivities(), loadSummary(), loadUnassigned(), loadAgents()]);
+        await Promise.all([loadConfig(), loadActivities(), loadStats(), loadUnassigned(), loadAgents()]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load sampling control data');
       } finally {
@@ -213,7 +213,7 @@ const SamplingControlView: React.FC = () => {
     const run = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadActivities(), loadSummary()]);
+        await Promise.all([loadActivities(), loadStats()]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load activities');
       } finally {
@@ -284,7 +284,6 @@ const SamplingControlView: React.FC = () => {
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
       );
       await loadActivities();
-      await loadSummary();
       await loadUnassigned();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to run sampling');
@@ -313,7 +312,6 @@ const SamplingControlView: React.FC = () => {
       });
       toast.showSuccess('Reactivated activities');
       await loadActivities();
-      await loadSummary();
       await loadUnassigned();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to reactivate');
@@ -325,7 +323,7 @@ const SamplingControlView: React.FC = () => {
   const handleRefresh = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadConfig(), loadActivities(), loadSummary(), loadUnassigned()]);
+      await Promise.all([loadConfig(), loadActivities(), loadUnassigned()]);
       toast.showSuccess('Refreshed');
     } catch (e: any) {
       toast.showError(e.message || 'Failed to refresh');
@@ -378,16 +376,6 @@ const SamplingControlView: React.FC = () => {
     if (!eligibleTypes.length) return 'All types eligible';
     return eligibleTypes.join(', ');
   }, [eligibleTypes]);
-
-  const lifecycleTitle = (s: string) => {
-    const map: Record<string, string> = {
-      active: 'Active',
-      sampled: 'Sampled',
-      inactive: 'Inactive',
-      not_eligible: 'Not Eligible',
-    };
-    return map[s] || s;
-  };
 
   return (
     <div className="space-y-6">
@@ -484,6 +472,89 @@ const SamplingControlView: React.FC = () => {
         </div>
       </div>
 
+      {/* Quick Dashboard */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Sampling Dashboard</h3>
+            <p className="text-sm text-slate-600">
+              Quick view by activity type for the selected date range
+              {activityFilters.dateFrom && activityFilters.dateTo
+                ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
+                : ''}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {[
+            { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0 },
+            { label: 'Active', value: stats?.totals?.active ?? 0 },
+            { label: 'Sampled', value: stats?.totals?.sampled ?? 0 },
+            { label: 'Inactive', value: stats?.totals?.inactive ?? 0 },
+            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0 },
+            { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0 },
+            { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0 },
+            { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0 },
+          ].map((card) => (
+            <div key={card.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-xl font-black text-slate-900">{card.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
+            <div className="text-sm font-black text-slate-700">By Activity Type</div>
+            <div className="text-xs text-slate-500">
+              Farmers sampled = sampling audit total; Tasks created = call tasks count
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead className="bg-white border-b border-slate-200">
+                <tr className="text-left">
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Total</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Active</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Sampled</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Inactive</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Not Eligible</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Total</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Sampled</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tasks</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(stats?.byType || []).map((row: any) => (
+                  <tr key={row.type} className="bg-white">
+                    <td className="px-4 py-3 font-black text-slate-900">{row.type}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.totalActivities}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.active}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampled}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.inactive}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.notEligible}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.farmersTotal}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampledFarmers}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.tasksCreated}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.unassignedTasks}</td>
+                  </tr>
+                ))}
+                {(!stats?.byType || stats.byType.length === 0) && (
+                  <tr>
+                    <td className="px-4 py-6 text-slate-600" colSpan={10}>
+                      No activities found in this date range.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -518,62 +589,6 @@ const SamplingControlView: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* Quick dashboard */}
-        {summary?.totals && (
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Activities</p>
-              <p className="text-xl font-black text-slate-900">{summary.totals.activitiesTotal || 0}</p>
-            </div>
-            <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Sampled</p>
-              <p className="text-xl font-black text-green-800">{summary.totals.byLifecycle?.sampled || 0}</p>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">Farmers Selected</p>
-              <p className="text-xl font-black text-blue-800">{summary.totals.farmersSampled || 0}</p>
-            </div>
-            <div className="bg-slate-900 rounded-xl p-3 border border-slate-900">
-              <p className="text-xs font-black text-slate-200 uppercase tracking-widest mb-1">Tasks Created</p>
-              <p className="text-xl font-black text-white">{summary.totals.tasksTotal || 0}</p>
-            </div>
-          </div>
-        )}
-
-        {Array.isArray(summary?.byType) && summary.byType.length > 0 && (
-          <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
-              Activity Type Summary (within date range)
-            </div>
-            <div className="divide-y divide-slate-100">
-              {summary.byType.map((row: any) => (
-                <div key={row.type} className="px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <div className="text-sm font-black text-slate-900">{row.type}</div>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-bold">
-                      Total {row.activitiesTotal || 0}
-                    </span>
-                    {['active', 'sampled', 'inactive', 'not_eligible'].map((s) => (
-                      <span
-                        key={s}
-                        className="px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-700 font-bold"
-                      >
-                        {lifecycleTitle(s)} {row.byLifecycle?.[s] || 0}
-                      </span>
-                    ))}
-                    <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-800 font-bold border border-blue-200">
-                      Farmers {row.farmersSampled || 0}
-                    </span>
-                    <span className="px-2 py-1 rounded-full bg-slate-900 text-white font-bold">
-                      Tasks {row.tasksTotal || 0}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>

@@ -18,15 +18,15 @@ router.use(authenticate);
 // Sampling Control (Team Lead + MIS Admin)
 // ============================================================================
 
-// @route   GET /api/sampling/summary
-// @desc    Quick sampling dashboard summary for date range (counts by activity type + lifecycle, sampled farmers, tasks)
+// @route   GET /api/sampling/stats
+// @desc    Sampling dashboard stats for a date range (counts by type + lifecycle + farmers sampled + tasks created)
 // @access  Private (Team Lead, MIS Admin)
 router.get(
-  '/summary',
+  '/stats',
   requirePermission('config.sampling'),
   [
-    query('dateFrom').optional().isISO8601().toDate(),
-    query('dateTo').optional().isISO8601().toDate(),
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -39,7 +39,6 @@ router.get(
       }
 
       const { dateFrom, dateTo } = req.query as any;
-
       const match: any = {};
       if (dateFrom || dateTo) {
         match.date = {};
@@ -47,12 +46,14 @@ router.get(
         if (dateTo) match.date.$lte = new Date(dateTo);
       }
 
-      // Aggregate per activity type + lifecycle status with joined sampling audit and tasks
-      const byType = await Activity.aggregate([
+      const auditCollection = SamplingAudit.collection.name;
+      const taskCollection = CallTask.collection.name;
+
+      const pipeline: any[] = [
         { $match: match },
         {
           $lookup: {
-            from: 'samplingaudits',
+            from: auditCollection,
             localField: '_id',
             foreignField: 'activityId',
             as: 'audit',
@@ -60,7 +61,7 @@ router.get(
         },
         {
           $lookup: {
-            from: 'calltasks',
+            from: taskCollection,
             localField: '_id',
             foreignField: 'activityId',
             as: 'tasks',
@@ -68,93 +69,85 @@ router.get(
         },
         {
           $addFields: {
-            sampledCount: {
+            farmersTotal: { $size: { $ifNull: ['$farmerIds', []] } },
+            sampledFarmers: {
               $ifNull: [{ $arrayElemAt: ['$audit.sampledCount', 0] }, 0],
             },
-            tasksCount: { $size: '$tasks' },
+            tasksCreated: { $size: { $ifNull: ['$tasks', []] } },
+            unassignedTasks: {
+              $size: {
+                $filter: {
+                  input: { $ifNull: ['$tasks', []] },
+                  as: 't',
+                  cond: { $eq: ['$$t.status', 'unassigned'] },
+                },
+              },
+            },
           },
         },
         {
           $group: {
-            _id: { type: '$type', lifecycleStatus: '$lifecycleStatus' },
-            activities: { $sum: 1 },
-            farmersSampled: { $sum: '$sampledCount' },
-            tasksTotal: { $sum: '$tasksCount' },
+            _id: '$type',
+            totalActivities: { $sum: 1 },
+            active: { $sum: { $cond: [{ $eq: ['$lifecycleStatus', 'active'] }, 1, 0] } },
+            sampled: { $sum: { $cond: [{ $eq: ['$lifecycleStatus', 'sampled'] }, 1, 0] } },
+            inactive: { $sum: { $cond: [{ $eq: ['$lifecycleStatus', 'inactive'] }, 1, 0] } },
+            notEligible: { $sum: { $cond: [{ $eq: ['$lifecycleStatus', 'not_eligible'] }, 1, 0] } },
+            farmersTotal: { $sum: '$farmersTotal' },
+            sampledFarmers: { $sum: '$sampledFarmers' },
+            tasksCreated: { $sum: '$tasksCreated' },
+            unassignedTasks: { $sum: '$unassignedTasks' },
           },
         },
-      ]);
+        { $sort: { totalActivities: -1 } },
+      ];
 
-      // Normalize into a nice payload
-      const types = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
-      const statuses = ['active', 'sampled', 'inactive', 'not_eligible'];
+      const byType = await Activity.aggregate(pipeline);
 
-      const byTypeMap = new Map<
-        string,
+      const totals = byType.reduce(
+        (acc: any, row: any) => {
+          acc.totalActivities += row.totalActivities || 0;
+          acc.active += row.active || 0;
+          acc.sampled += row.sampled || 0;
+          acc.inactive += row.inactive || 0;
+          acc.notEligible += row.notEligible || 0;
+          acc.farmersTotal += row.farmersTotal || 0;
+          acc.sampledFarmers += row.sampledFarmers || 0;
+          acc.tasksCreated += row.tasksCreated || 0;
+          acc.unassignedTasks += row.unassignedTasks || 0;
+          return acc;
+        },
         {
-          type: string;
-          activitiesTotal: number;
-          byLifecycle: Record<string, number>;
-          farmersSampled: number;
-          tasksTotal: number;
+          totalActivities: 0,
+          active: 0,
+          sampled: 0,
+          inactive: 0,
+          notEligible: 0,
+          farmersTotal: 0,
+          sampledFarmers: 0,
+          tasksCreated: 0,
+          unassignedTasks: 0,
         }
-      >();
-
-      for (const t of types) {
-        byTypeMap.set(t, {
-          type: t,
-          activitiesTotal: 0,
-          byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0])),
-          farmersSampled: 0,
-          tasksTotal: 0,
-        });
-      }
-
-      // Also allow unknown types to pass through
-      const ensureType = (t: string) => {
-        if (!byTypeMap.has(t)) {
-          byTypeMap.set(t, {
-            type: t,
-            activitiesTotal: 0,
-            byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0])),
-            farmersSampled: 0,
-            tasksTotal: 0,
-          });
-        }
-      };
-
-      let totals = {
-        activitiesTotal: 0,
-        byLifecycle: Object.fromEntries(statuses.map((s) => [s, 0] as const)),
-        farmersSampled: 0,
-        tasksTotal: 0,
-      } as any;
-
-      for (const row of byType) {
-        const type = row?._id?.type || 'Unknown';
-        const lifecycleStatus = row?._id?.lifecycleStatus || 'active';
-        ensureType(type);
-
-        const entry = byTypeMap.get(type)!;
-        entry.byLifecycle[lifecycleStatus] = (entry.byLifecycle[lifecycleStatus] || 0) + (row.activities || 0);
-        entry.activitiesTotal += row.activities || 0;
-        entry.farmersSampled += row.farmersSampled || 0;
-        entry.tasksTotal += row.tasksTotal || 0;
-
-        totals.byLifecycle[lifecycleStatus] = (totals.byLifecycle[lifecycleStatus] || 0) + (row.activities || 0);
-        totals.activitiesTotal += row.activities || 0;
-        totals.farmersSampled += row.farmersSampled || 0;
-        totals.tasksTotal += row.tasksTotal || 0;
-      }
+      );
 
       res.json({
         success: true,
         data: {
-          dateRange: {
-            dateFrom: dateFrom ? new Date(dateFrom).toISOString().split('T')[0] : '',
-            dateTo: dateTo ? new Date(dateTo).toISOString().split('T')[0] : '',
-          },
+          dateFrom: dateFrom || null,
+          dateTo: dateTo || null,
           totals,
-          byType: Array.from(byTypeMap.values()).filter((x) => x.activitiesTotal > 0),
+          byType: byType.map((r: any) => ({
+            type: r._id,
+            totalActivities: r.totalActivities,
+            active: r.active,
+            sampled: r.sampled,
+            inactive: r.inactive,
+            notEligible: r.notEligible,
+            farmersTotal: r.farmersTotal,
+            sampledFarmers: r.sampledFarmers,
+            tasksCreated: r.tasksCreated,
+            unassignedTasks: r.unassignedTasks,
+          })),
         },
       });
     } catch (error) {
