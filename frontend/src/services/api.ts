@@ -466,6 +466,32 @@ export const ffaAPI = {
     }
     return json;
   },
+
+  downloadExcelTemplate: async () => {
+    const apiUrl = getApiUrl();
+    const token = localStorage.getItem('token');
+
+    const res = await fetch(`${apiUrl}/ffa/excel-template`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      const msg = json?.error?.message || json?.message || `Download failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ffa_ems_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 // AI API

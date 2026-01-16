@@ -15,6 +15,7 @@ import logger from '../config/logger.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25MB
+const TEMPLATE_FILENAME = 'ffa_ems_template.xlsx';
 
 // All routes require authentication
 router.use(authenticate);
@@ -92,6 +93,13 @@ const splitCSVCell = (value: any): string[] => {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+};
+
+const formatDDMMYYYY = (d: Date): string => {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(d.getFullYear());
+  return `${dd}/${mm}/${yyyy}`;
 };
 
 // @route   POST /api/ffa/sync
@@ -174,6 +182,75 @@ router.post(
           hasEnvVar: !!process.env.FFA_API_URL,
         },
       });
+    }
+  }
+);
+
+// @route   GET /api/ffa/excel-template
+// @desc    Download Excel template (2 sheets: Activities + Farmers) with sample rows
+// @access  Private (MIS Admin)
+router.get(
+  '/excel-template',
+  requirePermission('config.ffa'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      const activitiesSample = [
+        {
+          activityId: 'FFA-ACT-EX-0001',
+          type: 'Field Day',
+          date: formatDDMMYYYY(new Date()),
+          officerId: 'FDA-0001',
+          officerName: 'Officer Name',
+          tmEmpCode: 'TM-0001',
+          tmName: 'TM Name',
+          location: 'Village Name',
+          territory: 'Karnataka Zone',
+          state: 'Karnataka',
+          territoryName: 'Karnataka Zone',
+          zoneName: 'South Zone',
+          buName: 'BU - Seeds',
+          crops: 'Rice,Wheat',
+          products: 'NACL Pro,NACL Gold',
+        },
+      ];
+
+      const farmersSample = [
+        {
+          activityId: 'FFA-ACT-EX-0001',
+          farmerId: 'FFA-FARM-EX-1',
+          name: 'Farmer Name',
+          mobileNumber: '9000000000',
+          location: 'Village, District, State',
+          territory: 'Karnataka Zone',
+          photoUrl: '',
+          crops: 'Rice',
+        },
+        {
+          activityId: 'FFA-ACT-EX-0001',
+          farmerId: 'FFA-FARM-EX-2',
+          name: 'Farmer Name 2',
+          mobileNumber: '9000000001',
+          location: 'Village, District, State',
+          territory: 'Karnataka Zone',
+          photoUrl: '',
+          crops: 'Wheat',
+        },
+      ];
+
+      const wsActivities = XLSX.utils.json_to_sheet(activitiesSample, { skipHeader: false });
+      const wsFarmers = XLSX.utils.json_to_sheet(farmersSample, { skipHeader: false });
+      XLSX.utils.book_append_sheet(wb, wsActivities, 'Activities');
+      XLSX.utils.book_append_sheet(wb, wsFarmers, 'Farmers');
+
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${TEMPLATE_FILENAME}"`);
+      res.status(200).send(buf);
+    } catch (error) {
+      next(error);
     }
   }
 );

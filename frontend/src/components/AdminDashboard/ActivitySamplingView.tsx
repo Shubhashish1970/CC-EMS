@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
-import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3 } from 'lucide-react';
+import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
 import Button from '../shared/Button';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
@@ -323,6 +323,14 @@ const ActivitySamplingView: React.FC = () => {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      await ffaAPI.downloadExcelTemplate();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to download template');
+    }
+  };
+
   const getSamplingStatusBadge = (status: 'sampled' | 'not_sampled' | 'partial') => {
     const config = {
       sampled: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Sampled' },
@@ -434,26 +442,29 @@ const ActivitySamplingView: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-2 py-1">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data Source</span>
-              <button
-                type="button"
-                onClick={() => setDataSource('api')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  dataSource === 'api' ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-600 hover:bg-white'
-                }`}
-              >
-                API
-              </button>
-              <button
-                type="button"
-                onClick={() => setDataSource('excel')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  dataSource === 'excel' ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-600 hover:bg-white'
-                }`}
-              >
-                Excel
-              </button>
+            {/* iPhone-style toggle */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Source</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-black ${dataSource === 'api' ? 'text-slate-900' : 'text-slate-400'}`}>API</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={dataSource === 'excel'}
+                  onClick={() => setDataSource((p) => (p === 'api' ? 'excel' : 'api'))}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full border transition-colors ${
+                    dataSource === 'excel' ? 'bg-green-700 border-green-700' : 'bg-slate-200 border-slate-300'
+                  }`}
+                  title="Toggle data source"
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      dataSource === 'excel' ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-xs font-black ${dataSource === 'excel' ? 'text-slate-900' : 'text-slate-400'}`}>Excel</span>
+              </div>
             </div>
             <Button
               variant="secondary"
@@ -519,6 +530,14 @@ const ActivitySamplingView: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center justify-center h-10 w-10 rounded-2xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    title="Download Excel template"
+                  >
+                    <ArrowDownToLine size={18} />
+                  </button>
                   <Button
                     variant="primary"
                     size="sm"
@@ -526,7 +545,7 @@ const ActivitySamplingView: React.FC = () => {
                     disabled={!excelFile || isImportingExcel}
                     title="Upload and import activities & farmers"
                   >
-                    <Download size={16} className={isImportingExcel ? 'animate-spin' : ''} />
+                    <ArrowUpToLine size={16} className={isImportingExcel ? 'animate-spin' : ''} />
                     {isImportingExcel ? 'Importing...' : 'Upload & Import'}
                   </Button>
                 </div>
