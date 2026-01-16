@@ -300,7 +300,11 @@ router.post(
       const { eligibleActivityTypes } = req.body as { eligibleActivityTypes: string[] };
       const allTypes = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
       const eligibleSet = new Set(eligibleActivityTypes || []);
-      const disabledTypes = allTypes.filter((t) => !eligibleSet.has(t));
+      // If eligibleActivityTypes is empty, treat as "all eligible" (consistent with config semantics)
+      const enabledTypes =
+        !eligibleActivityTypes || eligibleActivityTypes.length === 0 ? allTypes : Array.from(eligibleSet);
+      const enabledSet = new Set(enabledTypes);
+      const disabledTypes = allTypes.filter((t) => !enabledSet.has(t));
 
       // Persist config as well (source-of-truth)
       await SamplingConfig.findOneAndUpdate(
@@ -309,8 +313,8 @@ router.post(
         { upsert: true, new: true }
       );
 
-      // Mark activities of disabled types as not_eligible, but do not touch already-sampled activities.
-      const result = await Activity.updateMany(
+      // 1) Mark activities of disabled types as not_eligible, but do not touch already-sampled activities.
+      const toNotEligible = await Activity.updateMany(
         {
           type: { $in: disabledTypes },
           lifecycleStatus: { $ne: 'sampled' },
@@ -318,10 +322,25 @@ router.post(
         { $set: { lifecycleStatus: 'not_eligible', lifecycleUpdatedAt: new Date() } }
       );
 
-      res.json({
-        success: true,
+      // 2) Re-enable: move not_eligible activities back to active for enabled types (again, do not touch sampled)
+      // This makes eligibility toggles reversible via "Save & Apply".
+      const toActive = await Activity.updateMany(
+        {
+          type: { $in: enabledTypes },
+          lifecycleStatus: 'not_eligible',
+        },
+        { $set: { lifecycleStatus: 'active', lifecycleUpdatedAt: new Date() } }
+      );
+
+    res.json({
+      success: true,
         message: 'Eligibility applied (disabled types moved to Not Eligible)',
-        data: { disabledTypes, modifiedCount: result.modifiedCount },
+      data: {
+          disabledTypes,
+          enabledTypes,
+          movedToNotEligible: toNotEligible.modifiedCount,
+          movedToActive: toActive.modifiedCount,
+        },
       });
     } catch (error) {
       next(error);
@@ -566,8 +585,8 @@ router.post(
           errorCount: errorsList.length,
           errors: errorsList.slice(-10),
           ...(shouldIncludeResults ? { results } : {}),
-        },
-      });
+      },
+    });
     } catch (error) {
       next(error);
     }
