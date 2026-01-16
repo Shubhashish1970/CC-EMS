@@ -22,7 +22,7 @@ interface Task {
     crops?: string[];
     products?: string[];
   };
-  status: 'sampled_in_queue' | 'in_progress';
+  status: 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
   scheduledDate: string;
   createdAt: string;
 }
@@ -40,7 +40,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'in_progress' | 'sampled_in_queue'>('all');
+  const [filter, setFilter] = useState<'all' | 'in_progress' | 'sampled_in_queue' | 'completed'>('all');
 
   useEffect(() => {
     if (isOpen) {
@@ -98,15 +98,22 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     const matchesFilter = 
       filter === 'all' || 
       (filter === 'in_progress' && task.status === 'in_progress') ||
-      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue'); // Queue shows only sampled_in_queue
+      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue') || // Queue shows only sampled_in_queue
+      (filter === 'completed' && (task.status === 'completed' || task.status === 'not_reachable' || task.status === 'invalid_number'));
     
     return matchesSearch && matchesFilter;
   });
 
-  // Sort tasks: in_progress first, then by scheduled date
+  // Sort tasks: in_progress first, then queue, then completed; within group by scheduled date
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
-    if (a.status !== 'in_progress' && b.status === 'in_progress') return 1;
+    const rank = (s: Task['status']) => {
+      if (s === 'in_progress') return 0;
+      if (s === 'sampled_in_queue') return 1;
+      return 2; // completed/not_reachable/invalid_number
+    };
+    const rA = rank(a.status);
+    const rB = rank(b.status);
+    if (rA !== rB) return rA - rB;
     return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
   });
 
@@ -208,6 +215,16 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             >
               Queue
             </button>
+            <button
+              onClick={() => setFilter('completed')}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+                filter === 'completed'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Completed
+            </button>
           </div>
         </div>
 
@@ -246,15 +263,21 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               {sortedTasks.map((task) => {
                 const isSelected = selectedTaskId === task.taskId;
                 const isInProgress = task.status === 'in_progress';
+                const isCompleted = task.status === 'completed' || task.status === 'not_reachable' || task.status === 'invalid_number';
 
                 return (
                   <button
                     key={task.taskId}
-                    onClick={() => !isLoadingTask && handleSelectTask(task)}
-                    disabled={isLoadingTask}
+                    onClick={() => {
+                      if (isLoadingTask) return;
+                      // Completed tasks are shown for visibility but cannot be loaded into an active call flow.
+                      if (isCompleted) return;
+                      handleSelectTask(task);
+                    }}
+                    disabled={isLoadingTask || isCompleted}
                     className={`w-full px-6 py-4 hover:bg-white active:bg-slate-50 transition-colors flex items-center gap-4 ${
                       isSelected ? 'bg-green-50' : ''
-                    } ${isLoadingTask ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${(isLoadingTask || isCompleted) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     {/* Profile Icon/Photo - Light theme */}
                     <div className="flex-shrink-0 relative">

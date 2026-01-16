@@ -12,7 +12,7 @@ export interface TaskAssignmentOptions {
 }
 
 /**
- * Get all available tasks for an agent (sampled_in_queue and in_progress)
+ * Get all tasks for an agent that can be shown in the dialer (queue/in-progress + completed outcomes)
  * Returns list of tasks sorted by scheduledDate (earliest first)
  */
 export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallTask[]> => {
@@ -28,7 +28,7 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
     // Agents should be able to see and work on tasks immediately after sampling
     const tasks = await CallTask.find({
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
-      status: { $in: ['sampled_in_queue', 'in_progress'] },
+      status: { $in: ['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'] },
     })
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
       // Agent view needs: FDA (officerName), TM, Territory, State (+ optional legacy territory)
@@ -58,10 +58,16 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
       statusBreakdown: {
         sampled_in_queue: tasks.filter(t => t.status === 'sampled_in_queue').length,
         in_progress: tasks.filter(t => t.status === 'in_progress').length,
+        completed: tasks.filter(t => t.status === 'completed').length,
+        not_reachable: tasks.filter(t => t.status === 'not_reachable').length,
+        invalid_number: tasks.filter(t => t.status === 'invalid_number').length,
       },
       languageFilteredStatusBreakdown: {
         sampled_in_queue: languageFilteredTasks.filter(t => t.status === 'sampled_in_queue').length,
         in_progress: languageFilteredTasks.filter(t => t.status === 'in_progress').length,
+        completed: languageFilteredTasks.filter(t => t.status === 'completed').length,
+        not_reachable: languageFilteredTasks.filter(t => t.status === 'not_reachable').length,
+        invalid_number: languageFilteredTasks.filter(t => t.status === 'invalid_number').length,
       },
     });
 
