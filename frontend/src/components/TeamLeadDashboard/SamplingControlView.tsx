@@ -31,8 +31,6 @@ const SamplingControlView: React.FC = () => {
     lifecycleStatus: 'active' as LifecycleStatus,
     dateFrom: '',
     dateTo: '',
-    page: 1,
-    limit: 20,
   });
 
   // Date range dropdown (same UX as Admin Activity Sampling)
@@ -126,8 +124,6 @@ const SamplingControlView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDatePickerOpen]);
 
-  const [activities, setActivities] = useState<any[]>([]);
-  const [activityPagination, setActivityPagination] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
 
   const [unassignedTasks, setUnassignedTasks] = useState<any[]>([]);
@@ -135,7 +131,23 @@ const SamplingControlView: React.FC = () => {
   const [agents, setAgents] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [bulkAssignAgentId, setBulkAssignAgentId] = useState<string>('');
 
-  const totalMatchingActivities = Number(activityPagination?.total || 0);
+  const totalActivities = Number(stats?.totals?.totalActivities || 0);
+  const totalMatchingByLifecycle = useMemo(() => {
+    const t = stats?.totals;
+    if (!t) return 0;
+    switch (activityFilters.lifecycleStatus) {
+      case 'active':
+        return Number(t.active || 0);
+      case 'sampled':
+        return Number(t.sampled || 0);
+      case 'inactive':
+        return Number(t.inactive || 0);
+      case 'not_eligible':
+        return Number(t.notEligible || 0);
+      default:
+        return 0;
+    }
+  }, [stats, activityFilters.lifecycleStatus]);
 
   const loadConfig = async () => {
     const res: any = await samplingAPI.getConfig();
@@ -146,18 +158,6 @@ const SamplingControlView: React.FC = () => {
     setActivityCoolingDays(Number(cfg?.activityCoolingDays ?? 5));
     setFarmerCoolingDays(Number(cfg?.farmerCoolingDays ?? 30));
     setDefaultPercentage(Number(cfg?.defaultPercentage ?? 10));
-  };
-
-  const loadActivities = async () => {
-    const res: any = await samplingAPI.listActivities({
-      lifecycleStatus: activityFilters.lifecycleStatus,
-      dateFrom: activityFilters.dateFrom || undefined,
-      dateTo: activityFilters.dateTo || undefined,
-      page: activityFilters.page,
-      limit: activityFilters.limit,
-    });
-    setActivities(res?.data?.activities || []);
-    setActivityPagination(res?.data?.pagination || null);
   };
 
   const loadStats = async () => {
@@ -188,8 +188,6 @@ const SamplingControlView: React.FC = () => {
       lifecycleStatus: 'active',
       dateFrom: '',
       dateTo: '',
-      page: 1,
-      limit: 20,
     });
     toast.showSuccess('Selections cleared');
   };
@@ -198,7 +196,7 @@ const SamplingControlView: React.FC = () => {
     const init = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadConfig(), loadActivities(), loadStats(), loadUnassigned(), loadAgents()]);
+        await Promise.all([loadConfig(), loadStats(), loadUnassigned(), loadAgents()]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load sampling control data');
       } finally {
@@ -213,16 +211,16 @@ const SamplingControlView: React.FC = () => {
     const run = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadActivities(), loadStats()]);
+        await Promise.all([loadStats()]);
       } catch (e: any) {
-        toast.showError(e.message || 'Failed to load activities');
+        toast.showError(e.message || 'Failed to load dashboard');
       } finally {
         setIsLoading(false);
       }
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo, activityFilters.page, activityFilters.limit]);
+  }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo]);
 
   // Note: Activities selection removed. Sampling runs on ALL activities matching current filters.
 
@@ -246,7 +244,7 @@ const SamplingControlView: React.FC = () => {
       await samplingAPI.applyEligibility(eligibleTypes);
       toast.showSuccess('Sampling config saved and eligibility applied');
       await loadConfig();
-      await loadActivities();
+      await loadStats();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to save config');
     } finally {
@@ -260,7 +258,7 @@ const SamplingControlView: React.FC = () => {
       await samplingAPI.applyEligibility(eligibleTypes);
       toast.showSuccess('Activity type selection applied');
       await loadConfig();
-      await loadActivities();
+      await loadStats();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to apply eligibility');
     } finally {
@@ -269,7 +267,7 @@ const SamplingControlView: React.FC = () => {
   };
 
   const handleRunSampling = async () => {
-    if (totalMatchingActivities === 0) {
+    if (totalMatchingByLifecycle === 0) {
       toast.showError('No activities match the current filters');
       return;
     }
@@ -283,7 +281,7 @@ const SamplingControlView: React.FC = () => {
       toast.showSuccess(
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
       );
-      await loadActivities();
+      await loadStats();
       await loadUnassigned();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to run sampling');
@@ -293,7 +291,7 @@ const SamplingControlView: React.FC = () => {
   };
 
   const handleReactivateSelected = async () => {
-    if (totalMatchingActivities === 0) {
+    if (totalMatchingByLifecycle === 0) {
       toast.showError('No activities match the current filters');
       return;
     }
@@ -311,7 +309,7 @@ const SamplingControlView: React.FC = () => {
         deleteExistingAudit: true,
       });
       toast.showSuccess('Reactivated activities');
-      await loadActivities();
+      await loadStats();
       await loadUnassigned();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to reactivate');
@@ -323,7 +321,7 @@ const SamplingControlView: React.FC = () => {
   const handleRefresh = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadConfig(), loadActivities(), loadUnassigned()]);
+      await Promise.all([loadConfig(), loadStats(), loadUnassigned()]);
       toast.showSuccess('Refreshed');
     } catch (e: any) {
       toast.showError(e.message || 'Failed to refresh');
@@ -484,118 +482,42 @@ const SamplingControlView: React.FC = () => {
                 : ''}
             </p>
           </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          {[
-            { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0 },
-            { label: 'Active', value: stats?.totals?.active ?? 0 },
-            { label: 'Sampled', value: stats?.totals?.sampled ?? 0 },
-            { label: 'Inactive', value: stats?.totals?.inactive ?? 0 },
-            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0 },
-            { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0 },
-            { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0 },
-            { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0 },
-          ].map((card) => (
-            <div key={card.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-xl font-black text-slate-900">{card.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-5 border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
-            <div className="text-sm font-black text-slate-700">By Activity Type</div>
-            <div className="text-xs text-slate-500">
-              Farmers sampled = sampling audit total; Tasks created = call tasks count
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[900px] w-full text-sm">
-              <thead className="bg-white border-b border-slate-200">
-                <tr className="text-left">
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Total</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Active</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Sampled</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Inactive</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Not Eligible</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Total</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Sampled</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tasks</th>
-                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(stats?.byType || []).map((row: any) => (
-                  <tr key={row.type} className="bg-white">
-                    <td className="px-4 py-3 font-black text-slate-900">{row.type}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.totalActivities}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.active}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampled}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.inactive}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.notEligible}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.farmersTotal}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampledFarmers}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.tasksCreated}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.unassignedTasks}</td>
-                  </tr>
-                ))}
-                {(!stats?.byType || stats.byType.length === 0) && (
-                  <tr>
-                    <td className="px-4 py-6 text-slate-600" colSpan={10}>
-                      No activities found in this date range.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-black text-slate-900">Activities</h3>
-            <p className="text-sm text-slate-600">Select activities and run sampling or reactivate</p>
-          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleResetSelections}
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
-              title="Clear selections and reset filters"
+              title="Reset lifecycle/date range filters"
             >
               <RotateCcw size={16} />
               Reset
             </button>
             <button
               onClick={handleRunSampling}
-              disabled={isLoading || totalMatchingActivities === 0 || activityFilters.lifecycleStatus !== 'active'}
+              disabled={isLoading || totalMatchingByLifecycle === 0 || activityFilters.lifecycleStatus !== 'active'}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
             >
               <Play size={16} />
-              Run Sampling (All {totalMatchingActivities})
+              Run Sampling (All {totalMatchingByLifecycle})
             </button>
             <button
               onClick={handleReactivateSelected}
-              disabled={isLoading || totalMatchingActivities === 0 || activityFilters.lifecycleStatus === 'active'}
+              disabled={isLoading || totalMatchingByLifecycle === 0 || activityFilters.lifecycleStatus === 'active'}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
             >
               <RotateCcw size={16} />
-              Reactivate (All {totalMatchingActivities})
+              Reactivate (All {totalMatchingByLifecycle})
             </button>
           </div>
         </div>
 
+        {/* Filters (move here; no per-activity sampling selection needed) */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
             <select
               value={activityFilters.lifecycleStatus}
-              onChange={(e) => setActivityFilters((p) => ({ ...p, lifecycleStatus: e.target.value as LifecycleStatus, page: 1 }))}
+              onChange={(e) => setActivityFilters((p) => ({ ...p, lifecycleStatus: e.target.value as LifecycleStatus }))}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
             >
               <option value="active">Active</option>
@@ -712,7 +634,6 @@ const SamplingControlView: React.FC = () => {
                           onClick={() => {
                             setActivityFilters((prev) => ({
                               ...prev,
-                              page: 1,
                               dateFrom: draftStart || '',
                               dateTo: draftEnd || '',
                             }));
@@ -731,34 +652,71 @@ const SamplingControlView: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
-            <div className="text-sm font-black text-slate-700">
-              Showing {activities.length} of {activityPagination?.total ?? 0}
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {[
+            { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0 },
+            { label: 'Active', value: stats?.totals?.active ?? 0 },
+            { label: 'Sampled', value: stats?.totals?.sampled ?? 0 },
+            { label: 'Inactive', value: stats?.totals?.inactive ?? 0 },
+            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0 },
+            { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0 },
+            { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0 },
+            { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0 },
+          ].map((card) => (
+            <div key={card.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-xl font-black text-slate-900">{card.value}</p>
             </div>
+          ))}
+        </div>
+
+        <div className="mt-5 border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
+            <div className="text-sm font-black text-slate-700">By Activity Type</div>
             <div className="text-xs text-slate-500">
-              Use Run Sampling / Reactivate to operate on all matching activities.
+              Farmers sampled = sampling audit total; Tasks created = call tasks count
             </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {activities.map((a) => (
-              <div key={a._id} className="px-4 py-3 flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-slate-900">{a.type}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold">
-                      {lifecycleLabel(a.lifecycleStatus)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">
-                    {new Date(a.date).toLocaleDateString('en-IN')} • {a.officerName}{a.tmName ? ` • ${a.tmName}` : ''} • {a.territoryName || a.territory} {a.state ? `• ${a.state}` : ''}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {!activities.length && (
-              <div className="px-4 py-6 text-sm text-slate-600">No activities found for this filter.</div>
-            )}
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead className="bg-white border-b border-slate-200">
+                <tr className="text-left">
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Total</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Active</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Sampled</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Inactive</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Not Eligible</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Total</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Farmers Sampled</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tasks</th>
+                  <th className="px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(stats?.byType || []).map((row: any) => (
+                  <tr key={row.type} className="bg-white">
+                    <td className="px-4 py-3 font-black text-slate-900">{row.type}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.totalActivities}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.active}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampled}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.inactive}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.notEligible}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.farmersTotal}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampledFarmers}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.tasksCreated}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{row.unassignedTasks}</td>
+                  </tr>
+                ))}
+                {(!stats?.byType || stats.byType.length === 0) && (
+                  <tr>
+                    <td className="px-4 py-6 text-slate-600" colSpan={10}>
+                      No activities found in this date range.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -822,7 +780,7 @@ const SamplingControlView: React.FC = () => {
       </div>
 
       {/* Keep config reference to avoid unused warning */}
-      <div className="hidden">{config ? lifecycleLabel('active') : ''}</div>
+      <div className="hidden">{config ? lifecycleLabel('active') : ''}{totalActivities}</div>
     </div>
   );
 };
