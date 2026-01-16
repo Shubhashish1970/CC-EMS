@@ -8,12 +8,91 @@ import { CallTask } from '../models/CallTask.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
 import { CoolingPeriod } from '../models/CoolingPeriod.js';
 import { SamplingConfig } from '../models/SamplingConfig.js';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
+import { getLanguageForState } from '../utils/stateLanguageMapper.js';
 import logger from '../config/logger.js';
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25MB
 
 // All routes require authentication
 router.use(authenticate);
+
+type ExcelActivityRow = {
+  activityId: string;
+  type: string;
+  date: string | number | Date;
+  officerId: string;
+  officerName: string;
+  location: string;
+  territory: string;
+  state: string;
+  territoryName?: string;
+  zoneName?: string;
+  buName?: string;
+  tmEmpCode?: string;
+  tmName?: string;
+  crops?: string;
+  products?: string;
+};
+
+type ExcelFarmerRow = {
+  activityId: string;
+  farmerId?: string;
+  name: string;
+  mobileNumber: string;
+  location: string;
+  territory?: string;
+  photoUrl?: string;
+  crops?: string;
+};
+
+const normalizeStr = (v: any) => String(v ?? '').trim();
+
+const parseExcelDate = (value: any): Date => {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error('Invalid date');
+    return value;
+  }
+
+  // Excel serial number
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const d = XLSX.SSF.parse_date_code(value);
+    if (!d) throw new Error('Invalid excel date');
+    return new Date(d.y, d.m - 1, d.d);
+  }
+
+  const raw = normalizeStr(value);
+  if (!raw) throw new Error('Invalid date (missing)');
+
+  // DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+    const [ddStr, mmStr, yyyyStr] = raw.split('/');
+    const dd = Number(ddStr);
+    const mm = Number(mmStr);
+    const yyyy = Number(yyyyStr);
+    const d = new Date(yyyy, mm - 1, dd);
+    if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
+      throw new Error(`Invalid date (DD/MM/YYYY): ${raw}`);
+    }
+    return d;
+  }
+
+  // YYYY-MM-DD or ISO
+  const d = new Date(raw.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00.000Z` : raw);
+  if (Number.isNaN(d.getTime())) throw new Error(`Invalid date: ${raw}`);
+  return d;
+};
+
+const splitCSVCell = (value: any): string[] => {
+  const raw = normalizeStr(value);
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
 
 // @route   POST /api/ffa/sync
 // @desc    Manually trigger FFA sync (MIS Admin only)
@@ -95,6 +174,180 @@ router.post(
           hasEnvVar: !!process.env.FFA_API_URL,
         },
       });
+    }
+  }
+);
+
+// @route   POST /api/ffa/import-excel
+// @desc    Import Activities + Farmers via Excel (2 sheets) as fallback when FFA API is unavailable
+// @access  Private (MIS Admin)
+router.post(
+  '/import-excel',
+  requirePermission('config.ffa'),
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      if (!file) {
+        return res.status(400).json({ success: false, error: { message: 'Missing file. Use multipart/form-data with field name "file".' } });
+      }
+
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const activitiesSheetName = workbook.SheetNames.find((n) => n.toLowerCase() === 'activities');
+      const farmersSheetName = workbook.SheetNames.find((n) => n.toLowerCase() === 'farmers');
+
+      if (!activitiesSheetName || !farmersSheetName) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Workbook must include 2 sheets named exactly: Activities, Farmers' },
+        });
+      }
+
+      const activitiesSheet = workbook.Sheets[activitiesSheetName];
+      const farmersSheet = workbook.Sheets[farmersSheetName];
+
+      const activitiesRows = XLSX.utils.sheet_to_json<ExcelActivityRow>(activitiesSheet, { defval: '', raw: true });
+      const farmersRows = XLSX.utils.sheet_to_json<ExcelFarmerRow>(farmersSheet, { defval: '', raw: true });
+
+      const errors: Array<{ sheet: 'Activities' | 'Farmers'; row: number; message: string }> = [];
+
+      // Build activity map
+      const activityById = new Map<string, ExcelActivityRow>();
+      activitiesRows.forEach((r, idx) => {
+        const rowNum = idx + 2; // header row + 1
+        const activityId = normalizeStr((r as any).activityId);
+        if (!activityId) {
+          errors.push({ sheet: 'Activities', row: rowNum, message: 'Missing activityId' });
+          return;
+        }
+        activityById.set(activityId, r);
+      });
+
+      let activitiesUpserted = 0;
+      let farmersUpserted = 0;
+      let linksUpdated = 0;
+
+      // Group farmers by activityId
+      const farmersByActivity = new Map<string, ExcelFarmerRow[]>();
+      farmersRows.forEach((r, idx) => {
+        const rowNum = idx + 2;
+        const activityId = normalizeStr((r as any).activityId);
+        if (!activityId) {
+          errors.push({ sheet: 'Farmers', row: rowNum, message: 'Missing activityId' });
+          return;
+        }
+        if (!farmersByActivity.has(activityId)) farmersByActivity.set(activityId, []);
+        farmersByActivity.get(activityId)!.push(r);
+      });
+
+      for (const [activityId, activityRow] of activityById.entries()) {
+        try {
+          const type = normalizeStr((activityRow as any).type);
+          const officerId = normalizeStr((activityRow as any).officerId);
+          const officerName = normalizeStr((activityRow as any).officerName);
+          const location = normalizeStr((activityRow as any).location);
+          const territory = normalizeStr((activityRow as any).territory);
+          const state = normalizeStr((activityRow as any).state);
+
+          if (!type || !officerId || !officerName || !location || !territory || !state) {
+            throw new Error('Missing one or more required fields: type, officerId, officerName, location, territory, state');
+          }
+
+          const date = parseExcelDate((activityRow as any).date);
+
+          const preferredLanguage = await getLanguageForState(state);
+
+          const upserted = await Activity.findOneAndUpdate(
+            { activityId },
+            {
+              $set: {
+                activityId,
+                type,
+                date,
+                officerId,
+                officerName,
+                location,
+                territory,
+                state,
+                territoryName: normalizeStr((activityRow as any).territoryName || territory),
+                zoneName: normalizeStr((activityRow as any).zoneName || ''),
+                buName: normalizeStr((activityRow as any).buName || ''),
+                tmEmpCode: normalizeStr((activityRow as any).tmEmpCode || ''),
+                tmName: normalizeStr((activityRow as any).tmName || ''),
+                crops: splitCSVCell((activityRow as any).crops),
+                products: splitCSVCell((activityRow as any).products),
+                syncedAt: new Date(),
+              },
+              $setOnInsert: {
+                lifecycleStatus: 'active',
+                lifecycleUpdatedAt: new Date(),
+              },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+          activitiesUpserted += 1;
+
+          const farmerRowsForActivity = farmersByActivity.get(activityId) || [];
+          const farmerIds: any[] = [];
+          const seenMobile = new Set<string>();
+
+          for (let i = 0; i < farmerRowsForActivity.length; i++) {
+            const fr = farmerRowsForActivity[i];
+            const rowNum = farmersRows.indexOf(fr) + 2; // approximate row number
+
+            const name = normalizeStr((fr as any).name);
+            const mobileNumber = normalizeStr((fr as any).mobileNumber);
+            const farmerLocation = normalizeStr((fr as any).location);
+            const farmerTerritory = normalizeStr((fr as any).territory || upserted.territoryName || upserted.territory);
+            const photoUrl = normalizeStr((fr as any).photoUrl || '');
+
+            if (!name || !mobileNumber || !farmerLocation) {
+              errors.push({ sheet: 'Farmers', row: rowNum, message: `Missing required farmer fields (name/mobileNumber/location) for activityId=${activityId}` });
+              continue;
+            }
+            if (seenMobile.has(mobileNumber)) continue;
+            seenMobile.add(mobileNumber);
+
+            const farmer = await Farmer.findOneAndUpdate(
+              { mobileNumber },
+              {
+                name,
+                mobileNumber,
+                location: farmerLocation,
+                preferredLanguage,
+                territory: farmerTerritory || 'Unknown',
+                photoUrl: photoUrl || undefined,
+              },
+              { upsert: true, new: true }
+            );
+            farmersUpserted += 1;
+            farmerIds.push(farmer._id);
+          }
+
+          // Replace/Set farmerIds from Excel for this activity (deduped)
+          upserted.farmerIds = farmerIds;
+          await upserted.save();
+          linksUpdated += 1;
+        } catch (e: any) {
+          errors.push({ sheet: 'Activities', row: 0, message: `activityId=${activityId}: ${e?.message || String(e)}` });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Excel import completed: ${activitiesUpserted} activities processed, ${farmersUpserted} farmers upserted`,
+        data: {
+          activitiesRows: activitiesRows.length,
+          farmersRows: farmersRows.length,
+          activitiesUpserted,
+          farmersUpserted,
+          linksUpdated,
+          errorsCount: errors.length,
+          errors: errors.slice(0, 200),
+        },
+      });
+    } catch (error) {
+      next(error);
     }
   }
 );

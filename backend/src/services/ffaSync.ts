@@ -98,9 +98,13 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
   const baseUrl = FFA_API_URL.endsWith('/') ? FFA_API_URL.slice(0, -1) : FFA_API_URL;
   let url = `${baseUrl}/activities?limit=100`;
   if (dateFrom) {
-    const dateFromISO = dateFrom.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-    url += `&dateFrom=${dateFromISO}`;
-    logger.info(`[FFA SYNC] Incremental sync: fetching activities after ${dateFromISO}`);
+    // New contract: DD/MM/YYYY (keep server-side compatibility for legacy too)
+    const dd = String(dateFrom.getDate()).padStart(2, '0');
+    const mm = String(dateFrom.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(dateFrom.getFullYear());
+    const dateFromDDMMYYYY = `${dd}/${mm}/${yyyy}`;
+    url += `&dateFrom=${encodeURIComponent(dateFromDDMMYYYY)}`;
+    logger.info(`[FFA SYNC] Incremental sync: fetching activities after ${dateFromDDMMYYYY}`);
   } else {
     logger.info(`[FFA SYNC] Full sync: fetching all activities`);
   }
@@ -224,23 +228,23 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
       { activityId: ffaActivity.activityId },
       {
         $set: {
-          activityId: ffaActivity.activityId,
-          type: ffaActivity.type,
+        activityId: ffaActivity.activityId,
+        type: ffaActivity.type,
           date: parseFFADate(ffaActivity.date),
-          officerId: ffaActivity.officerId,
-          officerName: ffaActivity.officerName,
-          location: ffaActivity.location,
-          territory: ffaActivity.territory,
+        officerId: ffaActivity.officerId,
+        officerName: ffaActivity.officerName,
+        location: ffaActivity.location,
+        territory: ffaActivity.territory,
           territoryName: (ffaActivity.territoryName || ffaActivity.territory || '').trim(),
           zoneName: (ffaActivity.zoneName || '').trim(),
           buName: (ffaActivity.buName || '').trim(),
           state: resolvedState, // Store resolved state
           tmEmpCode: (ffaActivity.tmEmpCode || '').trim(),
           tmName: (ffaActivity.tmName || '').trim(),
-          crops: ffaActivity.crops || [],
-          products: ffaActivity.products || [],
-          syncedAt: new Date(),
-        },
+        crops: ffaActivity.crops || [],
+        products: ffaActivity.products || [],
+        syncedAt: new Date(),
+      },
         $setOnInsert: {
           lifecycleStatus: 'active',
           lifecycleUpdatedAt: new Date(),

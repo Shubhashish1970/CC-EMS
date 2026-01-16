@@ -445,6 +445,27 @@ export const ffaAPI = {
   getFFASyncStatus: async () => {
     return apiRequest('/ffa/status');
   },
+
+  importExcel: async (file: File) => {
+    const apiUrl = getApiUrl();
+    const token = localStorage.getItem('token');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${apiUrl}/ffa/import-excel`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = json?.error?.message || json?.message || `Upload failed (${res.status})`;
+      throw new Error(msg);
+    }
+    return json;
+  },
 };
 
 // AI API

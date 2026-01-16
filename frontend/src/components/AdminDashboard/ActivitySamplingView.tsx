@@ -64,6 +64,13 @@ const ActivitySamplingView: React.FC = () => {
   const [isIncrementalSyncing, setIsIncrementalSyncing] = useState(false);
   const [isFullSyncing, setIsFullSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ lastSyncAt: string | null; totalActivities: number; totalFarmers: number } | null>(null);
+  const [dataSource, setDataSource] = useState<'api' | 'excel'>(() => {
+    const v = localStorage.getItem('admin.activitySampling.dataSource');
+    return v === 'excel' ? 'excel' : 'api';
+  });
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [importReport, setImportReport] = useState<any | null>(null);
   const [filters, setFilters] = useState({
     activityType: '',
     territory: '',
@@ -244,6 +251,10 @@ const ActivitySamplingView: React.FC = () => {
     fetchSyncStatus();
   }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo]);
 
+  useEffect(() => {
+    localStorage.setItem('admin.activitySampling.dataSource', dataSource);
+  }, [dataSource]);
+
   const fetchSyncStatus = async () => {
     try {
       const response = await ffaAPI.getFFASyncStatus() as any;
@@ -257,6 +268,10 @@ const ActivitySamplingView: React.FC = () => {
   };
 
   const handleSyncFFA = async (fullSync: boolean = false) => {
+    if (dataSource !== 'api') {
+      showError('Data source is Excel. Switch to API to use Sync options.');
+      return;
+    }
     // Set appropriate loading state based on sync type
     if (fullSync) {
       setIsFullSyncing(true);
@@ -284,6 +299,27 @@ const ActivitySamplingView: React.FC = () => {
       } else {
         setIsIncrementalSyncing(false);
       }
+    }
+  };
+
+  const handleImportExcel = async () => {
+    if (!excelFile) {
+      showError('Please choose an Excel file first.');
+      return;
+    }
+    setIsImportingExcel(true);
+    setImportReport(null);
+    try {
+      const res = await ffaAPI.importExcel(excelFile);
+      setImportReport(res?.data || res);
+      showSuccess('Excel imported successfully');
+      // Refresh UI
+      await fetchActivities(1);
+      await fetchSyncStatus();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to import Excel');
+    } finally {
+      setIsImportingExcel(false);
     }
   };
 
@@ -398,6 +434,27 @@ const ActivitySamplingView: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-2 py-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data Source</span>
+              <button
+                type="button"
+                onClick={() => setDataSource('api')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
+                  dataSource === 'api' ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                API
+              </button>
+              <button
+                type="button"
+                onClick={() => setDataSource('excel')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
+                  dataSource === 'excel' ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-600 hover:bg-white'
+                }`}
+              >
+                Excel
+              </button>
+            </div>
             <Button
               variant="secondary"
               size="sm"
@@ -419,7 +476,7 @@ const ActivitySamplingView: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={() => handleSyncFFA(false)}
-              disabled={isIncrementalSyncing || isFullSyncing}
+              disabled={dataSource !== 'api' || isIncrementalSyncing || isFullSyncing}
               title="Incremental sync: Only syncs new activities since last sync"
             >
               <Download size={16} className={isIncrementalSyncing ? 'animate-spin' : ''} />
@@ -429,7 +486,7 @@ const ActivitySamplingView: React.FC = () => {
               variant="secondary"
               size="sm"
               onClick={() => handleSyncFFA(true)}
-              disabled={isIncrementalSyncing || isFullSyncing}
+              disabled={dataSource !== 'api' || isIncrementalSyncing || isFullSyncing}
               title="Full sync: Syncs all activities (takes longer)"
             >
               <Download size={16} className={isFullSyncing ? 'animate-spin' : ''} />
@@ -437,6 +494,96 @@ const ActivitySamplingView: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {dataSource === 'excel' && (
+          <div className="mt-3 pt-3 border-t border-slate-200">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-3 md:justify-between">
+                <div className="flex-1">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                    Upload Excel (2 sheets: Activities + Farmers)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setExcelFile(f);
+                      setImportReport(null);
+                    }}
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                  />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
+                    <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleImportExcel}
+                    disabled={!excelFile || isImportingExcel}
+                    title="Upload and import activities & farmers"
+                  >
+                    <Download size={16} className={isImportingExcel ? 'animate-spin' : ''} />
+                    {isImportingExcel ? 'Importing...' : 'Upload & Import'}
+                  </Button>
+                </div>
+              </div>
+
+              {importReport && (
+                <div className="mt-4 text-sm text-slate-700">
+                  <div className="font-black text-slate-900 mb-1">Import Summary</div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Activities upserted</div>
+                      <div className="text-lg font-black text-slate-900">{importReport.activitiesUpserted ?? 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Farmers upserted</div>
+                      <div className="text-lg font-black text-slate-900">{importReport.farmersUpserted ?? 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Links updated</div>
+                      <div className="text-lg font-black text-slate-900">{importReport.linksUpdated ?? 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Errors</div>
+                      <div className="text-lg font-black text-slate-900">{importReport.errorsCount ?? 0}</div>
+                    </div>
+                  </div>
+
+                  {Array.isArray(importReport.errors) && importReport.errors.length > 0 && (
+                    <div className="mt-3 text-xs text-slate-700">
+                      <div className="font-black text-slate-900 mb-1">Errors (first {importReport.errors.length})</div>
+                      <div className="max-h-40 overflow-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-black uppercase tracking-widest text-slate-400">Sheet</th>
+                              <th className="text-left px-3 py-2 font-black uppercase tracking-widest text-slate-400">Row</th>
+                              <th className="text-left px-3 py-2 font-black uppercase tracking-widest text-slate-400">Message</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {importReport.errors.map((e: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className="px-3 py-2">{e.sheet}</td>
+                                <td className="px-3 py-2">{e.row}</td>
+                                <td className="px-3 py-2">{e.message}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         {showFilters && (
