@@ -26,61 +26,12 @@ type LatestRun = {
   errorCount?: number;
 };
 
-const RunStatusInline: React.FC<{
-  loadLatestRunStatus: () => Promise<LatestRun | null>;
-  isLoading: boolean;
-}> = ({ loadLatestRunStatus, isLoading }) => {
-  const [run, setRun] = useState<LatestRun | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    let timer: any = null;
-
-    const tick = async () => {
-      try {
-        const r = await loadLatestRunStatus();
-        if (mounted) setRun(r);
-      } catch {
-        // ignore
-      }
-    };
-
-    tick();
-
-    const shouldPoll = isLoading || run?.status === 'running';
-    if (shouldPoll) {
-      timer = setInterval(tick, 2000);
-    }
-
-    return () => {
-      mounted = false;
-      if (timer) clearInterval(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, run?.status]);
-
-  if (!run) return <span>Latest run: none</span>;
-
-  const statusLabel =
-    run.status === 'running' ? 'Running' : run.status === 'completed' ? 'Completed' : 'Failed';
-
-  const parts = [
-    `Latest run: ${statusLabel}`,
-    typeof run.processed === 'number' && typeof run.matched === 'number'
-      ? `Processed ${run.processed}/${run.matched}`
-      : null,
-    typeof run.tasksCreatedTotal === 'number' ? `Tasks ${run.tasksCreatedTotal}` : null,
-    typeof run.errorCount === 'number' && run.errorCount > 0 ? `Errors ${run.errorCount}` : null,
-  ].filter(Boolean);
-
-  return <span>{parts.join(' • ')}</span>;
-};
-
 const SamplingControlView: React.FC = () => {
   const toast = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState<any>(null);
+  const [latestRun, setLatestRun] = useState<LatestRun | null>(null);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
   const [activityCoolingDays, setActivityCoolingDays] = useState<number>(5);
@@ -230,7 +181,9 @@ const SamplingControlView: React.FC = () => {
 
   const loadLatestRunStatus = async () => {
     const res: any = await samplingAPI.getLatestRunStatus();
-    return res?.data?.run || null;
+    const run = (res?.data?.run || null) as LatestRun | null;
+    setLatestRun(run);
+    return run;
   };
 
   const loadUnassigned = async () => {
@@ -261,7 +214,7 @@ const SamplingControlView: React.FC = () => {
     const init = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadConfig(), loadStats(), loadUnassigned(), loadAgents()]);
+        await Promise.all([loadConfig(), loadStats(), loadUnassigned(), loadAgents(), loadLatestRunStatus()]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load sampling control data');
       } finally {
@@ -271,6 +224,77 @@ const SamplingControlView: React.FC = () => {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const isSamplingRunning = latestRun?.status === 'running';
+  const progressPct = useMemo(() => {
+    const processed = Number(latestRun?.processed ?? 0);
+    const matched = Number(latestRun?.matched ?? 0);
+    if (!matched || matched <= 0) return 0;
+    const pct = Math.round((processed / matched) * 100);
+    return Math.max(0, Math.min(100, pct));
+  }, [latestRun?.processed, latestRun?.matched]);
+
+  // Poll latest run status while a run is active
+  useEffect(() => {
+    let timer: any = null;
+
+    // Always do one refresh if we don't have run info yet
+    if (!latestRun) {
+      loadLatestRunStatus().catch(() => undefined);
+    }
+
+    if (isSamplingRunning) {
+      timer = setInterval(() => {
+        loadLatestRunStatus().catch(() => undefined);
+      }, 2000);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSamplingRunning]);
+
+  // Auto-refresh dashboard periodically while sampling is running so users see updates
+  useEffect(() => {
+    if (!isSamplingRunning) return;
+    let statsTimer: any = null;
+    let tasksTimer: any = null;
+    let stopped = false;
+
+    const safeStatsRefresh = async () => {
+      try {
+        await loadStats();
+      } catch {
+        // ignore
+      }
+    };
+    const safeTasksRefresh = async () => {
+      try {
+        await loadUnassigned();
+      } catch {
+        // ignore
+      }
+    };
+
+    // refresh immediately
+    safeStatsRefresh();
+    safeTasksRefresh();
+
+    statsTimer = setInterval(() => {
+      if (!stopped) safeStatsRefresh();
+    }, 5000);
+    tasksTimer = setInterval(() => {
+      if (!stopped) safeTasksRefresh();
+    }, 10000);
+
+    return () => {
+      stopped = true;
+      if (statsTimer) clearInterval(statsTimer);
+      if (tasksTimer) clearInterval(tasksTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSamplingRunning, activityFilters.dateFrom, activityFilters.dateTo]);
 
   useEffect(() => {
     const run = async () => {
@@ -338,6 +362,9 @@ const SamplingControlView: React.FC = () => {
     }
     setIsLoading(true);
     try {
+      // Ensure status is visible immediately
+      await loadLatestRunStatus();
+
       const res: any = await samplingAPI.runSampling({
         lifecycleStatus: activityFilters.lifecycleStatus,
         dateFrom: activityFilters.dateFrom || undefined,
@@ -348,6 +375,7 @@ const SamplingControlView: React.FC = () => {
       );
       await loadStats();
       await loadUnassigned();
+      await loadLatestRunStatus();
     } catch (e: any) {
       // If the request timed out on the client, keep polling status instead of showing a hard error
       const msg = e?.message || 'Failed to run sampling';
@@ -570,7 +598,7 @@ const SamplingControlView: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={handleResetSelections}
-              disabled={isLoading}
+              disabled={isLoading || isSamplingRunning}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
               title="Reset lifecycle/date range filters"
             >
@@ -579,7 +607,12 @@ const SamplingControlView: React.FC = () => {
             </button>
             <button
               onClick={handleRunSampling}
-              disabled={isLoading || totalMatchingByLifecycle === 0 || activityFilters.lifecycleStatus !== 'active'}
+              disabled={
+                isLoading ||
+                isSamplingRunning ||
+                totalMatchingByLifecycle === 0 ||
+                activityFilters.lifecycleStatus !== 'active'
+              }
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
             >
               <Play size={16} />
@@ -587,7 +620,12 @@ const SamplingControlView: React.FC = () => {
             </button>
             <button
               onClick={handleReactivateSelected}
-              disabled={isLoading || totalMatchingByLifecycle === 0 || activityFilters.lifecycleStatus === 'active'}
+              disabled={
+                isLoading ||
+                isSamplingRunning ||
+                totalMatchingByLifecycle === 0 ||
+                activityFilters.lifecycleStatus === 'active'
+              }
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black disabled:opacity-50"
             >
               <RotateCcw size={16} />
@@ -596,10 +634,58 @@ const SamplingControlView: React.FC = () => {
           </div>
         </div>
 
-        {/* Latest run status */}
-        <div className="mt-2 text-xs text-slate-500">
-          {/* This stays lightweight; details are pulled from the backend tracker */}
-          <RunStatusInline loadLatestRunStatus={loadLatestRunStatus} isLoading={isLoading} />
+        {/* Latest run status + progress */}
+        <div className="mt-2">
+          {latestRun ? (
+            <div className="text-xs text-slate-600">
+              <span className="font-black">Latest run:</span>{' '}
+              <span className="font-bold">
+                {latestRun.status === 'running'
+                  ? 'Running'
+                  : latestRun.status === 'completed'
+                    ? 'Completed'
+                    : 'Failed'}
+              </span>
+              {typeof latestRun.processed === 'number' && typeof latestRun.matched === 'number' ? (
+                <>
+                  {' '}
+                  • <span className="font-bold">Processed {latestRun.processed}/{latestRun.matched}</span>
+                </>
+              ) : null}
+              {typeof latestRun.tasksCreatedTotal === 'number' ? (
+                <>
+                  {' '}
+                  • <span className="font-bold">Tasks {latestRun.tasksCreatedTotal}</span>
+                </>
+              ) : null}
+              {typeof latestRun.errorCount === 'number' && latestRun.errorCount > 0 ? (
+                <>
+                  {' '}
+                  • <span className="font-bold text-red-700">Errors {latestRun.errorCount}</span>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-xs text-slate-500">Latest run: none</div>
+          )}
+
+          {isSamplingRunning && (
+            <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-black text-green-900">Sampling is running…</div>
+                <div className="text-xs font-black text-green-900">{progressPct}%</div>
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full bg-green-100 overflow-hidden">
+                <div
+                  className="h-2 bg-green-700 rounded-full transition-[width] duration-300"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-green-900">
+                The dashboard will refresh automatically while sampling runs. Please wait until it completes.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filters (move here; no per-activity sampling selection needed) */}
