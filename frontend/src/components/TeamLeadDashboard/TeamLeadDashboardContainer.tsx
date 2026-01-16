@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sliders, List, LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import TaskList from '../TaskList';
 import SamplingControlView from './SamplingControlView';
+import TaskDashboardView from './TaskDashboardView';
 
 const TeamLeadDashboardContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sampling' | 'tasks'>('sampling');
@@ -77,7 +77,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
 
       <div className="max-w-7xl mx-auto p-6">
         {activeTab === 'sampling' && <SamplingControlView />}
-        {activeTab === 'tasks' && <TaskList />}
+        {activeTab === 'tasks' && <TaskDashboardView />}
       </div>
     </div>
   );

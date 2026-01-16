@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult, query } from 'express-validator';
 import { CallTask, ICallLog, TaskStatus } from '../models/CallTask.js';
+import { User } from '../models/User.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/rbac.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -14,6 +15,7 @@ import {
   updateTaskStatus,
 } from '../services/taskService.js';
 import logger from '../config/logger.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -321,6 +323,156 @@ router.get(
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/dashboard
+// @desc    Task dashboard for Team Lead: unassigned by language + agent workload (sampled_in_queue/in_progress)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/dashboard',
+  requirePermission('tasks.view.team'),
+  [
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const { dateFrom, dateTo } = req.query as any;
+
+      const dateMatch: any = {};
+      if (dateFrom || dateTo) {
+        dateMatch.scheduledDate = {};
+        if (dateFrom) {
+          const d = new Date(dateFrom);
+          d.setHours(0, 0, 0, 0);
+          dateMatch.scheduledDate.$gte = d;
+        }
+        if (dateTo) {
+          const d = new Date(dateTo);
+          d.setHours(23, 59, 59, 999);
+          dateMatch.scheduledDate.$lte = d;
+        }
+      }
+
+      // Team agents (for workload summary)
+      const agents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+      })
+        .select('_id name email employeeId')
+        .sort({ name: 1 })
+        .lean();
+
+      const agentIds = agents.map((a) => a._id);
+
+      const farmersCollection = (await import('../models/Farmer.js')).Farmer.collection.name;
+
+      // 1) Unassigned tasks by farmer preferredLanguage
+      const byLanguageRaw = await CallTask.aggregate([
+        { $match: { status: 'unassigned', ...dateMatch } },
+        {
+          $lookup: {
+            from: farmersCollection,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
+            unassigned: { $sum: 1 },
+          },
+        },
+        { $project: { _id: 0, language: '$_id', unassigned: 1 } },
+      ]);
+
+      // Stable order for language rows
+      const languageOrder = ['Hindi', 'Telugu', 'Marathi', 'Kannada', 'Tamil', 'Bengali', 'Oriya', 'Malayalam', 'English', 'Unknown'];
+      const languageRank = (l: string) => {
+        const idx = languageOrder.indexOf(l);
+        return idx === -1 ? 999 : idx;
+      };
+
+      const byLanguage = [...byLanguageRaw].sort((a: any, b: any) => {
+        const ar = languageRank(a.language);
+        const br = languageRank(b.language);
+        if (ar !== br) return ar - br;
+        return String(a.language).localeCompare(String(b.language));
+      });
+
+      const totalUnassigned = byLanguage.reduce((sum: number, r: any) => sum + (r.unassigned || 0), 0);
+
+      // 2) Agent workload: sampled_in_queue + in_progress
+      const workloadAgg = agentIds.length
+        ? await CallTask.aggregate([
+            {
+              $match: {
+                assignedAgentId: { $in: agentIds },
+                status: { $in: ['sampled_in_queue', 'in_progress'] },
+                ...dateMatch,
+              },
+            },
+            {
+              $group: {
+                _id: { agentId: '$assignedAgentId', status: '$status' },
+                count: { $sum: 1 },
+              },
+            },
+          ])
+        : [];
+
+      const workloadMap = new Map<string, { sampled_in_queue: number; in_progress: number }>();
+      for (const row of workloadAgg) {
+        const agentId = row._id?.agentId?.toString();
+        const status = row._id?.status as 'sampled_in_queue' | 'in_progress';
+        if (!agentId) continue;
+        const current = workloadMap.get(agentId) || { sampled_in_queue: 0, in_progress: 0 };
+        current[status] = row.count || 0;
+        workloadMap.set(agentId, current);
+      }
+
+      const agentWorkload = agents.map((a) => {
+        const c = workloadMap.get(a._id.toString()) || { sampled_in_queue: 0, in_progress: 0 };
+        return {
+          agentId: a._id.toString(),
+          name: a.name,
+          email: a.email,
+          employeeId: a.employeeId,
+          sampledInQueue: c.sampled_in_queue,
+          inProgress: c.in_progress,
+          totalOpen: c.sampled_in_queue + c.in_progress,
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          dateFrom: dateFrom || null,
+          dateTo: dateTo || null,
+          unassignedByLanguage: byLanguage,
+          totals: {
+            totalUnassigned,
+          },
+          agentWorkload,
+        },
       });
     } catch (error) {
       next(error);

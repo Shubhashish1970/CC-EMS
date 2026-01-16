@@ -191,6 +191,13 @@ export const tasksAPI = {
     const query = params.toString();
     return apiRequest(`/tasks/unassigned${query ? `?${query}` : ''}`);
   },
+  getDashboard: async (filters?: { dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
+  },
 
   reassignTask: async (taskId: string, agentId: string) => {
     return apiRequest(`/tasks/${taskId}/reassign`, {

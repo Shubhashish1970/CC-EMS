@@ -1040,61 +1040,10 @@ const SamplingControlView: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h3 className="text-lg font-black text-slate-900">Unassigned Tasks</h3>
-        <p className="text-sm text-slate-600">Tasks created by sampling that need assignment</p>
-
-        <div className="mt-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <div className="flex items-center gap-2">
-            <select
-              value={bulkAssignAgentId}
-              onChange={(e) => setBulkAssignAgentId(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
-            >
-              <option value="">Select agent</option>
-              {agents.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.name} ({a.email})
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleBulkAssign}
-              disabled={isLoading || !bulkAssignAgentId || selectedUnassignedCount === 0}
-              className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
-            >
-              Assign ({selectedUnassignedCount})
-            </button>
-          </div>
-          <button
-            onClick={loadUnassigned}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black"
-          >
-            <RefreshCw size={16} />
-            Refresh tasks
-          </button>
-        </div>
-
-        <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="divide-y divide-slate-100">
-            {unassignedTasks.map((t) => (
-              <div key={t._id} className="px-4 py-3 flex items-start gap-3">
-                <button type="button" onClick={() => toggleUnassignedSelection(t._id)} className="mt-1">
-                  {selectedUnassignedTaskIds.has(t._id) ? <CheckSquare size={18} className="text-green-700" /> : <Square size={18} className="text-slate-400" />}
-                </button>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-slate-900">{t.farmerId?.name || 'Unknown Farmer'}</p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    {t.farmerId?.preferredLanguage || 'Unknown'} • {t.farmerId?.mobileNumber || 'Unknown'} • {t.activityId?.type || 'Unknown'} • {t.activityId?.territoryName || t.activityId?.territory || ''}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {!unassignedTasks.length && (
-              <div className="px-4 py-6 text-sm text-slate-600">No unassigned tasks right now.</div>
-            )}
-          </div>
-        </div>
+        <h3 className="text-lg font-black text-slate-900">Task Insights</h3>
+        <p className="text-sm text-slate-600 mt-1">
+          Task listing has been removed from this page. Use <span className="font-black">Task Management</span> tab to view the Task Dashboard.
+        </p>
       </div>
 
       {/* Keep config reference to avoid unused warning */}
