@@ -31,6 +31,7 @@ const TaskDashboardView: React.FC = () => {
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [allocRun, setAllocRun] = useState<any>(null);
 
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '' });
   const [allocLanguage, setAllocLanguage] = useState<string>('ALL');
@@ -128,11 +129,18 @@ const TaskDashboardView: React.FC = () => {
     setData(res?.data || null);
   };
 
+  const loadLatestAllocationStatus = async () => {
+    const res: any = await tasksAPI.getLatestAllocationStatus();
+    const run = res?.data?.run || null;
+    setAllocRun(run);
+    return run;
+  };
+
   useEffect(() => {
     const run = async () => {
       setIsLoading(true);
       try {
-        await loadDashboard();
+        await Promise.all([loadDashboard(), loadLatestAllocationStatus()]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load task dashboard');
       } finally {
@@ -142,6 +150,46 @@ const TaskDashboardView: React.FC = () => {
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.dateFrom, filters.dateTo]);
+
+  const isAllocRunning = allocRun?.status === 'running';
+  const allocPct = useMemo(() => {
+    const processed = Number(allocRun?.processed ?? 0);
+    const total = Number(allocRun?.total ?? 0);
+    if (!total || total <= 0) return 0;
+    const pct = Math.round((processed / total) * 100);
+    return Math.max(0, Math.min(100, pct));
+  }, [allocRun?.processed, allocRun?.total]);
+
+  // Poll allocation status + refresh dashboard while allocation is running
+  useEffect(() => {
+    if (!isAllocRunning) return;
+    let statusTimer: any = null;
+    let refreshTimer: any = null;
+
+    const tickStatus = async () => {
+      try {
+        const r = await loadLatestAllocationStatus();
+        if (r && r.status !== 'running') {
+          // final refresh
+          await loadDashboard();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    tickStatus();
+    statusTimer = setInterval(tickStatus, 2000);
+    refreshTimer = setInterval(() => {
+      loadDashboard().catch(() => undefined);
+    }, 5000);
+
+    return () => {
+      if (statusTimer) clearInterval(statusTimer);
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAllocRunning]);
 
   const unassignedRows = useMemo(() => {
     const rows = Array.isArray(data?.unassignedByLanguage) ? [...data.unassignedByLanguage] : [];
@@ -204,6 +252,17 @@ const TaskDashboardView: React.FC = () => {
     setIsAllocConfirmOpen(false);
     setIsLoading(true);
     try {
+      // Optimistic: show allocation progress immediately (0%) so user sees it started.
+      setAllocRun({
+        _id: 'optimistic',
+        status: 'running',
+        total: requested,
+        processed: 0,
+        allocated: 0,
+        skipped: 0,
+        lastProgressAt: new Date().toISOString(),
+      });
+
       const payload: any = {
         language: allocLanguage,
         dateFrom: filters.dateFrom || undefined,
@@ -218,9 +277,16 @@ const TaskDashboardView: React.FC = () => {
           ? `Allocated ${requested} task(s) across all languages`
           : `Allocated ${requested} task(s) for ${allocLanguage}`
       );
-      await loadDashboard();
+      await Promise.all([loadDashboard(), loadLatestAllocationStatus()]);
     } catch (e: any) {
-      toast.showError(e.message || 'Failed to allocate tasks');
+      const msg = e?.message || 'Failed to allocate tasks';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('timed out')) {
+        toast.showSuccess('Allocation is still running. Keeping this screen active and checking status...');
+        // keep polling; status effect will refresh
+        await loadLatestAllocationStatus().catch(() => undefined);
+      } else {
+        toast.showError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -472,6 +538,7 @@ const TaskDashboardView: React.FC = () => {
                 onClick={openAllocateConfirm}
                 disabled={
                   isLoading ||
+                  isAllocRunning ||
                   !allocLanguage ||
                   (allocLanguage === 'ALL'
                     ? totalUnassigned === 0
@@ -483,6 +550,56 @@ const TaskDashboardView: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Allocation progress */}
+        <div className="mt-4">
+          {allocRun ? (
+            <div className="text-xs text-slate-600">
+              <span className="font-black">Latest allocation:</span>{' '}
+              <span className="font-bold">
+                {allocRun.status === 'running' ? 'Running' : allocRun.status === 'completed' ? 'Completed' : 'Failed'}
+              </span>
+              {typeof allocRun.processed === 'number' && typeof allocRun.total === 'number' ? (
+                <>
+                  {' '}
+                  • <span className="font-bold">Processed {allocRun.processed}/{allocRun.total}</span>
+                </>
+              ) : null}
+              {typeof allocRun.allocated === 'number' ? (
+                <>
+                  {' '}
+                  • <span className="font-bold">Allocated {allocRun.allocated}</span>
+                </>
+              ) : null}
+              {typeof allocRun.skipped === 'number' && allocRun.skipped > 0 ? (
+                <>
+                  {' '}
+                  • <span className="font-bold text-amber-800">Skipped {allocRun.skipped}</span>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-xs text-slate-500">Latest allocation: none</div>
+          )}
+
+          {isAllocRunning && (
+            <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-black text-green-900">Allocation is running…</div>
+                <div className="text-xs font-black text-green-900">{allocPct}%</div>
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full bg-green-100 overflow-hidden">
+                <div
+                  className="h-2 bg-green-700 rounded-full transition-[width] duration-300"
+                  style={{ width: `${allocPct}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-green-900">
+                The dashboard will refresh automatically while allocation runs. Please wait until it completes.
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">

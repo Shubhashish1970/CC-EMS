@@ -3,6 +3,7 @@ import { body, validationResult, query } from 'express-validator';
 import { CallTask, ICallLog, TaskStatus } from '../models/CallTask.js';
 import { User } from '../models/User.js';
 import { Farmer } from '../models/Farmer.js';
+import { AllocationRun } from '../models/AllocationRun.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/rbac.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -505,6 +506,7 @@ router.post(
 
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
+      const authUserId = authReq.user._id.toString();
       const { language, count, dateFrom, dateTo } = req.body as any;
 
       const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
@@ -641,29 +643,88 @@ router.post(
         });
       }
 
+      // Create allocation run tracker (so UI can poll progress)
+      const runDoc = await AllocationRun.create({
+        createdByUserId: authUserId ? new mongoose.Types.ObjectId(authUserId) : null,
+        status: 'running',
+        startedAt: new Date(),
+        filters: {
+          language: language,
+          count: requestedCount || null,
+          dateFrom: dateFrom ? new Date(dateFrom) : null,
+          dateTo: dateTo ? new Date(dateTo) : null,
+        },
+        total: selectedTasks.length,
+        processed: 0,
+        allocated: 0,
+        skipped: 0,
+        skippedByLanguage: {},
+        errorCount: 0,
+        errorMessages: [],
+        lastProgressAt: new Date(),
+      });
+
       // Round-robin assignment across capable agents
       const STATUS_UNASSIGNED: TaskStatus = 'unassigned';
       const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
 
       const languageAgentCursor = new Map<string, number>();
       const skippedByLanguage: Record<string, number> = {};
+      const errorMessages: string[] = [];
+      let processed = 0;
+      let allocated = 0;
+      let skipped = 0;
 
-      const bulkOps = selectedTasks
-        .map((t, idx: number) => {
+      const BATCH_SIZE = 200;
+      let batchOps: any[] = [];
+
+      const flushBatch = async () => {
+        if (!batchOps.length) return;
+        try {
+          const r = await CallTask.bulkWrite(batchOps as any, { ordered: false });
+          allocated += r.modifiedCount || 0;
+        } catch (e: any) {
+          errorMessages.push(e?.message || 'Bulk write failed');
+        } finally {
+          batchOps = [];
+        }
+      };
+
+      for (let idx = 0; idx < selectedTasks.length; idx++) {
+        const t = selectedTasks[idx];
           const taskId = t._id;
           const farmerLangKey = normalize(t.farmerLanguage) || 'unknown';
 
           const langAgents = isAllLanguages ? (agentsByLanguage.get(farmerLangKey) || []) : capableAgents;
           if (!langAgents.length) {
             skippedByLanguage[farmerLangKey] = (skippedByLanguage[farmerLangKey] || 0) + 1;
-            return null;
+            skipped++;
+            processed++;
+            // Persist progress occasionally even if we're only skipping
+            if (processed % 50 === 0) {
+              await AllocationRun.updateOne(
+                { _id: runDoc._id },
+                {
+                  $set: {
+                    processed,
+                    allocated,
+                    skipped,
+                    skippedByLanguage,
+                    errorCount: errorMessages.length,
+                    errorMessages: errorMessages.slice(-50),
+                    lastProgressAt: new Date(),
+                  },
+                }
+              );
+            }
+            continue;
           }
 
           const cursor = languageAgentCursor.get(farmerLangKey) || 0;
           const agent = langAgents[cursor % langAgents.length];
           languageAgentCursor.set(farmerLangKey, cursor + 1);
 
-        return {
+          batchOps.push({
           updateOne: {
             filter: { _id: taskId, status: STATUS_UNASSIGNED },
             update: {
@@ -680,24 +741,101 @@ router.post(
               },
             },
           },
-        };
-      })
-      .filter(Boolean);
+        });
+        processed++;
 
-      const result = await CallTask.bulkWrite(bulkOps as any, { ordered: false });
+        if (batchOps.length >= BATCH_SIZE) {
+          await flushBatch();
+        }
+
+        // Persist progress every ~50 processed tasks
+        if (processed % 50 === 0) {
+          await AllocationRun.updateOne(
+            { _id: runDoc._id },
+            {
+              $set: {
+                processed,
+                allocated,
+                skipped,
+                skippedByLanguage,
+                errorCount: errorMessages.length,
+                errorMessages: errorMessages.slice(-50),
+                lastProgressAt: new Date(),
+              },
+            }
+          );
+        }
+      }
+
+      await flushBatch();
+
+      await AllocationRun.updateOne(
+        { _id: runDoc._id },
+        {
+          $set: {
+            status: 'completed',
+            finishedAt: new Date(),
+            processed,
+            allocated,
+            skipped,
+            skippedByLanguage,
+            errorCount: errorMessages.length,
+            errorMessages: errorMessages.slice(-50),
+            lastProgressAt: new Date(),
+          },
+        }
+      );
 
       res.json({
         success: true,
         message: 'Tasks allocated successfully',
         data: {
+          runId: runDoc._id.toString(),
           language,
           requested: requestedCount,
           matchedTasks: selectedTasks.length,
-          allocated: result.modifiedCount || 0,
+          allocated,
           agentsUsed: capableAgents.map((a: any) => ({ agentId: a._id.toString(), name: a.name, email: a.email })),
           skippedByLanguage,
         },
       });
+    } catch (error) {
+      try {
+        const authReq = req as AuthRequest;
+        if (authReq?.user?._id) {
+          await AllocationRun.create({
+            createdByUserId: authReq.user._id,
+            status: 'failed',
+            startedAt: new Date(),
+            finishedAt: new Date(),
+            total: 0,
+            processed: 0,
+            allocated: 0,
+            skipped: 0,
+            errorCount: 1,
+            errorMessages: [error instanceof Error ? error.message : 'Unknown error'],
+          });
+        }
+      } catch {
+        // ignore
+      }
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/allocate-status/latest
+// @desc    Latest allocation run status for current user (for UI polling)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/allocate-status/latest',
+  requirePermission('tasks.view.team'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const userId = authReq.user._id;
+      const run = await AllocationRun.findOne({ createdByUserId: userId }).sort({ startedAt: -1 }).lean();
+      res.json({ success: true, data: { run: run || null } });
     } catch (error) {
       next(error);
     }

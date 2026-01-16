@@ -207,8 +207,11 @@ export const tasksAPI = {
         body: JSON.stringify(payload),
       },
       undefined,
-      60000
+      300000
     );
+  },
+  getLatestAllocationStatus: async () => {
+    return apiRequest('/tasks/allocate-status/latest');
   },
 
   reassignTask: async (taskId: string, agentId: string) => {
