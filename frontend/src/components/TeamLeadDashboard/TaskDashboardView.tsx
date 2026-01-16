@@ -527,11 +527,10 @@ const TaskDashboardView: React.FC = () => {
         </div>
 
         {/* KPI strip */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Total Open', value: totals.totalOpen ?? 0 },
             { label: 'Unassigned', value: totals.unassigned ?? 0 },
-            { label: 'Assigned', value: totals.assigned ?? 0 },
             { label: 'Sampled-in-queue', value: totals.sampledInQueue ?? 0 },
             { label: 'In-progress', value: totals.inProgress ?? 0 },
           ].map((c: any) => (
@@ -670,7 +669,6 @@ const TaskDashboardView: React.FC = () => {
               {(data?.openByLanguage || []).map((r: any) => (
                 <tr key={r.language}>
                   <td className="px-4 py-3 font-black text-slate-900">{r.language}</td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.totalOpen}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.sampledInQueue}</td>
