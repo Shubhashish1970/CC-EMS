@@ -341,6 +341,8 @@ router.get(
   [
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
+    query('bu').optional().isString(),
+    query('state').optional().isString(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -354,7 +356,7 @@ router.get(
 
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
-      const { dateFrom, dateTo } = req.query as any;
+      const { dateFrom, dateTo, bu, state } = req.query as any;
 
       const dateMatch: any = {};
       if (dateFrom || dateTo) {
@@ -383,7 +385,22 @@ router.get(
 
       const agentIds = agents.map((a) => a._id);
 
-      // 1) Unassigned tasks by farmer preferredLanguage
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+
+      const activityFilter: any = {};
+      if (bu) activityFilter['activity.buName'] = String(bu);
+      if (state) activityFilter['activity.state'] = String(state);
+
+      // Scope for dashboard totals:
+      // - Unassigned tasks (pool to allocate)
+      // - Plus team-assigned open tasks (sampled_in_queue + in_progress) to show agent workload
+      const openMatch: any = {
+        ...dateMatch,
+        status: { $in: ['unassigned', 'sampled_in_queue', 'in_progress'] },
+        $or: [{ status: 'unassigned' }, { assignedAgentId: { $in: agentIds } }],
+      };
+
+      // 1) Unassigned tasks by farmer preferredLanguage (with BU/State activity filter)
       const byLanguageRaw = await CallTask.aggregate([
         { $match: { status: 'unassigned', ...dateMatch } },
         {
@@ -395,6 +412,16 @@ router.get(
           },
         },
         { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: activityCollection,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        ...(bu || state ? [{ $match: activityFilter }] : []),
         {
           $group: {
             _id: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
@@ -420,7 +447,61 @@ router.get(
 
       const totalUnassigned = byLanguage.reduce((sum: number, r: any) => sum + (r.unassigned || 0), 0);
 
-      // 2) Agent workload: sampled_in_queue + in_progress
+      // 2) Open totals + by-language breakdown (unassigned + team sampled_in_queue + team in_progress)
+      const openByLanguage = await CallTask.aggregate([
+        { $match: openMatch },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: activityCollection,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        ...(bu || state ? [{ $match: activityFilter }] : []),
+        {
+          $group: {
+            _id: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
+            totalOpen: { $sum: 1 },
+            unassigned: { $sum: { $cond: [{ $eq: ['$status', 'unassigned'] }, 1, 0] } },
+            sampledInQueue: { $sum: { $cond: [{ $eq: ['$status', 'sampled_in_queue'] }, 1, 0] } },
+            inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            language: '$_id',
+            totalOpen: 1,
+            unassigned: 1,
+            sampledInQueue: 1,
+            inProgress: 1,
+          },
+        },
+      ]);
+
+      const openTotals = openByLanguage.reduce(
+        (acc: any, r: any) => {
+          acc.totalOpen += r.totalOpen || 0;
+          acc.unassigned += r.unassigned || 0;
+          acc.sampledInQueue += r.sampledInQueue || 0;
+          acc.inProgress += r.inProgress || 0;
+          return acc;
+        },
+        { totalOpen: 0, unassigned: 0, sampledInQueue: 0, inProgress: 0 }
+      );
+
+      // 3) Agent workload: sampled_in_queue + in_progress (with BU/State activity filter)
       const workloadAgg = agentIds.length
         ? await CallTask.aggregate([
             {
@@ -430,6 +511,16 @@ router.get(
                 ...dateMatch,
               },
             },
+            {
+              $lookup: {
+                from: activityCollection,
+                localField: 'activityId',
+                foreignField: '_id',
+                as: 'activity',
+              },
+            },
+            { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+            ...(bu || state ? [{ $match: activityFilter }] : []),
             {
               $group: {
                 _id: { agentId: '$assignedAgentId', status: '$status' },
@@ -463,15 +554,58 @@ router.get(
         };
       });
 
+      // 4) Filter option lists (BU/State) - derived from activities present in the open task pool
+      const filterOptionsAgg = await CallTask.aggregate([
+        { $match: openMatch },
+        {
+          $lookup: {
+            from: activityCollection,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: null,
+            buList: { $addToSet: { $ifNull: ['$activity.buName', ''] } },
+            stateList: { $addToSet: { $ifNull: ['$activity.state', ''] } },
+          },
+        },
+        { $project: { _id: 0, buList: 1, stateList: 1 } },
+      ]);
+
+      const buOptions = (filterOptionsAgg?.[0]?.buList || [])
+        .map((s: string) => String(s || '').trim())
+        .filter((s: string) => !!s)
+        .sort((a: string, b: string) => a.localeCompare(b));
+      const stateOptions = (filterOptionsAgg?.[0]?.stateList || [])
+        .map((s: string) => String(s || '').trim())
+        .filter((s: string) => !!s)
+        .sort((a: string, b: string) => a.localeCompare(b));
+
       res.json({
         success: true,
         data: {
           dateFrom: dateFrom || null,
           dateTo: dateTo || null,
+          bu: bu || null,
+          state: state || null,
+          filterOptions: {
+            buOptions,
+            stateOptions,
+          },
           unassignedByLanguage: byLanguage,
           totals: {
-            totalUnassigned,
+            totalUnassigned, // filtered unassigned pool (BU/State applied)
+            totalOpen: openTotals.totalOpen,
+            unassigned: openTotals.unassigned,
+            sampledInQueue: openTotals.sampledInQueue,
+            inProgress: openTotals.inProgress,
+            assigned: openTotals.sampledInQueue + openTotals.inProgress,
           },
+          openByLanguage,
           agentWorkload,
         },
       });
@@ -493,6 +627,8 @@ router.post(
     body('count').optional().isInt({ min: 0, max: 5000 }),
     body('dateFrom').optional().isISO8601().toDate(),
     body('dateTo').optional().isISO8601().toDate(),
+    body('bu').optional().isString(),
+    body('state').optional().isString(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -507,7 +643,7 @@ router.post(
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
       const authUserId = authReq.user._id.toString();
-      const { language, count, dateFrom, dateTo } = req.body as any;
+      const { language, count, dateFrom, dateTo, bu, state } = req.body as any;
 
       const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
       const desired = normalize(language);
@@ -583,11 +719,25 @@ router.post(
           },
         },
         { $unwind: '$farmer' },
+        {
+          $lookup: {
+            from: (await import('../models/Activity.js')).Activity.collection.name,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
       ];
+
+      const activityFilter: any = {};
+      if (bu) activityFilter['activity.buName'] = String(bu);
+      if (state) activityFilter['activity.state'] = String(state);
 
       const taskRows = await CallTask.aggregate([
         ...basePipeline,
         ...(isAllLanguages ? [] : [{ $match: { 'farmer.preferredLanguage': language } }]),
+        ...(bu || state ? [{ $match: activityFilter }] : []),
         { $sort: { scheduledDate: 1, createdAt: 1 } },
         { $limit: serverCap },
         { $project: { _id: 1, farmerLanguage: '$farmer.preferredLanguage' } },

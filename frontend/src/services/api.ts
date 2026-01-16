@@ -191,14 +191,16 @@ export const tasksAPI = {
     const query = params.toString();
     return apiRequest(`/tasks/unassigned${query ? `?${query}` : ''}`);
   },
-  getDashboard: async (filters?: { dateFrom?: string; dateTo?: string }) => {
+  getDashboard: async (filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     const params = new URLSearchParams();
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.state) params.append('state', filters.state);
     const query = params.toString();
     return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
   },
-  allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string }) => {
+  allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     // Allocation can update many tasks; allow longer timeout
     return apiRequest(
       '/tasks/allocate',

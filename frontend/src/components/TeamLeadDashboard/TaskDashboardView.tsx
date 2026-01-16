@@ -33,7 +33,7 @@ const TaskDashboardView: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [allocRun, setAllocRun] = useState<any>(null);
 
-  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '' });
+  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', bu: '', state: '' });
   const [allocLanguage, setAllocLanguage] = useState<string>('ALL');
   const [allocCount, setAllocCount] = useState<number>(0);
   const [isAllocConfirmOpen, setIsAllocConfirmOpen] = useState(false);
@@ -125,6 +125,8 @@ const TaskDashboardView: React.FC = () => {
     const res: any = await tasksAPI.getDashboard({
       dateFrom: filters.dateFrom || undefined,
       dateTo: filters.dateTo || undefined,
+      bu: filters.bu || undefined,
+      state: filters.state || undefined,
     });
     setData(res?.data || null);
   };
@@ -149,7 +151,7 @@ const TaskDashboardView: React.FC = () => {
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFrom, filters.dateTo]);
+  }, [filters.dateFrom, filters.dateTo, filters.bu, filters.state]);
 
   const isAllocRunning = allocRun?.status === 'running';
   const allocPct = useMemo(() => {
@@ -215,6 +217,7 @@ const TaskDashboardView: React.FC = () => {
   }, [unassignedRows]);
 
   const totalUnassigned = useMemo(() => Number(data?.totals?.totalUnassigned || 0), [data]);
+  const totals = useMemo(() => data?.totals || {}, [data]);
 
   const agentRows = useMemo(() => {
     const rows = Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
@@ -267,6 +270,8 @@ const TaskDashboardView: React.FC = () => {
         language: allocLanguage,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
+        bu: filters.bu || undefined,
+        state: filters.state || undefined,
       };
       // If count is 0/blank, allocate all (backend interprets missing/0 as all)
       if (allocCount && allocCount > 0) payload.count = requested;
@@ -375,7 +380,7 @@ const TaskDashboardView: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
             <div className="relative" ref={datePickerRef}>
@@ -487,13 +492,61 @@ const TaskDashboardView: React.FC = () => {
               )}
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">BU</label>
+            <select
+              value={filters.bu}
+              onChange={(e) => setFilters((p) => ({ ...p, bu: e.target.value }))}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+            >
+              <option value="">All</option>
+              {(data?.filterOptions?.buOptions || []).map((b: string) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
+            <select
+              value={filters.state}
+              onChange={(e) => setFilters((p) => ({ ...p, state: e.target.value }))}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+            >
+              <option value="">All</option>
+              {(data?.filterOptions?.stateOptions || []).map((s: string) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* KPI strip */}
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: 'Total Open', value: totals.totalOpen ?? 0 },
+            { label: 'Unassigned', value: totals.unassigned ?? 0 },
+            { label: 'Assigned', value: totals.assigned ?? 0 },
+            { label: 'Sampled-in-queue', value: totals.sampledInQueue ?? 0 },
+            { label: 'In-progress', value: totals.inProgress ?? 0 },
+          ].map((c: any) => (
+            <div key={c.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{c.label}</p>
+              <p className="text-xl font-black text-slate-900">{c.value}</p>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Unassigned by language */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black text-slate-900">Unassigned Tasks by Language</h3>
+          <h3 className="text-lg font-black text-slate-900">Tasks by Language (Open)</h3>
           <div className="text-sm font-bold text-slate-600">
             Total Unassigned: <span className="font-black text-slate-900">{data?.totals?.totalUnassigned ?? 0}</span>
           </div>
@@ -603,24 +656,31 @@ const TaskDashboardView: React.FC = () => {
         </div>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
-          <table className="min-w-[520px] w-full text-sm">
+          <table className="min-w-[780px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Language</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {unassignedRows.map((r: any) => (
+              {(data?.openByLanguage || []).map((r: any) => (
                 <tr key={r.language}>
                   <td className="px-4 py-3 font-black text-slate-900">{r.language}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.totalOpen}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.sampledInQueue}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.inProgress}</td>
                 </tr>
               ))}
-              {!unassignedRows.length && (
+              {(!data?.openByLanguage || data.openByLanguage.length === 0) && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={2}>
-                    No unassigned tasks found for this date range.
+                  <td className="px-4 py-6 text-slate-600" colSpan={5}>
+                    No open tasks found for this filter.
                   </td>
                 </tr>
               )}
