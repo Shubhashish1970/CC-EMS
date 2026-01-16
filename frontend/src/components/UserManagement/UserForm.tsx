@@ -82,6 +82,18 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
     }
   }, [isOpen, user]);
 
+  // UX: if creating a CC Agent and there is exactly one active Team Lead, preselect it
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditMode) return;
+    if (formData.role !== 'cc_agent') return;
+    if (formData.teamLeadId) return;
+    if (teamLeads.length === 1) {
+      setFormData((prev) => ({ ...prev, teamLeadId: teamLeads[0]._id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isEditMode, formData.role, teamLeads]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -106,6 +118,10 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
       showError('At least one language capability is required for CC Agents');
       return;
     }
+    if (formData.role === 'cc_agent' && !formData.teamLeadId) {
+      showError('Team Lead is required for CC Agents (needed for task allocation)');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -124,7 +140,7 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
       }
 
       // Only include teamLeadId for CC Agents
-      if (formData.role === 'cc_agent' && formData.teamLeadId) {
+      if (formData.role === 'cc_agent') {
         submitData.teamLeadId = formData.teamLeadId;
       }
 
@@ -274,21 +290,27 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
           {showTeamLeadField && (
             <div>
               <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
-                Team Lead
+                Team Lead <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.teamLeadId}
                 onChange={(e) => setFormData({ ...formData, teamLeadId: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-green-700 focus:outline-none bg-white"
                 disabled={isSubmitting}
+                required
               >
-                <option value="">Select Team Lead (Optional)</option>
+                <option value="">Select Team Lead</option>
                 {teamLeads.map((lead) => (
                   <option key={lead._id} value={lead._id}>
                     {lead.name} ({lead.email})
                   </option>
                 ))}
               </select>
+              {!teamLeads.length && (
+                <p className="text-xs text-amber-700 mt-1">
+                  No active Team Leads found. Create a Team Lead first.
+                </p>
+              )}
             </div>
           )}
 
