@@ -33,7 +33,7 @@ const TaskDashboardView: React.FC = () => {
   const [data, setData] = useState<any>(null);
 
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '' });
-  const [allocLanguage, setAllocLanguage] = useState<string>('');
+  const [allocLanguage, setAllocLanguage] = useState<string>('ALL');
   const [allocCount, setAllocCount] = useState<number>(0);
   const [isAllocConfirmOpen, setIsAllocConfirmOpen] = useState(false);
 
@@ -166,6 +166,8 @@ const TaskDashboardView: React.FC = () => {
     return map;
   }, [unassignedRows]);
 
+  const totalUnassigned = useMemo(() => Number(data?.totals?.totalUnassigned || 0), [data]);
+
   const agentRows = useMemo(() => {
     const rows = Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
     // stable order: name asc (backend already sorts by name, but keep stable)
@@ -176,8 +178,9 @@ const TaskDashboardView: React.FC = () => {
   // Preselect the first language with unassigned tasks once data is loaded
   useEffect(() => {
     if (allocLanguage) return;
-    const first = (unassignedRows as any[]).find((r) => Number(r.unassigned || 0) > 0);
-    if (first?.language) setAllocLanguage(first.language);
+    // Default to ALL (best of both worlds) if any unassigned exists
+    const any = (unassignedRows as any[]).some((r) => Number(r.unassigned || 0) > 0);
+    if (any) setAllocLanguage('ALL');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unassignedRows]);
 
@@ -186,7 +189,7 @@ const TaskDashboardView: React.FC = () => {
       toast.showError('Select a language to allocate');
       return;
     }
-    const available = Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
+    const available = allocLanguage === 'ALL' ? totalUnassigned : Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
     if (available <= 0) {
       toast.showError('No unassigned tasks for the selected language');
       return;
@@ -195,19 +198,26 @@ const TaskDashboardView: React.FC = () => {
   };
 
   const confirmAllocate = async () => {
-    const available = Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
+    const available = allocLanguage === 'ALL' ? totalUnassigned : Number(unassignedTotalByLanguage.get(allocLanguage) || 0);
     const requested = allocCount && allocCount > 0 ? Math.min(allocCount, available) : available;
 
     setIsAllocConfirmOpen(false);
     setIsLoading(true);
     try {
-      await tasksAPI.allocate({
+      const payload: any = {
         language: allocLanguage,
-        count: requested,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
-      });
-      toast.showSuccess(`Allocated ${requested} task(s) for ${allocLanguage}`);
+      };
+      // If count is 0/blank, allocate all (backend interprets missing/0 as all)
+      if (allocCount && allocCount > 0) payload.count = requested;
+
+      await tasksAPI.allocate(payload);
+      toast.showSuccess(
+        allocLanguage === 'ALL'
+          ? `Allocated ${requested} task(s) across all languages`
+          : `Allocated ${requested} task(s) for ${allocLanguage}`
+      );
       await loadDashboard();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to allocate tasks');
@@ -241,10 +251,18 @@ const TaskDashboardView: React.FC = () => {
             Auto-allocate{' '}
             <span className="font-black">
               {allocCount && allocCount > 0
-                ? Math.min(allocCount, Number(unassignedTotalByLanguage.get(allocLanguage) || 0))
-                : Number(unassignedTotalByLanguage.get(allocLanguage) || 0)}
+                ? Math.min(allocCount, allocLanguage === 'ALL' ? totalUnassigned : Number(unassignedTotalByLanguage.get(allocLanguage) || 0))
+                : (allocLanguage === 'ALL' ? totalUnassigned : Number(unassignedTotalByLanguage.get(allocLanguage) || 0))}
             </span>{' '}
-            unassigned task(s) for <span className="font-black">{allocLanguage}</span> to capable agents?
+            unassigned task(s){' '}
+            {allocLanguage === 'ALL' ? (
+              <span className="font-black">across all languages</span>
+            ) : (
+              <>
+                for <span className="font-black">{allocLanguage}</span>
+              </>
+            )}{' '}
+            to capable agents?
           </p>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs text-slate-700 font-bold">
@@ -426,6 +444,7 @@ const TaskDashboardView: React.FC = () => {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
               >
                 <option value="">Select language</option>
+                <option value="ALL">All Languages ({totalUnassigned})</option>
                 {unassignedRows
                   .filter((r: any) => Number(r.unassigned || 0) > 0)
                   .map((r: any) => (
@@ -451,7 +470,13 @@ const TaskDashboardView: React.FC = () => {
             <div className="flex items-end">
               <button
                 onClick={openAllocateConfirm}
-                disabled={isLoading || !allocLanguage || Number(unassignedTotalByLanguage.get(allocLanguage) || 0) === 0}
+                disabled={
+                  isLoading ||
+                  !allocLanguage ||
+                  (allocLanguage === 'ALL'
+                    ? totalUnassigned === 0
+                    : Number(unassignedTotalByLanguage.get(allocLanguage) || 0) === 0)
+                }
                 className="w-full px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
               >
                 Auto-Allocate

@@ -488,7 +488,8 @@ router.post(
   requirePermission('tasks.reassign'),
   [
     body('language').isString().notEmpty(),
-    body('count').optional().isInt({ min: 1, max: 500 }),
+    // count is optional: when omitted or 0, allocate all matching tasks (bounded by server cap)
+    body('count').optional().isInt({ min: 0, max: 5000 }),
     body('dateFrom').optional().isISO8601().toDate(),
     body('dateTo').optional().isISO8601().toDate(),
   ],
@@ -504,10 +505,14 @@ router.post(
 
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
-      const { language, count = 100, dateFrom, dateTo } = req.body as any;
+      const { language, count, dateFrom, dateTo } = req.body as any;
 
       const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
       const desired = normalize(language);
+      const isAllLanguages = desired === 'all' || desired === '__all__';
+      const serverCap = 5000;
+      const requestedCountRaw = typeof count === 'number' ? count : Number(count);
+      const requestedCount = Number.isFinite(requestedCountRaw) ? requestedCountRaw : 0; // 0 means "all"
 
       // Find active agents under this team lead (then do robust matching in code)
       const teamAgents = await User.find({
@@ -519,11 +524,19 @@ router.post(
         .sort({ name: 1 })
         .lean();
 
-      const capableAgents = teamAgents.filter((a: any) =>
-        Array.isArray(a.languageCapabilities) &&
-        a.languageCapabilities.some((cap: string) => normalize(cap) === desired)
-      );
+      const agentsByLanguage = new Map<string, any[]>();
+      for (const a of teamAgents as any[]) {
+        const caps: string[] = Array.isArray(a.languageCapabilities) ? a.languageCapabilities : [];
+        for (const cap of caps) {
+          const key = normalize(cap);
+          if (!key) continue;
+          const list = agentsByLanguage.get(key) || [];
+          list.push(a);
+          agentsByLanguage.set(key, list);
+        }
+      }
 
+      const capableAgents = isAllLanguages ? teamAgents : (agentsByLanguage.get(desired) || []);
       if (!capableAgents.length) {
         return res.status(400).json({
           success: false,
@@ -557,7 +570,7 @@ router.post(
       }
 
       // Find unassigned tasks for farmers of this language
-      const taskRows = await CallTask.aggregate([
+      const basePipeline: any[] = [
         { $match: { status: 'unassigned', ...dateMatch } },
         {
           $lookup: {
@@ -568,18 +581,63 @@ router.post(
           },
         },
         { $unwind: '$farmer' },
-        { $match: { 'farmer.preferredLanguage': language } },
+      ];
+
+      const taskRows = await CallTask.aggregate([
+        ...basePipeline,
+        ...(isAllLanguages ? [] : [{ $match: { 'farmer.preferredLanguage': language } }]),
         { $sort: { scheduledDate: 1, createdAt: 1 } },
-        { $limit: Number(count) },
-        { $project: { _id: 1 } },
+        { $limit: serverCap },
+        { $project: { _id: 1, farmerLanguage: '$farmer.preferredLanguage' } },
       ]);
 
-      const taskIds = taskRows.map((r: any) => r._id);
-      if (!taskIds.length) {
+      if (!taskRows.length) {
         return res.json({
           success: true,
-          message: 'No unassigned tasks found for this language',
-          data: { requested: Number(count), allocated: 0 },
+          message: isAllLanguages ? 'No unassigned tasks found' : 'No unassigned tasks found for this language',
+          data: { requested: requestedCount, allocated: 0 },
+        });
+      }
+
+      // If ALL: pick tasks in a fair way across languages (round-robin by language) up to requestedCount
+      // If requestedCount is 0 => allocate all tasks (bounded by serverCap).
+      let selectedTasks: Array<{ _id: any; farmerLanguage: string }> = [];
+
+      if (!isAllLanguages) {
+        selectedTasks = taskRows.map((r: any) => ({ _id: r._id, farmerLanguage: r.farmerLanguage }));
+        if (requestedCount > 0) selectedTasks = selectedTasks.slice(0, requestedCount);
+      } else {
+        const buckets = new Map<string, Array<{ _id: any; farmerLanguage: string }>>();
+        for (const r of taskRows as any[]) {
+          const langKey = normalize(r.farmerLanguage) || 'unknown';
+          const arr = buckets.get(langKey) || [];
+          arr.push({ _id: r._id, farmerLanguage: r.farmerLanguage });
+          buckets.set(langKey, arr);
+        }
+
+        const langs = Array.from(buckets.keys()).sort(); // stable ordering
+        const target = requestedCount > 0 ? Math.min(requestedCount, serverCap) : serverCap;
+        let added = 0;
+        while (added < target) {
+          let progressed = false;
+          for (const lk of langs) {
+            const q = buckets.get(lk);
+            if (!q || q.length === 0) continue;
+            const t = q.shift()!;
+            selectedTasks.push(t);
+            added++;
+            progressed = true;
+            if (added >= target) break;
+          }
+          if (!progressed) break; // all empty
+        }
+      }
+
+      if (!selectedTasks.length) {
+        return res.json({
+          success: true,
+          message: 'No matching tasks found',
+          data: { requested: requestedCount, allocated: 0 },
         });
       }
 
@@ -587,8 +645,24 @@ router.post(
       const STATUS_UNASSIGNED: TaskStatus = 'unassigned';
       const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
 
-      const bulkOps = taskIds.map((taskId: any, idx: number) => {
-        const agent = capableAgents[idx % capableAgents.length];
+      const languageAgentCursor = new Map<string, number>();
+      const skippedByLanguage: Record<string, number> = {};
+
+      const bulkOps = selectedTasks
+        .map((t, idx: number) => {
+          const taskId = t._id;
+          const farmerLangKey = normalize(t.farmerLanguage) || 'unknown';
+
+          const langAgents = isAllLanguages ? (agentsByLanguage.get(farmerLangKey) || []) : capableAgents;
+          if (!langAgents.length) {
+            skippedByLanguage[farmerLangKey] = (skippedByLanguage[farmerLangKey] || 0) + 1;
+            return null;
+          }
+
+          const cursor = languageAgentCursor.get(farmerLangKey) || 0;
+          const agent = langAgents[cursor % langAgents.length];
+          languageAgentCursor.set(farmerLangKey, cursor + 1);
+
         return {
           updateOne: {
             filter: { _id: taskId, status: STATUS_UNASSIGNED },
@@ -607,7 +681,8 @@ router.post(
             },
           },
         };
-      });
+      })
+      .filter(Boolean);
 
       const result = await CallTask.bulkWrite(bulkOps as any, { ordered: false });
 
@@ -616,10 +691,11 @@ router.post(
         message: 'Tasks allocated successfully',
         data: {
           language,
-          requested: Number(count),
-          matchedTasks: taskIds.length,
+          requested: requestedCount,
+          matchedTasks: selectedTasks.length,
           allocated: result.modifiedCount || 0,
           agentsUsed: capableAgents.map((a: any) => ({ agentId: a._id.toString(), name: a.name, email: a.email })),
+          skippedByLanguage,
         },
       });
     } catch (error) {
