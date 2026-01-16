@@ -506,21 +506,38 @@ router.post(
       const teamLeadId = authReq.user._id.toString();
       const { language, count = 100, dateFrom, dateTo } = req.body as any;
 
-      // Find capable agents under this team lead
-      const agents = await User.find({
+      const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
+      const desired = normalize(language);
+
+      // Find active agents under this team lead (then do robust matching in code)
+      const teamAgents = await User.find({
         teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
         role: 'cc_agent',
         isActive: true,
-        languageCapabilities: language,
       })
-        .select('_id name email')
+        .select('_id name email languageCapabilities')
         .sort({ name: 1 })
         .lean();
 
-      if (!agents.length) {
+      const capableAgents = teamAgents.filter((a: any) =>
+        Array.isArray(a.languageCapabilities) &&
+        a.languageCapabilities.some((cap: string) => normalize(cap) === desired)
+      );
+
+      if (!capableAgents.length) {
         return res.status(400).json({
           success: false,
-          error: { message: `No active agents found with language capability "${language}"` },
+          error: {
+            message: `No active agents found under your team with language capability "${language}"`,
+            details: {
+              teamAgentsFound: teamAgents.length,
+              teamAgents: teamAgents.map((a: any) => ({
+                name: a.name,
+                email: a.email,
+                languageCapabilities: Array.isArray(a.languageCapabilities) ? a.languageCapabilities : [],
+              })),
+            },
+          },
         });
       }
 
@@ -571,7 +588,7 @@ router.post(
       const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
 
       const bulkOps = taskIds.map((taskId: any, idx: number) => {
-        const agent = agents[idx % agents.length];
+        const agent = capableAgents[idx % capableAgents.length];
         return {
           updateOne: {
             filter: { _id: taskId, status: STATUS_UNASSIGNED },
@@ -602,7 +619,7 @@ router.post(
           requested: Number(count),
           matchedTasks: taskIds.length,
           allocated: result.modifiedCount || 0,
-          agentsUsed: agents.map((a) => ({ agentId: a._id.toString(), name: a.name, email: a.email })),
+          agentsUsed: capableAgents.map((a: any) => ({ agentId: a._id.toString(), name: a.name, email: a.email })),
         },
       });
     } catch (error) {

@@ -493,11 +493,12 @@ const TaskDashboardView: React.FC = () => {
         <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress</p>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
-          <table className="min-w-[780px] w-full text-sm">
+          <table className="min-w-[980px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Agent</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Employee ID</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Languages</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Assigned</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
@@ -512,6 +513,9 @@ const TaskDashboardView: React.FC = () => {
                     <div className="text-xs text-slate-500">{a.email}</div>
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.employeeId}</td>
+                  <td className="px-4 py-3 text-xs font-bold text-slate-700">
+                    {(Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).join(', ') || '—'}
+                  </td>
                   <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress}</td>
@@ -520,7 +524,7 @@ const TaskDashboardView: React.FC = () => {
               ))}
               {!agentRows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={6}>
+                  <td className="px-4 py-6 text-slate-600" colSpan={7}>
                     No agents found for this Team Lead.
                   </td>
                 </tr>
