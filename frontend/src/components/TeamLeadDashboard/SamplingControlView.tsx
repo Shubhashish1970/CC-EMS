@@ -364,8 +364,16 @@ const SamplingControlView: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      // Ensure status is visible immediately
-      await loadLatestRunStatus();
+      // Optimistic UI: show progress immediately so users know the run has begun.
+      // This will be reconciled with the real backend run status via polling within ~1-2 seconds.
+      setLatestRun({
+        _id: 'optimistic',
+        status: 'running',
+        matched: totalMatchingByLifecycle,
+        processed: 0,
+        tasksCreatedTotal: 0,
+        errorCount: 0,
+      });
 
       const res: any = await samplingAPI.runSampling({
         lifecycleStatus: activityFilters.lifecycleStatus,
