@@ -162,6 +162,34 @@ const INDIAN_NAMES: Record<string, string[]> = {
   ]
 };
 
+const formatDDMMYYYY = (d: Date): string => {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(d.getFullYear());
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+const parseDateParam = (value: string): Date | null => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  // Support DD/MM/YYYY (new)
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+    const [ddStr, mmStr, yyyyStr] = raw.split('/');
+    const dd = Number(ddStr);
+    const mm = Number(mmStr);
+    const yyyy = Number(yyyyStr);
+    const d = new Date(yyyy, mm - 1, dd);
+    if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) return null;
+    return d;
+  }
+
+  // Support YYYY-MM-DD (legacy) + ISO (fallback)
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  return d;
+};
+
 // Helper functions
 const generateMobileNumber = (index: number): string => {
   const prefixes = [7, 8, 9];
@@ -274,7 +302,8 @@ const generateSampleData = () => {
     const activity = {
       activityId: `FFA-ACT-${1000 + i}`,
       type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
-      date: activityDate.toISOString().split('T')[0],
+      // NEW contract: DD/MM/YYYY
+      date: formatDDMMYYYY(activityDate),
       officerId: officerId,
       officerName: officerName,
       location: village, // Use village name as location
@@ -348,9 +377,16 @@ app.get('/api/activities', (req: Request, res: Response) => {
   // Filter activities by dateFrom if provided (for incremental sync)
   let filteredActivities = mockActivities;
   if (dateFrom && typeof dateFrom === 'string') {
-    const dateFromDate = new Date(dateFrom);
+    const dateFromDate = parseDateParam(dateFrom);
+    if (!dateFromDate) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid dateFrom. Use DD/MM/YYYY (recommended) or YYYY-MM-DD.' },
+      });
+    }
     filteredActivities = mockActivities.filter((activity) => {
-      const activityDate = new Date(activity.date);
+      const activityDate = parseDateParam(activity.date);
+      if (!activityDate) return false;
       return activityDate >= dateFromDate;
     });
     console.log(`Filtering activities: ${mockActivities.length} total, ${filteredActivities.length} after ${dateFrom}`);

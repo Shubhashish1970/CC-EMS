@@ -38,6 +38,52 @@ interface FFAFarmer {
 const FFA_API_URL = process.env.FFA_API_URL || 'http://localhost:4000/api';
 
 /**
+ * Parse FFA activity date string into a Date.
+ * Supports:
+ * - DD/MM/YYYY (new contract)
+ * - YYYY-MM-DD (legacy contract)
+ * - ISO strings (fallback)
+ */
+const parseFFADate = (value: string): Date => {
+  if (!value || typeof value !== 'string') {
+    throw new Error('Invalid activity date (missing)');
+  }
+
+  const raw = value.trim();
+
+  // New: DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+    const [ddStr, mmStr, yyyyStr] = raw.split('/');
+    const dd = Number(ddStr);
+    const mm = Number(mmStr);
+    const yyyy = Number(yyyyStr);
+
+    const d = new Date(yyyy, mm - 1, dd);
+    // Validate round-trip (catches invalid dates like 32/13/2026)
+    if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
+      throw new Error(`Invalid activity date (DD/MM/YYYY): ${raw}`);
+    }
+    return d;
+  }
+
+  // Legacy: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(`${raw}T00:00:00.000Z`);
+    if (isNaN(d.getTime())) {
+      throw new Error(`Invalid activity date (YYYY-MM-DD): ${raw}`);
+    }
+    return d;
+  }
+
+  // Fallback: ISO or other parseable formats
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) {
+    throw new Error(`Invalid activity date: ${raw}`);
+  }
+  return d;
+};
+
+/**
  * Fetch activities from FFA API with timeout and better error handling
  * @param dateFrom - Optional date to fetch activities after (for incremental sync)
  */
@@ -180,7 +226,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
         $set: {
           activityId: ffaActivity.activityId,
           type: ffaActivity.type,
-          date: new Date(ffaActivity.date),
+          date: parseFFADate(ffaActivity.date),
           officerId: ffaActivity.officerId,
           officerName: ffaActivity.officerName,
           location: ffaActivity.location,
