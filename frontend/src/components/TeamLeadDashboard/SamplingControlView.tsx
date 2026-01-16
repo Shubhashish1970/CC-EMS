@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square } from 'lucide-react';
 import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import Modal from '../shared/Modal';
 
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
 
@@ -32,6 +33,7 @@ const SamplingControlView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState<any>(null);
   const [latestRun, setLatestRun] = useState<LatestRun | null>(null);
+  const [isReactivateConfirmOpen, setIsReactivateConfirmOpen] = useState(false);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
   const [activityCoolingDays, setActivityCoolingDays] = useState<number>(5);
@@ -408,9 +410,11 @@ const SamplingControlView: React.FC = () => {
       toast.showError('No activities match the current filters');
       return;
     }
-    const confirm = window.prompt('Type YES to confirm reactivating ALL matching activities to Active');
-    if (confirm !== 'YES') return;
+    setIsReactivateConfirmOpen(true);
+  };
 
+  const confirmReactivate = async () => {
+    setIsReactivateConfirmOpen(false);
     setIsLoading(true);
     try {
       await samplingAPI.reactivate({
@@ -424,6 +428,7 @@ const SamplingControlView: React.FC = () => {
       toast.showSuccess('Reactivated activities');
       await loadStats();
       await loadUnassigned();
+      await loadLatestRunStatus();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to reactivate');
     } finally {
@@ -490,6 +495,43 @@ const SamplingControlView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <Modal
+        isOpen={isReactivateConfirmOpen}
+        onClose={() => setIsReactivateConfirmOpen(false)}
+        title="Confirm Reactivation"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 font-medium">
+            Reactivate <span className="font-black">{totalMatchingByLifecycle}</span> matching activities to{' '}
+            <span className="font-black">Active</span>?
+          </p>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs text-amber-900 font-bold">
+              This will delete existing tasks and sampling audit for the matching activities before reactivating.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsReactivateConfirmOpen(false)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmReactivate}
+              className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
+              disabled={isLoading}
+            >
+              Yes
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
