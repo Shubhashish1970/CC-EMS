@@ -54,13 +54,12 @@ interface ActivitySamplingStatus {
 }
 
 type ActivityTableColumnKey =
+  | 'expand'
   | 'type'
   | 'samplingStatus'
   | 'date'
   | 'territory'
-  | 'zone'
   | 'bu'
-  | 'location'
   | 'officer'
   | 'farmersTotal'
   | 'farmersSampled'
@@ -70,13 +69,12 @@ type ActivityTableColumnKey =
   | 'completed';
 
 const DEFAULT_ACTIVITY_TABLE_WIDTHS: Record<ActivityTableColumnKey, number> = {
+  expand: 56,
   type: 180,
   samplingStatus: 140,
   date: 130,
   territory: 240,
-  zone: 190,
   bu: 170,
-  location: 280,
   officer: 220,
   farmersTotal: 130,
   farmersSampled: 150,
@@ -420,6 +418,8 @@ const ActivitySamplingView: React.FC = () => {
   const getSortValue = (item: ActivitySamplingStatus, key: ActivityTableColumnKey): string | number => {
     const a: any = item.activity as any;
     switch (key) {
+      case 'expand':
+        return 0;
       case 'type':
         return (item.activity.type || '').toLowerCase();
       case 'samplingStatus':
@@ -428,12 +428,8 @@ const ActivitySamplingView: React.FC = () => {
         return new Date(item.activity.date).getTime() || 0;
       case 'territory':
         return ((a.territoryName || item.activity.territory || '') as string).toLowerCase();
-      case 'zone':
-        return ((a.zoneName || '') as string).toLowerCase();
       case 'bu':
         return ((a.buName || '') as string).toLowerCase();
-      case 'location':
-        return (item.activity.location || '').toLowerCase();
       case 'officer':
         return (item.activity.officerName || '').toLowerCase();
       case 'farmersTotal':
@@ -930,7 +926,7 @@ const ActivitySamplingView: React.FC = () => {
                                   setDraftEnd(e.target.value);
                                 }}
                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                              />
+                />
                             </div>
                           </div>
 
@@ -1073,13 +1069,12 @@ const ActivitySamplingView: React.FC = () => {
                   <tr>
                     {(
                       [
+                        { key: 'expand', label: '' },
                         { key: 'type', label: 'Type' },
                         { key: 'samplingStatus', label: 'Sampling' },
                         { key: 'date', label: 'Date' },
                         { key: 'territory', label: 'Territory' },
-                        { key: 'zone', label: 'Zone' },
                         { key: 'bu', label: 'BU' },
-                        { key: 'location', label: 'Location' },
                         { key: 'officer', label: 'Officer' },
                         { key: 'farmersTotal', label: 'Total Farmers' },
                         { key: 'farmersSampled', label: 'Farmers Sampled' },
@@ -1096,12 +1091,12 @@ const ActivitySamplingView: React.FC = () => {
                           key={col.key}
                           className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
                           style={{ width, minWidth: width }}
-                          onClick={() => handleHeaderClick(col.key)}
+                          onClick={col.key === 'expand' ? undefined : () => handleHeaderClick(col.key)}
                           title="Click to sort"
                         >
                           <div className="flex items-center gap-2">
                             <span className="truncate">{col.label}</span>
-                            {isSorted && (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                            {col.key !== 'expand' && isSorted && (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                           </div>
                           <div
                             className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
@@ -1118,7 +1113,6 @@ const ActivitySamplingView: React.FC = () => {
                     const isExpanded = expandedActivity === item.activity._id;
                     const a: any = item.activity as any;
                     const territory = String((a.territoryName || item.activity.territory || '') ?? '').trim();
-                    const zone = String(a.zoneName ?? '').trim();
                     const bu = String(a.buName ?? '').trim();
                     const totalFarmers = item.activity.farmerIds?.length || 0;
                     const farmersSampled = item.samplingAudit?.sampledCount ?? null;
@@ -1133,33 +1127,39 @@ const ActivitySamplingView: React.FC = () => {
                           <td
                             className="px-3 py-3 text-sm"
                             style={{
-                              width: tableColumnWidths.type ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.type,
-                              minWidth: tableColumnWidths.type ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.type,
+                              width: tableColumnWidths.expand ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.expand,
+                              minWidth: tableColumnWidths.expand ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.expand,
                             }}
                           >
                             <button
                               type="button"
-                              className="w-full text-left"
-                    onClick={() => toggleExpand(item.activity._id)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 transition-colors"
+                              onClick={() => toggleExpand(item.activity._id)}
                               title="Expand / collapse"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {isExpanded ? (
-                                  <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
-                                ) : (
-                                  <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />
-                                )}
-                                <ActivityIcon size={16} className="text-green-700 flex-shrink-0" />
-                                <span className="font-black text-slate-900 truncate">{item.activity.type}</span>
-                        </div>
+                              {isExpanded ? (
+                                <ChevronUp size={16} className="text-slate-500" />
+                              ) : (
+                                <ChevronDown size={16} className="text-slate-500" />
+                              )}
                             </button>
+                          </td>
+                          <td
+                            className="px-3 py-3 text-sm"
+                            style={{
+                              width: tableColumnWidths.type ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.type,
+                              minWidth: tableColumnWidths.type ?? DEFAULT_ACTIVITY_TABLE_WIDTHS.type,
+                            }}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <ActivityIcon size={16} className="text-green-700 flex-shrink-0" />
+                              <span className="font-black text-slate-900 truncate">{item.activity.type}</span>
+                            </div>
                           </td>
                           <td className="px-3 py-3 text-sm">{getSamplingStatusBadge(item.samplingStatus)}</td>
                           <td className="px-3 py-3 text-sm text-slate-700">{formatDate(item.activity.date)}</td>
                           <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory || ''}>{territory || '-'}</td>
-                          <td className="px-3 py-3 text-sm text-slate-700 truncate" title={zone || ''}>{zone || '-'}</td>
                           <td className="px-3 py-3 text-sm text-slate-700 truncate" title={bu || ''}>{bu || '-'}</td>
-                          <td className="px-3 py-3 text-sm text-slate-700 truncate" title={item.activity.location || ''}>{item.activity.location || '-'}</td>
                           <td className="px-3 py-3 text-sm text-slate-700 truncate" title={item.activity.officerName || ''}>{item.activity.officerName || '-'}</td>
                           <td className="px-3 py-3 text-sm font-bold text-slate-900">{totalFarmers}</td>
                           <td className="px-3 py-3 text-sm font-bold text-slate-900">
@@ -1173,208 +1173,208 @@ const ActivitySamplingView: React.FC = () => {
                           <td className="px-3 py-3 text-sm font-bold text-green-800">{completed}</td>
                         </tr>
 
-                        {isExpanded && (
+                  {isExpanded && (
                           <tr className="bg-white">
-                            <td colSpan={14} className="px-5 pb-5 pt-4">
+                            <td colSpan={13} className="px-5 pb-5 pt-4">
                               <div className="space-y-4">
-                                {/* Assigned Agents */}
-                                {item.assignedAgents.length > 0 && (
+                        {/* Assigned Agents */}
+                        {item.assignedAgents.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-black text-slate-700 mb-2">Assigned Agents</h4>
+                            <div className="space-y-2">
+                              {item.assignedAgents.map((agent) => (
+                                <div
+                                  key={agent.agentId}
+                                  className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200"
+                                >
                                   <div>
-                                    <h4 className="text-sm font-black text-slate-700 mb-2">Assigned Agents</h4>
-                                    <div className="space-y-2">
-                                      {item.assignedAgents.map((agent) => (
-                                        <div
-                                          key={agent.agentId}
-                                          className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200"
-                                        >
-                                          <div>
-                                            <p className="text-sm font-medium text-slate-900">{agent.agentName}</p>
-                                            <p className="text-xs text-slate-600">{agent.agentEmail}</p>
-                          </div>
-                                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
-                                            {agent.tasksCount} task{agent.tasksCount !== 1 ? 's' : ''}
-                                          </span>
-                          </div>
-                                      ))}
-                          </div>
-                        </div>
-                                )}
-
-                                {/* Sampling Audit Details */}
-                          {item.samplingAudit && (
-                                  <div>
-                                    <h4 className="text-sm font-black text-slate-700 mb-2">Sampling Details</h4>
-                                    <div className="grid grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                      <div>
-                                        <p className="text-xs text-slate-500 mb-1">Sampling Percentage</p>
-                                        <p className="text-sm font-bold text-slate-900">{item.samplingAudit.samplingPercentage}%</p>
-                        </div>
-                                      <div>
-                                        <p className="text-xs text-slate-500 mb-1">Total Farmers</p>
-                                        <p className="text-sm font-bold text-slate-900">{item.samplingAudit.totalFarmers}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs text-slate-500 mb-1">Sampled Count</p>
-                                        <p className="text-sm font-bold text-slate-900">{item.samplingAudit.sampledCount}</p>
-                                      </div>
-                                    </div>
+                                    <p className="text-sm font-medium text-slate-900">{agent.agentName}</p>
+                                    <p className="text-xs text-slate-600">{agent.agentEmail}</p>
                                   </div>
-                                )}
-
-                                {/* Crops and Products */}
-                                {(item.activity.crops?.length > 0 || item.activity.products?.length > 0) && (
-                                  <div>
-                                    <h4 className="text-sm font-black text-slate-700 mb-2">Activity Details</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                      {item.activity.crops?.map((crop, idx) => (
-                                        <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-200">
-                                          {crop}
-                              </span>
-                                      ))}
-                                      {item.activity.products?.map((product, idx) => (
-                                        <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium border border-blue-200">
-                                          {product}
-                              </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Farmers List */}
-                                {item.farmers && item.farmers.length > 0 ? (
-                                  <div>
-                                    <h4 className="text-sm font-black text-slate-700 mb-3">
-                                      Farmers List ({item.farmers.length} of {item.activity.farmerIds?.length || 0})
-                                      <span className="ml-2 text-xs font-normal text-slate-500">
-                                        ({item.farmers.filter(f => f.isSampled).length} sampled, {item.farmers.filter(f => !f.isSampled).length} not sampled)
-                              </span>
-                                    </h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                                      {item.farmers.map((farmer) => (
-                                        <div
-                                          key={farmer.farmerId}
-                                          className={`p-3 rounded-xl border-2 transition-all ${
-                                            farmer.isSampled
-                                              ? 'bg-green-50 border-green-200'
-                                              : 'bg-slate-50 border-slate-200'
-                                          }`}
-                                        >
-                                          <div className="flex items-start gap-3">
-                                            {/* Farmer Avatar */}
-                                            <div className="flex-shrink-0">
-                                              {farmer.photoUrl ? (
-                                                <img
-                                                  src={farmer.photoUrl}
-                                                  alt={farmer.name}
-                                                  className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
-                                                  onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.src = '/images/farmer-default-logo.png';
-                                                  }}
-                                                />
-                                              ) : (
-                                                <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
-                                                  farmer.isSampled
-                                                    ? 'bg-green-100 border-green-300'
-                                                    : 'bg-slate-100 border-slate-300'
-                                                }`}>
-                                                  <UserIcon size={20} className={farmer.isSampled ? 'text-green-700' : 'text-slate-400'} />
+                                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+                                    {agent.tasksCount} task{agent.tasksCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
-                      </div>
 
-                                            {/* Farmer Info */}
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center gap-2 mb-1">
-                                                <p className="text-sm font-black text-slate-900 truncate">{farmer.name}</p>
-                                                {farmer.isSampled ? (
-                                                  <CheckCircle2 size={14} className="text-green-600 flex-shrink-0" />
-                                                ) : (
-                                                  <XCircle size={14} className="text-slate-400 flex-shrink-0" />
+                        {/* Sampling Audit Details */}
+                        {item.samplingAudit && (
+                          <div>
+                            <h4 className="text-sm font-black text-slate-700 mb-2">Sampling Details</h4>
+                            <div className="grid grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Sampling Percentage</p>
+                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.samplingPercentage}%</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Total Farmers</p>
+                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.totalFarmers}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">Sampled Count</p>
+                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.sampledCount}</p>
+                              </div>
+                            </div>
+                          </div>
                         )}
-                      </div>
-                                              <div className="space-y-1 text-xs text-slate-600">
-                                                <div className="flex items-center gap-1.5">
-                                                  <Phone size={12} />
-                                                  <span className="font-medium">{farmer.mobileNumber}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                  <MapPin size={12} />
-                                                  <span className="truncate">{farmer.location}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                  <span className="font-medium">Language:</span>
-                                                  <span>{farmer.preferredLanguage}</span>
-                    </div>
-                  </div>
 
-                                              {/* Sampling Status Badge */}
-                                              {farmer.isSampled && farmer.taskStatus && (
-                                                <div className="mt-2 pt-2 border-t border-green-200">
-                                                  <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-green-700 font-medium">Assigned to:</span>
-                                                    <span className="text-xs font-bold text-green-800">{farmer.assignedAgentName || 'Unknown'}</span>
-                                                  </div>
-                                                  <div className="flex items-center justify-between mt-1">
-                                                    <span className="text-xs text-green-700 font-medium">Status:</span>
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                                      farmer.taskStatus === 'sampled_in_queue' ? 'bg-yellow-100 text-yellow-700' :
-                                                      farmer.taskStatus === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                                                      farmer.taskStatus === 'completed' ? 'bg-green-100 text-green-700' :
-                                                      farmer.taskStatus === 'not_reachable' ? 'bg-red-100 text-red-700' :
-                                                      farmer.taskStatus === 'invalid_number' ? 'bg-red-100 text-red-700' :
-                                                      'bg-gray-100 text-gray-700'
-                                                    }`}>
-                                                      {farmer.taskStatus ? getTaskStatusLabel(farmer.taskStatus) : 'Unknown'}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
+                        {/* Crops and Products */}
+                        {(item.activity.crops?.length > 0 || item.activity.products?.length > 0) && (
+                          <div>
+                            <h4 className="text-sm font-black text-slate-700 mb-2">Activity Details</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {item.activity.crops?.map((crop, idx) => (
+                                <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-200">
+                                  {crop}
+                                </span>
+                              ))}
+                              {item.activity.products?.map((product, idx) => (
+                                <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium border border-blue-200">
+                                  {product}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Farmers List */}
+                        {item.farmers && item.farmers.length > 0 ? (
+                          <div>
+                            <h4 className="text-sm font-black text-slate-700 mb-3">
+                              Farmers List ({item.farmers.length} of {item.activity.farmerIds?.length || 0})
+                              <span className="ml-2 text-xs font-normal text-slate-500">
+                                ({item.farmers.filter(f => f.isSampled).length} sampled, {item.farmers.filter(f => !f.isSampled).length} not sampled)
+                              </span>
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                              {item.farmers.map((farmer) => (
+                                <div
+                                  key={farmer.farmerId}
+                                  className={`p-3 rounded-xl border-2 transition-all ${
+                                    farmer.isSampled
+                                      ? 'bg-green-50 border-green-200'
+                                      : 'bg-slate-50 border-slate-200'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {/* Farmer Avatar */}
+                                    <div className="flex-shrink-0">
+                                      {farmer.photoUrl ? (
+                                        <img
+                                          src={farmer.photoUrl}
+                                          alt={farmer.name}
+                                          className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = '/images/farmer-default-logo.png';
+                                          }}
+                                        />
+                                      ) : (
+                                        <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                                          farmer.isSampled
+                                            ? 'bg-green-100 border-green-300'
+                                            : 'bg-slate-100 border-slate-300'
+                                        }`}>
+                                          <UserIcon size={20} className={farmer.isSampled ? 'text-green-700' : 'text-slate-400'} />
                                         </div>
-                                      ))}
+                                      )}
                                     </div>
-                                  </div>
-                                ) : (
-                                  // Show message if no farmers or farmers array missing
-                                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                                    <div className="flex items-start gap-3">
-                                      <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                                      <div className="flex-1">
-                                        <p className="text-sm text-amber-700 font-medium">
-                                          {item.activity.farmerIds && item.activity.farmerIds.length > 0
-                                            ? `This activity has ${item.activity.farmerIds.length} farmers, but farmer details are not available.`
-                                            : 'No farmers are associated with this activity.'}
-                                        </p>
-                                        {item.activity.farmerIds && item.activity.farmerIds.length > 0 && (
-                                          <div className="mt-2 space-y-1">
-                                            <p className="text-xs text-amber-600">
-                                              Farmers may need to be synced from FFA or farmer documents may not exist in the database.
-                                            </p>
-                                            <Button
-                                              variant="secondary"
-                                              size="sm"
-                                              onClick={() => handleSyncFFA(false)}
-                                              disabled={isIncrementalSyncing || isFullSyncing}
-                                              className="mt-2"
-                                            >
-                                              <Download size={14} className={isIncrementalSyncing ? 'animate-spin' : ''} />
-                                              {isIncrementalSyncing ? 'Syncing...' : 'Sync FFA Data'}
-                                            </Button>
-                                          </div>
+
+                                    {/* Farmer Info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="text-sm font-black text-slate-900 truncate">{farmer.name}</p>
+                                        {farmer.isSampled ? (
+                                          <CheckCircle2 size={14} className="text-green-600 flex-shrink-0" />
+                                        ) : (
+                                          <XCircle size={14} className="text-slate-400 flex-shrink-0" />
                                         )}
                                       </div>
+                                      <div className="space-y-1 text-xs text-slate-600">
+                                        <div className="flex items-center gap-1.5">
+                                          <Phone size={12} />
+                                          <span className="font-medium">{farmer.mobileNumber}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <MapPin size={12} />
+                                          <span className="truncate">{farmer.location}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-medium">Language:</span>
+                                          <span>{farmer.preferredLanguage}</span>
+                                        </div>
+                                      </div>
+
+                                      {/* Sampling Status Badge */}
+                                      {farmer.isSampled && farmer.taskStatus && (
+                                        <div className="mt-2 pt-2 border-t border-green-200">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-xs text-green-700 font-medium">Assigned to:</span>
+                                            <span className="text-xs font-bold text-green-800">{farmer.assignedAgentName || 'Unknown'}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between mt-1">
+                                            <span className="text-xs text-green-700 font-medium">Status:</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                              farmer.taskStatus === 'sampled_in_queue' ? 'bg-yellow-100 text-yellow-700' :
+                                              farmer.taskStatus === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                                              farmer.taskStatus === 'completed' ? 'bg-green-100 text-green-700' :
+                                              farmer.taskStatus === 'not_reachable' ? 'bg-red-100 text-red-700' :
+                                              farmer.taskStatus === 'invalid_number' ? 'bg-red-100 text-red-700' :
+                                              'bg-gray-100 text-gray-700'
+                                            }`}>
+                                              {farmer.taskStatus ? getTaskStatusLabel(farmer.taskStatus) : 'Unknown'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          // Show message if no farmers or farmers array missing
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <div className="flex items-start gap-3">
+                              <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                              <div className="flex-1">
+                                <p className="text-sm text-amber-700 font-medium">
+                                  {item.activity.farmerIds && item.activity.farmerIds.length > 0
+                                    ? `This activity has ${item.activity.farmerIds.length} farmers, but farmer details are not available.`
+                                    : 'No farmers are associated with this activity.'}
+                                </p>
+                                {item.activity.farmerIds && item.activity.farmerIds.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs text-amber-600">
+                                      Farmers may need to be synced from FFA or farmer documents may not exist in the database.
+                                    </p>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => handleSyncFFA(false)}
+                                      disabled={isIncrementalSyncing || isFullSyncing}
+                                      className="mt-2"
+                                    >
+                                      <Download size={14} className={isIncrementalSyncing ? 'animate-spin' : ''} />
+                                      {isIncrementalSyncing ? 'Syncing...' : 'Sync FFA Data'}
+                                    </Button>
                                   </div>
                                 )}
                               </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                             </td>
                           </tr>
-                        )}
+                  )}
                       </React.Fragment>
-                    );
-                  })}
+              );
+            })}
                 </tbody>
               </table>
             </div>
