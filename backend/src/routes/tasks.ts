@@ -131,11 +131,8 @@ router.post(
         throw error;
       }
 
-      // Update status to in_progress if it's sampled_in_queue
-      if (task.status === 'sampled_in_queue') {
-        await updateTaskStatus(taskId, 'in_progress', 'Task selected by agent');
-        task.status = 'in_progress';
-      }
+      // IMPORTANT: Do NOT auto-move to in_progress on load.
+      // Status should move to in_progress only after agent selects an Outbound Status.
 
       // Format activity data
       const activity = task.activityId as any;
@@ -171,6 +168,371 @@ router.post(
   }
 );
 
+// @route   POST /api/tasks/:id/mark-in-progress
+// @desc    Mark task as in_progress (called when agent selects Outbound Status)
+// @access  Private (CC Agent only)
+router.post(
+  '/:id/mark-in-progress',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const taskId = req.params.id;
+
+      const task = await CallTask.findById(taskId);
+      if (!task) {
+        const error: AppError = new Error('Task not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!task.assignedAgentId || task.assignedAgentId.toString() !== agentId) {
+        const error: AppError = new Error('Task not assigned to you');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      if (task.status === 'sampled_in_queue') {
+        // First meaningful action by agent -> mark attempt start
+        if (!(task as any).callStartedAt) {
+          (task as any).callStartedAt = new Date();
+        }
+        task.status = 'in_progress';
+        task.interactionHistory.push({
+          timestamp: new Date(),
+          status: 'in_progress',
+          notes: 'Outbound status selected by agent',
+        });
+        await task.save();
+      }
+
+      res.json({ success: true, data: { taskId: task._id.toString(), status: task.status, callStartedAt: (task as any).callStartedAt || null } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/history
+// @desc    Agent History (all own tasks except sampled_in_queue), with filters
+// @access  Private (CC Agent)
+router.get(
+  '/own/history',
+  requirePermission('tasks.view.own'),
+  [
+    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+
+      const { status, search, dateFrom, dateTo, page, limit } = req.query as any;
+      const p = page ? Number(page) : 1;
+      const l = limit ? Number(limit) : 20;
+      const skip = (p - 1) * l;
+
+      const baseMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' },
+      };
+      if (status) baseMatch.status = String(status) as TaskStatus;
+
+      // Date filter: primarily by callStartedAt; fallback to updatedAt for older records.
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        baseMatch.$or = [
+          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+        ];
+      }
+
+      const normalizedSearch = String(search || '').trim();
+      if (normalizedSearch) {
+        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(escaped, 'i');
+
+        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+
+        const agg = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmer' } },
+          { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activity' } },
+          { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+          {
+            $match: {
+              $or: [
+                { 'farmer.name': re },
+                { 'farmer.mobileNumber': re },
+                { 'farmer.location': re },
+                { 'farmer.preferredLanguage': re },
+                { 'activity.type': re },
+                { 'activity.officerName': re },
+                { 'activity.tmName': re },
+                { 'activity.territoryName': re },
+                { 'activity.territory': re },
+                { 'activity.state': re },
+                { 'activity.activityId': re },
+              ],
+            },
+          },
+          { $sort: { updatedAt: -1 } },
+          {
+            $facet: {
+              data: [{ $skip: skip }, { $limit: l }],
+              total: [{ $count: 'count' }],
+            },
+          },
+        ]);
+
+        const tasks = agg?.[0]?.data || [];
+        const total = agg?.[0]?.total?.[0]?.count || 0;
+
+        return res.json({
+          success: true,
+          data: {
+            tasks,
+            pagination: { page: p, limit: l, total, pages: Math.ceil(total / l) },
+          },
+        });
+      }
+
+      const tasks = await CallTask.find(baseMatch)
+        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+        .populate('activityId', 'activityId type date officerName tmName location territory territoryName state zoneName buName')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean();
+
+      const total = await CallTask.countDocuments(baseMatch);
+
+      res.json({
+        success: true,
+        data: {
+          tasks,
+          pagination: { page: p, limit: l, total, pages: Math.ceil(total / l) },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/history/:id
+// @desc    Agent History detail for a specific task
+// @access  Private (CC Agent)
+router.get(
+  '/own/history/:id',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const taskId = req.params.id;
+
+      const task = await CallTask.findById(taskId)
+        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+        .populate('activityId', 'activityId type date officerName tmName location territory territoryName state zoneName buName crops products')
+        .populate('assignedAgentId', 'name email employeeId')
+        .lean();
+
+      if (!task) {
+        const error: AppError = new Error('Task not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!task.assignedAgentId || (task.assignedAgentId as any)?._id?.toString?.() !== agentId) {
+        const error: AppError = new Error('Access denied');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      res.json({ success: true, data: { task } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/analytics
+// @desc    Agent performance analytics (attempts + outcomes) with time-bucket toggle
+// @access  Private (CC Agent)
+router.get(
+  '/own/analytics',
+  requirePermission('tasks.view.own'),
+  [
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('bucket').optional().isIn(['daily', 'weekly', 'monthly']),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const { dateFrom, dateTo, bucket } = req.query as any;
+
+      const from = dateFrom ? new Date(dateFrom) : null;
+      const to = dateTo ? new Date(dateTo) : null;
+      if (from) from.setHours(0, 0, 0, 0);
+      if (to) to.setHours(23, 59, 59, 999);
+
+      const match: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' }, // exclude in-queue
+        callStartedAt: { $ne: null },
+      };
+      if (from || to) {
+        match.callStartedAt = { ...(match.callStartedAt || {}), ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) };
+      }
+
+      const bucketKey = String(bucket || 'daily');
+      const dateExpr =
+        bucketKey === 'monthly'
+          ? { $dateToString: { format: '%Y-%m', date: '$callStartedAt' } }
+          : bucketKey === 'weekly'
+          ? { $dateToString: { format: '%G-W%V', date: '$callStartedAt' } }
+          : { $dateToString: { format: '%Y-%m-%d', date: '$callStartedAt' } };
+
+      const agg = await CallTask.aggregate([
+        { $match: match },
+        { $addFields: { __outbound: { $ifNull: ['$callLog.callStatus', ''] } } },
+        {
+          $group: {
+            _id: { period: dateExpr, status: '$status', outbound: '$__outbound' },
+            count: { $sum: 1 },
+            connectedDuration: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$callLog.callStatus', 'Connected'] },
+                  { $ifNull: ['$callLog.callDurationSeconds', 0] },
+                  0,
+                ],
+              },
+            },
+            connectedCount: { $sum: { $cond: [{ $eq: ['$callLog.callStatus', 'Connected'] }, 1, 0] } },
+          },
+        },
+      ]);
+
+      const byPeriod: Record<string, any> = {};
+      const totals = {
+        attempted: 0,
+        successful: 0,
+        unsuccessful: 0,
+        inProgress: 0,
+        disconnected: 0,
+        incomingNA: 0,
+        invalid: 0,
+        noAnswer: 0,
+        connectedDurationSeconds: 0,
+        connectedCount: 0,
+      };
+
+      const normOutbound = (s: string) => String(s || '').trim();
+
+      for (const row of agg) {
+        const period = row._id?.period || 'Unknown';
+        const status = row._id?.status || 'unknown';
+        const outbound = normOutbound(row._id?.outbound);
+        const count = Number(row.count || 0);
+
+        if (!byPeriod[period]) {
+          byPeriod[period] = {
+            period,
+            attempted: 0,
+            successful: 0,
+            unsuccessful: 0,
+            inProgress: 0,
+            disconnected: 0,
+            incomingNA: 0,
+            invalid: 0,
+            noAnswer: 0,
+          };
+        }
+
+        byPeriod[period].attempted += count;
+        totals.attempted += count;
+
+        if (status === 'in_progress') {
+          byPeriod[period].inProgress += count;
+          totals.inProgress += count;
+        }
+        if (status === 'completed') {
+          byPeriod[period].successful += count;
+          totals.successful += count;
+        }
+        if (status === 'not_reachable' || status === 'invalid_number') {
+          byPeriod[period].unsuccessful += count;
+          totals.unsuccessful += count;
+        }
+
+        if (outbound === 'Disconnected') {
+          byPeriod[period].disconnected += count;
+          totals.disconnected += count;
+        } else if (outbound === 'Incoming N/A' || outbound === 'Not Reachable') {
+          byPeriod[period].incomingNA += count;
+          totals.incomingNA += count;
+        } else if (outbound === 'Invalid' || outbound === 'Invalid Number') {
+          byPeriod[period].invalid += count;
+          totals.invalid += count;
+        } else if (outbound === 'No Answer') {
+          byPeriod[period].noAnswer += count;
+          totals.noAnswer += count;
+        }
+
+        totals.connectedDurationSeconds += Number(row.connectedDuration || 0);
+        totals.connectedCount += Number(row.connectedCount || 0);
+      }
+
+      const trend = Object.values(byPeriod).sort((a: any, b: any) => String(a.period).localeCompare(String(b.period)));
+      const avgConnectedDurationSeconds =
+        totals.connectedCount > 0 ? Math.round(totals.connectedDurationSeconds / totals.connectedCount) : 0;
+
+      res.json({
+        success: true,
+        data: {
+          bucket: bucketKey,
+          dateFrom: from ? from.toISOString() : null,
+          dateTo: to ? to.toISOString() : null,
+          totals: { ...totals, avgConnectedDurationSeconds },
+          trend,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/tasks/active
 // @desc    Get next assigned task for CC Agent (legacy - for backward compatibility)
 // @access  Private (CC Agent only)
@@ -190,8 +552,8 @@ router.get(
         });
       }
 
-      // Update status to in_progress
-      await updateTaskStatus(task._id.toString(), 'in_progress', 'Task loaded by agent');
+      // IMPORTANT: Do NOT auto-move to in_progress on load.
+      // Status should move to in_progress only after agent selects an Outbound Status.
 
       // Ensure activity data includes crops and products
       const activity = task.activityId as any;
@@ -1234,7 +1596,10 @@ router.post(
   '/:id/submit',
   requirePermission('tasks.submit'),
   [
-    body('callStatus').isIn(['Connected', 'Disconnected', 'Not Reachable', 'Invalid Number']).withMessage('Invalid call status'),
+    body('callStatus')
+      .isIn(['Connected', 'Disconnected', 'Incoming N/A', 'No Answer', 'Invalid', 'Not Reachable', 'Invalid Number'])
+      .withMessage('Invalid call status'),
+    body('callDurationSeconds').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Invalid callDurationSeconds'),
     body('didAttend').optional().isIn(['Yes, I attended', 'No, I missed', "Don't recall", 'Identity Wrong', 'Not a Farmer', null]).withMessage('Invalid didAttend value'),
     body('didRecall').optional({ nullable: true }).isBoolean(),
     body('cropsDiscussed').optional().isArray(),
@@ -1282,6 +1647,7 @@ router.post(
       const callLog: ICallLog = {
         timestamp: new Date(),
         callStatus: req.body.callStatus,
+        callDurationSeconds: Number(req.body.callDurationSeconds || 0),
         didAttend: req.body.didAttend ?? null,
         didRecall: req.body.didRecall ?? null,
         cropsDiscussed: req.body.cropsDiscussed || [],
@@ -1300,9 +1666,9 @@ router.post(
 
       // Determine final status based on call status
       let finalStatus: TaskStatus = 'completed';
-      if (req.body.callStatus === 'Not Reachable') {
+      if (['Incoming N/A', 'No Answer', 'Disconnected', 'Not Reachable'].includes(req.body.callStatus)) {
         finalStatus = 'not_reachable';
-      } else if (req.body.callStatus === 'Invalid Number') {
+      } else if (['Invalid', 'Invalid Number'].includes(req.body.callStatus)) {
         finalStatus = 'invalid_number';
       }
 

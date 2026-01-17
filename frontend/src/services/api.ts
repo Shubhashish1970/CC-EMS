@@ -156,6 +156,35 @@ export const tasksAPI = {
     });
   },
 
+  markInProgress: async (taskId: string) => {
+    return apiRequest(`/tasks/${taskId}/mark-in-progress`, { method: 'POST' });
+  },
+
+  getOwnHistory: async (filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+    const query = params.toString();
+    return apiRequest(`/tasks/own/history${query ? `?${query}` : ''}`);
+  },
+
+  getOwnHistoryDetail: async (taskId: string) => {
+    return apiRequest(`/tasks/own/history/${taskId}`);
+  },
+
+  getOwnAnalytics: async (filters?: { dateFrom?: string; dateTo?: string; bucket?: 'daily' | 'weekly' | 'monthly' }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.bucket) params.append('bucket', filters.bucket);
+    const query = params.toString();
+    return apiRequest(`/tasks/own/analytics${query ? `?${query}` : ''}`);
+  },
+
   getPendingTasks: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);

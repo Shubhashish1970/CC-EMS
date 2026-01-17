@@ -7,11 +7,20 @@ export type TaskStatus =
   | 'completed'
   | 'not_reachable'
   | 'invalid_number';
-export type CallStatus = 'Connected' | 'Disconnected' | 'Not Reachable' | 'Invalid Number';
+export type CallStatus =
+  | 'Connected'
+  | 'Disconnected'
+  | 'Incoming N/A'
+  | 'No Answer'
+  | 'Invalid'
+  // Backward-compatible legacy values stored previously
+  | 'Not Reachable'
+  | 'Invalid Number';
 
 export interface ICallLog {
   timestamp: Date;
   callStatus: CallStatus;
+  callDurationSeconds?: number; // captured for analytics (connected calls)
   didAttend: string | null; // Changed from boolean to string enum
   didRecall: boolean | null;
   cropsDiscussed: string[];
@@ -32,6 +41,7 @@ export interface ICallTask extends Document {
   retryCount: number;
   assignedAgentId?: mongoose.Types.ObjectId | null;
   scheduledDate: Date;
+  callStartedAt?: Date | null;
   callLog?: ICallLog;
   interactionHistory: Array<{
     timestamp: Date;
@@ -49,8 +59,12 @@ const CallLogSchema = new Schema<ICallLog>({
   },
   callStatus: {
     type: String,
-    enum: ['Connected', 'Disconnected', 'Not Reachable', 'Invalid Number'],
+    enum: ['Connected', 'Disconnected', 'Incoming N/A', 'No Answer', 'Invalid', 'Not Reachable', 'Invalid Number'],
     required: true,
+  },
+  callDurationSeconds: {
+    type: Number,
+    default: 0,
   },
   didAttend: {
     type: String,
@@ -152,6 +166,10 @@ const CallTaskSchema = new Schema<ICallTask>(
     scheduledDate: {
       type: Date,
       required: [true, 'Scheduled date is required'],
+    },
+    callStartedAt: {
+      type: Date,
+      default: null,
     },
     callLog: {
       type: CallLogSchema,

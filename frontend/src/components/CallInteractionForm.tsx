@@ -31,6 +31,7 @@ interface CallInteractionFormProps {
   NACLProducts: string[]; // Activity products (for highlighting)
   NonPurchaseReasons: string[];
   isAIPanelExpanded?: boolean;
+  onOutboundStatusSelected?: (status: string) => void;
 }
 
 const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
@@ -45,6 +46,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
   NACLProducts, // Activity products
   NonPurchaseReasons,
   isAIPanelExpanded = false,
+  onOutboundStatusSelected,
 }) => {
   const [masterCrops, setMasterCrops] = useState<string[]>([]);
   const [masterProducts, setMasterProducts] = useState<string[]>([]);
@@ -254,7 +256,13 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                     return (
                       <button
                         key={status}
-                        onClick={() => setFormData((p: any) => ({ ...p, callStatus: isSelected ? '' : status }))}
+                        onClick={() => {
+                          const nextStatus = isSelected ? '' : status;
+                          setFormData((p: any) => ({ ...p, callStatus: nextStatus }));
+                          if (nextStatus) {
+                            onOutboundStatusSelected?.(nextStatus);
+                          }
+                        }}
                         className={`py-2 px-2.5 rounded-lg border text-[9px] font-black uppercase tracking-tighter transition-all min-h-[32px] flex items-center justify-center ${
                           isSelected
                             ? isConnected

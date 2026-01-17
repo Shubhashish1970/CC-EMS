@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI } from '../services/api';
@@ -15,6 +15,8 @@ import AICopilotPanel from './AICopilotPanel';
 import CallReviewModal from './CallReviewModal';
 import TaskSelectionModal from './TaskSelectionModal';
 import Button from './shared/Button';
+import AgentHistoryView from './AgentHistoryView';
+import AgentAnalyticsView from './AgentAnalyticsView';
 
 // Business Constants
 const IndianCrops = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane'];
@@ -53,9 +55,11 @@ const AgentWorkspace: React.FC = () => {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'flow' | 'ai'>('flow');
+  const [activeSection, setActiveSection] = useState<'dialer' | 'history' | 'analytics'>('dialer');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showTaskSelectionModal, setShowTaskSelectionModal] = useState(false);
   const [isAIPanelExpanded, setIsAIPanelExpanded] = useState(false);
+  const hasMarkedInProgressRef = useRef(false);
   const [formData, setFormData] = useState({
     callStatus: '',
     didAttend: null as string | null,
@@ -119,6 +123,8 @@ const AgentWorkspace: React.FC = () => {
         },
       };
       setTaskData(formattedTask);
+      setActiveSection('dialer');
+      hasMarkedInProgressRef.current = false;
       setError(null);
       
       // Reset form when new task is loaded
@@ -139,6 +145,53 @@ const AgentWorkspace: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to load selected task');
       setTaskData(null);
+    }
+  };
+
+  const openTaskById = async (taskId: string) => {
+    try {
+      const res: any = await tasksAPI.loadTask(taskId);
+      if (!res?.success || !res?.data) throw new Error(res?.error?.message || 'Failed to load task');
+      const d = res.data;
+      const formattedTask: TaskData = {
+        taskId: String(d.taskId),
+        farmer: {
+          name: d.farmer?.name,
+          location: d.farmer?.location,
+          preferredLanguage: d.farmer?.preferredLanguage,
+          mobileNumber: d.farmer?.mobileNumber,
+          photoUrl: d.farmer?.photoUrl,
+        },
+        activity: {
+          type: d.activity?.type,
+          date: d.activity?.date,
+          officer: d.activity?.officerName,
+          tm: d.activity?.tmName || '',
+          location: d.activity?.location,
+          territory: d.activity?.territory,
+          state: d.activity?.state,
+          crops: d.activity?.crops || [],
+          products: d.activity?.products || [],
+        },
+      };
+      setTaskData(formattedTask);
+      setActiveSection('dialer');
+      setActiveTab('flow');
+      hasMarkedInProgressRef.current = false;
+      setError(null);
+    } catch (e: any) {
+      showError(e?.message || 'Failed to open task');
+    }
+  };
+
+  const handleOutboundStatusSelected = async () => {
+    if (!taskData) return;
+    if (hasMarkedInProgressRef.current) return;
+    try {
+      await tasksAPI.markInProgress(taskData.taskId);
+      hasMarkedInProgressRef.current = true;
+    } catch {
+      // do not block agent workflow
     }
   };
 
@@ -300,28 +353,18 @@ const AgentWorkspace: React.FC = () => {
     }
   };
 
-  // Map frontend call status to backend format
-  const mapCallStatusToBackend = (frontendStatus: string): string => {
-    const statusMap: Record<string, string> = {
-      'Connected': 'Connected',
-      'Disconnected': 'Disconnected',
-      'Incoming N/A': 'Not Reachable',
-      'Invalid': 'Invalid Number',
-      'No Answer': 'Not Reachable',
-    };
-    return statusMap[frontendStatus] || frontendStatus;
-  };
+  // Backend now accepts raw outbound statuses for accurate reporting.
 
   const handleFinalSubmit = async () => {
     if (!taskData) return;
 
     setIsSubmitting(true);
     try {
-      // Map frontend status to backend format
-      const backendStatus = mapCallStatusToBackend(formData.callStatus);
       const submissionData = {
         ...formData,
-        callStatus: backendStatus,
+        // Persist raw outbound status for reporting; backend will map to task status.
+        callStatus: formData.callStatus,
+        callDurationSeconds: callDuration,
       };
       
       await tasksAPI.submitInteraction(taskData.taskId, submissionData);
@@ -419,13 +462,29 @@ const AgentWorkspace: React.FC = () => {
       {/* Global Navigation (Desktop) */}
       <aside className="hidden lg:flex w-20 flex-col items-center py-8 bg-green-950 text-white shadow-2xl z-30">
         <nav className="flex flex-col gap-8">
-          <button className="p-3 bg-white/10 rounded-2xl text-green-400 border border-white/10 shadow-xl">
+          <button
+            onClick={() => setActiveSection('dialer')}
+            className={`p-3 rounded-2xl border shadow-xl transition-all ${
+              activeSection === 'dialer'
+                ? 'bg-white/10 text-green-400 border-white/10'
+                : 'bg-transparent text-white/40 border-transparent hover:text-white'
+            }`}
+            title="Dialer"
+          >
             <Phone size={24} />
           </button>
-          <button className="p-3 text-white/40 hover:text-white transition-all">
+          <button
+            onClick={() => setActiveSection('history')}
+            className={`p-3 transition-all ${activeSection === 'history' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+            title="History"
+          >
             <History size={24} />
           </button>
-          <button className="p-3 text-white/40 hover:text-white transition-all">
+          <button
+            onClick={() => setActiveSection('analytics')}
+            className={`p-3 transition-all ${activeSection === 'analytics' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+            title="Performance"
+          >
             <TrendingUp size={24} />
           </button>
         </nav>
@@ -456,7 +515,7 @@ const AgentWorkspace: React.FC = () => {
                 </div>
               </div>
             )}
-            {!taskData && (
+            {activeSection === 'dialer' && !taskData && (
               <div className="flex items-center gap-3">
                 <button
                   onClick={(e) => {
@@ -487,7 +546,7 @@ const AgentWorkspace: React.FC = () => {
             )}
           </div>
               <div className="flex items-center gap-3">
-                {taskData && (
+                {activeSection === 'dialer' && taskData && (
                   <Button 
                     variant="primary" 
                     size="sm" 
@@ -506,8 +565,14 @@ const AgentWorkspace: React.FC = () => {
           </div>
         </header>
 
-        {/* Main Three-Pane Interface */}
-        <div className="flex-1 flex overflow-hidden relative">
+        {activeSection !== 'dialer' ? (
+          <div className="flex-1 overflow-hidden relative">
+            {activeSection === 'history' && <AgentHistoryView onOpenTask={openTaskById} />}
+            {activeSection === 'analytics' && <AgentAnalyticsView />}
+          </div>
+        ) : (
+          /* Main Three-Pane Interface */
+          <div className="flex-1 flex overflow-hidden relative">
           
           {/* Document Context (Details) */}
           <TaskDetailsPanel 
@@ -528,6 +593,7 @@ const AgentWorkspace: React.FC = () => {
                 NACLProducts={taskData?.activity?.products || NACLProducts}
                 NonPurchaseReasons={NonPurchaseReasons}
                 isAIPanelExpanded={isAIPanelExpanded}
+                onOutboundStatusSelected={handleOutboundStatusSelected}
               />
 
           {/* Edge Hover Detector for AI Panel - Invisible trigger zone */}
@@ -565,6 +631,7 @@ const AgentWorkspace: React.FC = () => {
           </div>
 
         </div>
+        )}
 
         {/* Mobile Interaction Navigation */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-200 flex items-center justify-around z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] px-6">
