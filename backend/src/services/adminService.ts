@@ -844,6 +844,8 @@ export const getActivitiesSamplingFilterOptions = async (filters?: {
     return clauses.length === 1 ? clauses[0] : { $and: clauses };
   };
 
+  // IMPORTANT: Options must be fast and consistent across pages.
+  // Only compute samplingStatus (needs lookups) if the user is actually filtering by it.
   const pipeline: any[] = [
     { $match: baseMatch },
     {
@@ -859,73 +861,79 @@ export const getActivitiesSamplingFilterOptions = async (filters?: {
         __bu: { $trim: { input: { $ifNull: ['$buName', ''] } } },
       },
     },
-    {
-      $lookup: {
-        from: SamplingAudit.collection.name,
-        localField: '_id',
-        foreignField: 'activityId',
-        as: '__audit',
-      },
-    },
-    { $unwind: { path: '$__audit', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: CallTask.collection.name,
-        let: { aid: '$_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$activityId', '$$aid'] } } },
-          { $count: 'count' },
-        ],
-        as: '__tasksCount',
-      },
-    },
-    {
-      $addFields: {
-        __taskCount: {
-          $ifNull: [{ $arrayElemAt: ['__$tasksCount.count', 0] }, 0],
-        },
-        __sampledCount: {
-          $ifNull: ['__$audit.sampledCount', 0],
-        },
-        __hasAudit: {
-          $cond: [{ $ifNull: ['__$audit', false] }, true, false],
-        },
-      },
-    },
-    {
-      $addFields: {
-        __samplingStatus: {
-          $cond: [
-            { $eq: ['__$hasAudit', false] },
-            'not_sampled',
-            {
-              $cond: [{ $gte: ['__$taskCount', '$__sampledCount'] }, 'sampled', 'partial'],
-            },
-          ],
-        },
-      },
-    },
-    ...(samplingStatus ? [{ $match: { __samplingStatus: samplingStatus } }] : []),
-    {
-      $facet: {
-        territory: [
-          ...(buildGeoMatch('territory') ? [{ $match: buildGeoMatch('territory') }] : []),
-          { $group: { _id: null, values: { $addToSet: '$__territory' } } },
-          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
-        ],
-        zone: [
-          ...(buildGeoMatch('zone') ? [{ $match: buildGeoMatch('zone') }] : []),
-          { $group: { _id: null, values: { $addToSet: '$__zone' } } },
-          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
-        ],
-        bu: [
-          ...(buildGeoMatch('bu') ? [{ $match: buildGeoMatch('bu') }] : []),
-          { $group: { _id: null, values: { $addToSet: '$__bu' } } },
-          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
-        ],
-      },
-    },
   ];
+
+  if (samplingStatus) {
+    pipeline.push(
+      {
+        $lookup: {
+          from: SamplingAudit.collection.name,
+          localField: '_id',
+          foreignField: 'activityId',
+          as: '__audit',
+        },
+      },
+      { $unwind: { path: '$__audit', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: CallTask.collection.name,
+          let: { aid: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$activityId', '$$aid'] } } },
+            { $count: 'count' },
+          ],
+          as: '__tasksCount',
+        },
+      },
+      {
+        $addFields: {
+          __taskCount: {
+            $ifNull: [{ $arrayElemAt: ['__$tasksCount.count', 0] }, 0],
+          },
+          __sampledCount: {
+            $ifNull: ['__$audit.sampledCount', 0],
+          },
+          __hasAudit: {
+            $cond: [{ $ifNull: ['__$audit', false] }, true, false],
+          },
+        },
+      },
+      {
+        $addFields: {
+          __samplingStatus: {
+            $cond: [
+              { $eq: ['__$hasAudit', false] },
+              'not_sampled',
+              {
+                $cond: [{ $gte: ['__$taskCount', '$__sampledCount'] }, 'sampled', 'partial'],
+              },
+            ],
+          },
+        },
+      },
+      { $match: { __samplingStatus: samplingStatus } }
+    );
+  }
+
+  pipeline.push({
+    $facet: {
+      territory: [
+        ...(buildGeoMatch('territory') ? [{ $match: buildGeoMatch('territory') }] : []),
+        { $group: { _id: null, values: { $addToSet: '$__territory' } } },
+        { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+      ],
+      zone: [
+        ...(buildGeoMatch('zone') ? [{ $match: buildGeoMatch('zone') }] : []),
+        { $group: { _id: null, values: { $addToSet: '$__zone' } } },
+        { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+      ],
+      bu: [
+        ...(buildGeoMatch('bu') ? [{ $match: buildGeoMatch('bu') }] : []),
+        { $group: { _id: null, values: { $addToSet: '$__bu' } } },
+        { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+      ],
+    },
+  });
 
   const out = await Activity.aggregate(pipeline);
   const first = out?.[0] || {};
