@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown, ChevronRight, Loader2 } from 'lucide-react';
+import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown, ChevronRight, Loader2, User as UserIcon } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -184,6 +184,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
   const datePickerRef = useRef<HTMLDivElement | null>(null);
+
+  const syncDraftFromFilters = () => {
+    const start = filters.dateFrom || getPresetRange(selectedPreset).start;
+    const end = filters.dateTo || getPresetRange(selectedPreset).end;
+    setDraftStart(start);
+    setDraftEnd(end);
+  };
 
   // Default date range
   useEffect(() => {
@@ -468,59 +475,110 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   <div className="relative" ref={datePickerRef}>
                     <button
                       type="button"
-                      onClick={() => setIsDatePickerOpen((v) => !v)}
-                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-between"
+                      onClick={() => {
+                        setIsDatePickerOpen((prev) => {
+                          const next = !prev;
+                          if (!prev && next) syncDraftFromFilters();
+                          return next;
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
                     >
                       <span className="truncate">
-                        {selectedPreset} • {formatPretty(filters.dateFrom)} - {formatPretty(filters.dateTo)}
+                        {selectedPreset}
+                        {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
                       </span>
-                      <ChevronDown size={16} className="text-slate-400" />
+                      <span className="text-slate-400 font-black">▾</span>
                     </button>
 
                     {isDatePickerOpen && (
-                      <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
-                            <select
-                              value={selectedPreset}
-                              onChange={(e) => {
-                                const p = e.target.value as DateRangePreset;
-                                setSelectedPreset(p);
-                                const r = getPresetRange(p);
-                                setDraftStart(r.start || draftStart);
-                                setDraftEnd(r.end || draftEnd);
-                              }}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-                            >
-                              {(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => (
-                                <option key={p} value={p}>{p}</option>
-                              ))}
-                            </select>
+                      <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                        <div className="flex">
+                          {/* Presets */}
+                          <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                            {([
+                              'Custom',
+                              'Today',
+                              'Yesterday',
+                              'This week (Sun - Today)',
+                              'Last 7 days',
+                              'Last week (Sun - Sat)',
+                              'Last 28 days',
+                              'Last 30 days',
+                            ] as DateRangePreset[]).map((p) => {
+                              const isActive = selectedPreset === p;
+                              return (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPreset(p);
+                                    const { start, end } = getPresetRange(p);
+                                    setDraftStart(start);
+                                    setDraftEnd(end);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                                    isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'
+                                  }`}
+                                >
+                                  {p}
+                                </button>
+                              );
+                            })}
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">From</div>
-                              <input type="date" value={draftStart} onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
+
+                          {/* Date inputs */}
+                          <div className="flex-1 p-4">
+                            <div className="flex items-center justify-between gap-3 mb-4">
+                              <div className="flex-1">
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                                <input
+                                  type="date"
+                                  value={draftStart}
+                                  onChange={(e) => {
+                                    setSelectedPreset('Custom');
+                                    setDraftStart(e.target.value);
+                                  }}
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                                <input
+                                  type="date"
+                                  value={draftEnd}
+                                  onChange={(e) => {
+                                    setSelectedPreset('Custom');
+                                    setDraftEnd(e.target.value);
+                                  }}
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                />
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To</div>
-                              <input type="date" value={draftEnd} onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
+
+                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsDatePickerOpen(false);
+                                  syncDraftFromFilters();
+                                }}
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilters((p) => ({ ...p, dateFrom: draftStart, dateTo: draftEnd }));
+                                  setIsDatePickerOpen(false);
+                                }}
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                              >
+                                Apply
+                              </button>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2 mt-4">
-                          <Button variant="secondary" size="sm" onClick={() => setIsDatePickerOpen(false)}>Cancel</Button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilters((p) => ({ ...p, dateFrom: draftStart, dateTo: draftEnd }));
-                              setIsDatePickerOpen(false);
-                            }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
-                          >
-                            Apply
-                          </button>
                         </div>
                       </div>
                     )}
@@ -653,9 +711,28 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           </button>
                         </td>
                         <td className="py-3 pr-2" style={{ width: colWidths.farmer }}>
-                        <div className="font-bold text-slate-900">{farmer.name || 'Unknown'}</div>
-                        <div className="text-xs text-slate-500">{farmer.mobileNumber || ''}</div>
-                      </td>
+                          <div className="flex items-center gap-3 min-w-0">
+                            {farmer.photoUrl ? (
+                              <img
+                                src={farmer.photoUrl}
+                                alt={farmer.name}
+                                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = '/images/farmer-default-logo.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                                <UserIcon className="text-slate-400" size={18} />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-black text-slate-900 truncate">{farmer.name || 'Unknown'}</div>
+                              <div className="text-xs text-slate-500 truncate">{farmer.mobileNumber || ''}</div>
+                            </div>
+                          </div>
+                        </td>
                       <td className="py-3 pr-2 font-bold text-slate-700" style={{ width: colWidths.outcome }}>
                         {outcomeLabel(t.status)}
                       </td>
