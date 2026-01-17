@@ -108,7 +108,9 @@ const TaskList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<'scheduledDate' | 'status' | 'farmerName' | 'agentName'>('scheduledDate');
+  const [sortBy, setSortBy] = useState<
+    'scheduledDate' | 'status' | 'farmerName' | 'agentName' | 'territory' | 'activityType' | 'officerName' | 'language'
+  >('scheduledDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
@@ -357,6 +359,25 @@ const TaskList: React.FC = () => {
         aValue = a.assignedAgentId.name.toLowerCase();
         bValue = b.assignedAgentId.name.toLowerCase();
         break;
+      case 'territory': {
+        const at: any = a.activityId as any;
+        const bt: any = b.activityId as any;
+        aValue = String((at?.territoryName || at?.territory || '')).toLowerCase();
+        bValue = String((bt?.territoryName || bt?.territory || '')).toLowerCase();
+        break;
+      }
+      case 'activityType':
+        aValue = a.activityId.type.toLowerCase();
+        bValue = b.activityId.type.toLowerCase();
+        break;
+      case 'officerName':
+        aValue = a.activityId.officerName.toLowerCase();
+        bValue = b.activityId.officerName.toLowerCase();
+        break;
+      case 'language':
+        aValue = a.farmerId.preferredLanguage.toLowerCase();
+        bValue = b.farmerId.preferredLanguage.toLowerCase();
+        break;
       default:
         return 0;
     }
@@ -543,6 +564,10 @@ const TaskList: React.FC = () => {
                   <option value="status">Status</option>
                   <option value="farmerName">Farmer Name</option>
                   <option value="agentName">Agent Name</option>
+                  <option value="territory">Territory</option>
+                  <option value="activityType">Activity Type</option>
+                  <option value="officerName">Officer Name</option>
+                  <option value="language">Language</option>
                 </select>
                 <Button
                   variant="ghost"
@@ -852,22 +877,34 @@ const TaskList: React.FC = () => {
                       </th>
                       {(
                         [
-                          { key: 'farmer', label: 'Farmer' },
-                          { key: 'status', label: 'Status' },
-                          { key: 'scheduled', label: 'Scheduled' },
-                          { key: 'agent', label: 'Agent' },
-                          { key: 'territory', label: 'Territory' },
-                          { key: 'activity', label: 'Activity' },
-                          { key: 'officer', label: 'Officer' },
-                          { key: 'language', label: 'Language' },
-                        ] as Array<{ key: TaskTableColumnKey; label: string }>
+                          { key: 'farmer', label: 'Farmer', sortKey: 'farmerName' },
+                          { key: 'status', label: 'Status', sortKey: 'status' },
+                          { key: 'scheduled', label: 'Scheduled', sortKey: 'scheduledDate' },
+                          { key: 'agent', label: 'Agent', sortKey: 'agentName' },
+                          { key: 'territory', label: 'Territory', sortKey: 'territory' },
+                          { key: 'activity', label: 'Activity', sortKey: 'activityType' },
+                          { key: 'officer', label: 'Officer', sortKey: 'officerName' },
+                          { key: 'language', label: 'Language', sortKey: 'language' },
+                        ] as Array<{ key: TaskTableColumnKey; label: string; sortKey: any }>
                       ).map((c) => (
                         <th
                           key={c.key}
                           className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
                           style={{ width: tableColumnWidths[c.key], minWidth: tableColumnWidths[c.key] }}
+                          onClick={() => {
+                            const nextKey = c.sortKey as any;
+                            if (sortBy === nextKey) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                            else {
+                              setSortBy(nextKey);
+                              setSortOrder('asc');
+                            }
+                          }}
+                          title="Click to sort"
                         >
-                          <span className="truncate block">{c.label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="truncate block">{c.label}</span>
+                            {sortBy === c.sortKey && (sortOrder === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                          </div>
                           <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, c.key)} />
                         </th>
                       ))}
