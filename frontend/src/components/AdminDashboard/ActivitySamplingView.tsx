@@ -419,6 +419,8 @@ const ActivitySamplingView: React.FC = () => {
         samplingStatus: filters.samplingStatus || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
+        page: pagination.page,
+        limit: pageSize,
       });
       showSuccess('Excel downloaded');
     } catch (err: any) {
@@ -666,16 +668,6 @@ const ActivitySamplingView: React.FC = () => {
               Refresh
             </Button>
             <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadActivitiesExport}
-              disabled={isLoading || isExporting}
-              title="Download the current filtered activity list as Excel"
-            >
-              <ArrowDownToLine size={16} className={isExporting ? 'animate-spin' : ''} />
-              {isExporting ? 'Downloading...' : 'Download Excel'}
-            </Button>
-            <Button
               variant="primary"
               size="sm"
               onClick={() => handleSyncFFA(false)}
@@ -701,27 +693,30 @@ const ActivitySamplingView: React.FC = () => {
         {dataSource === 'excel' && (
           <div className="mt-3 pt-3 border-t border-slate-200">
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-              <div className="flex flex-col md:flex-row md:items-end gap-3 md:justify-between">
-                <div className="flex-1">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+              <div className="flex flex-col gap-3">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">
                     Upload Excel (2 sheets: Activities + Farmers)
-                  </label>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      setExcelFile(f);
-                      setImportReport(null);
-                    }}
-                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-                  />
-                  <p className="text-xs text-slate-500 mt-2">
-                    Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
-                    <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
+                </label>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setExcelFile(f);
+                        setImportReport(null);
+                      }}
+                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                    />
+                    <p className="text-xs text-slate-500 mt-2">
+                      Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
+                      <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 md:flex-shrink-0">
                   <button
                     type="button"
                     onClick={handleDownloadTemplate}
@@ -740,6 +735,7 @@ const ActivitySamplingView: React.FC = () => {
                     <ArrowUpToLine size={16} className={isImportingExcel ? 'animate-spin' : ''} />
                     {isImportingExcel ? 'Importing...' : 'Upload & Import'}
                   </Button>
+                  </div>
                 </div>
               </div>
 
@@ -1018,9 +1014,24 @@ const ActivitySamplingView: React.FC = () => {
       {/* Statistics Dashboard */}
       {!isLoading && activities.length > 0 && (
         <div className="bg-white rounded-3xl p-4 mb-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="text-green-700" size={18} />
-            <h2 className="text-base font-black text-slate-900">Statistics</h2>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="text-green-700" size={18} />
+              <h2 className="text-base font-black text-slate-900">Statistics</h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadActivitiesExport}
+              disabled={isLoading || isExporting}
+              className={`flex items-center justify-center h-10 w-10 rounded-2xl border transition-colors ${
+                isExporting
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
+              }`}
+              title="Download Excel (matches current filters and page)"
+            >
+              <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
+            </button>
           </div>
           
           {/* Compact Statistics Grid */}

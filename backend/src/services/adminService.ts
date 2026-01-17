@@ -534,6 +534,7 @@ export const getActivitiesSamplingExportRows = async (filters?: {
   samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
   dateFrom?: Date;
   dateTo?: Date;
+  page?: number;
   limit?: number; // safety cap
 }): Promise<ActivitySamplingExportRow[]> => {
   const {
@@ -544,10 +545,13 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     samplingStatus,
     dateFrom,
     dateTo,
+    page = 1,
     limit = 5000,
   } = filters || {};
 
   const safeLimit = Math.min(Math.max(1, limit), 5000);
+  const safePage = Math.max(1, page);
+  const skip = (safePage - 1) * safeLimit;
 
   const activityQuery: any = {};
   if (activityType) activityQuery.type = activityType;
@@ -562,7 +566,7 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     if (dateTo) activityQuery.date.$lte = dateTo;
   }
 
-  const activities = await Activity.find(activityQuery).sort({ date: -1 }).limit(safeLimit).lean();
+  const activities = await Activity.find(activityQuery).sort({ date: -1 }).skip(skip).limit(safeLimit).lean();
   const activityIds = activities.map((a) => a._id);
 
   const samplingAudits = await SamplingAudit.find({ activityId: { $in: activityIds } }).lean();

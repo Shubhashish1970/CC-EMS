@@ -99,6 +99,7 @@ router.get(
     query('samplingStatus').optional().isIn(['sampled', 'not_sampled', 'partial']),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
+    query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 5000 }),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
@@ -119,6 +120,7 @@ router.get(
         samplingStatus,
         dateFrom,
         dateTo,
+        page,
         limit,
       } = req.query;
 
@@ -133,6 +135,7 @@ router.get(
         samplingStatus: samplingStatus as any,
         dateFrom: dateFromParsed,
         dateTo: dateToParsed,
+        page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });
 

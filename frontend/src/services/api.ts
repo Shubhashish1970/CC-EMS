@@ -424,6 +424,8 @@ export const adminAPI = {
     samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
     dateFrom?: string;
     dateTo?: string;
+    page?: number;
+    limit?: number;
   }) => {
     const token = getAuthToken();
     const params = new URLSearchParams();
@@ -434,8 +436,8 @@ export const adminAPI = {
     if (filters?.samplingStatus) params.append('samplingStatus', filters.samplingStatus);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
-    // safety cap for export
-    params.append('limit', '5000');
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
 
     const query = params.toString();
     const res = await fetch(`${API_BASE_URL}/admin/activities-sampling/export${query ? `?${query}` : ''}`, {
