@@ -504,6 +504,145 @@ export const getActivitiesWithSampling = async (filters?: {
   }
 };
 
+export type ActivitySamplingExportRow = {
+  activityId: string;
+  type: string;
+  date: Date;
+  territory: string;
+  zone: string;
+  region: string;
+  bu: string;
+  officerName: string;
+  totalFarmers: number;
+  farmersSampled: number;
+  samplingPercentage: number;
+  samplingStatus: 'sampled' | 'not_sampled' | 'partial';
+  tasksTotal: number;
+  sampledInQueue: number;
+  inProgress: number;
+  completed: number;
+  notReachable: number;
+  invalidNumber: number;
+  unassigned: number;
+};
+
+export const getActivitiesSamplingExportRows = async (filters?: {
+  activityType?: string;
+  territory?: string;
+  zone?: string;
+  bu?: string;
+  samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+  dateFrom?: Date;
+  dateTo?: Date;
+  limit?: number; // safety cap
+}): Promise<ActivitySamplingExportRow[]> => {
+  const {
+    activityType,
+    territory,
+    zone,
+    bu,
+    samplingStatus,
+    dateFrom,
+    dateTo,
+    limit = 5000,
+  } = filters || {};
+
+  const safeLimit = Math.min(Math.max(1, limit), 5000);
+
+  const activityQuery: any = {};
+  if (activityType) activityQuery.type = activityType;
+  if (territory) {
+    activityQuery.$or = [{ territoryName: territory }, { territory: territory }];
+  }
+  if (zone) activityQuery.zoneName = zone;
+  if (bu) activityQuery.buName = bu;
+  if (dateFrom || dateTo) {
+    activityQuery.date = {};
+    if (dateFrom) activityQuery.date.$gte = dateFrom;
+    if (dateTo) activityQuery.date.$lte = dateTo;
+  }
+
+  const activities = await Activity.find(activityQuery).sort({ date: -1 }).limit(safeLimit).lean();
+  const activityIds = activities.map((a) => a._id);
+
+  const samplingAudits = await SamplingAudit.find({ activityId: { $in: activityIds } }).lean();
+  const auditMap = new Map<string, any>(samplingAudits.map((a: any) => [String(a.activityId), a]));
+
+  // Tasks breakdown by status per activity (lightweight)
+  const taskAgg = await CallTask.aggregate([
+    { $match: { activityId: { $in: activityIds } } },
+    {
+      $group: {
+        _id: { activityId: '$activityId', status: '$status' },
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.activityId',
+        counts: { $push: { k: '$_id.status', v: '$count' } },
+        total: { $sum: '$count' },
+      },
+    },
+  ]);
+
+  const taskMap = new Map<string, { total: number; byStatus: Record<string, number> }>();
+  for (const row of taskAgg) {
+    const byStatus: Record<string, number> = {};
+    for (const kv of row.counts || []) {
+      if (kv?.k) byStatus[String(kv.k)] = Number(kv.v || 0);
+    }
+    taskMap.set(String(row._id), { total: Number(row.total || 0), byStatus });
+  }
+
+  const out: ActivitySamplingExportRow[] = [];
+
+  for (const a of activities as any[]) {
+    const totalFarmers = Array.isArray(a.farmerIds) ? a.farmerIds.length : 0;
+    const audit = auditMap.get(String(a._id));
+    const farmersSampled = audit?.sampledCount ? Number(audit.sampledCount) : 0;
+    const samplingPercentage = audit?.samplingPercentage ? Number(audit.samplingPercentage) : 0;
+
+    let computedSamplingStatus: 'sampled' | 'not_sampled' | 'partial' = 'not_sampled';
+    if (audit && farmersSampled > 0) {
+      computedSamplingStatus = farmersSampled >= totalFarmers && totalFarmers > 0 ? 'sampled' : 'partial';
+    }
+
+    const t = taskMap.get(String(a._id));
+    const by = t?.byStatus || {};
+    const row: ActivitySamplingExportRow = {
+      activityId: String(a.activityId || ''),
+      type: String(a.type || ''),
+      date: a.date ? new Date(a.date) : new Date(0),
+      territory: String((a.territoryName || a.territory || '')).trim(),
+      zone: String((a.zoneName || '')).trim(),
+      region: String((a as any).regionName || '').trim(),
+      bu: String((a.buName || '')).trim(),
+      officerName: String((a.officerName || '')).trim(),
+      totalFarmers,
+      farmersSampled,
+      samplingPercentage,
+      samplingStatus: computedSamplingStatus,
+      tasksTotal: Number(t?.total || 0),
+      sampledInQueue: Number(by.sampled_in_queue || 0),
+      inProgress: Number(by.in_progress || 0),
+      completed: Number(by.completed || 0),
+      notReachable: Number(by.not_reachable || 0),
+      invalidNumber: Number(by.invalid_number || 0),
+      unassigned: Number(by.unassigned || 0),
+    };
+
+    out.push(row);
+  }
+
+  // Apply samplingStatus filter post-compute (since export derives it)
+  if (samplingStatus) {
+    return out.filter((r) => r.samplingStatus === samplingStatus);
+  }
+
+  return out;
+};
+
 /**
  * Get task queues for all agents with status breakdown
  * Returns summary of all agents with their task counts by status

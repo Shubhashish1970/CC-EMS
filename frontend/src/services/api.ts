@@ -416,6 +416,54 @@ export const adminAPI = {
     return apiRequest(`/admin/activities-sampling${query ? `?${query}` : ''}`);
   },
 
+  downloadActivitiesSamplingExport: async (filters?: {
+    activityType?: string;
+    territory?: string;
+    zone?: string;
+    bu?: string;
+    samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.samplingStatus) params.append('samplingStatus', filters.samplingStatus);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    // safety cap for export
+    params.append('limit', '5000');
+
+    const query = params.toString();
+    const res = await fetch(`${API_BASE_URL}/admin/activities-sampling/export${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      const msg = json?.error?.message || json?.message || `Download failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'activity_sampling_export.xlsx';
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   getAgentQueues: async (filters?: {
     agentId?: string;
     isActive?: boolean;

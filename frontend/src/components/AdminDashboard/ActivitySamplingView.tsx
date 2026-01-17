@@ -86,11 +86,17 @@ const DEFAULT_ACTIVITY_TABLE_WIDTHS: Record<ActivityTableColumnKey, number> = {
 
 const ActivitySamplingView: React.FC = () => {
   const { showError, showSuccess } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
   const [activities, setActivities] = useState<ActivitySamplingStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('admin.activitySampling.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 50;
+  });
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
   const [isIncrementalSyncing, setIsIncrementalSyncing] = useState(false);
   const [isFullSyncing, setIsFullSyncing] = useState(false);
@@ -143,7 +149,7 @@ const ActivitySamplingView: React.FC = () => {
     | 'Last 30 days';
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 28 days');
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
   const [draftStart, setDraftStart] = useState(''); // YYYY-MM-DD
   const [draftEnd, setDraftEnd] = useState(''); // YYYY-MM-DD
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -219,6 +225,16 @@ const ActivitySamplingView: React.FC = () => {
     setDraftEnd(end);
   };
 
+  // Apply default date range on first load (Last 7 days) if user hasn't set any dates yet
+  useEffect(() => {
+    if (filters.dateFrom || filters.dateTo) return;
+    const range = getPresetRange('Last 7 days');
+    setFilters((prev) => ({ ...prev, dateFrom: range.start, dateTo: range.end }));
+    setDraftStart(range.start);
+    setDraftEnd(range.end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const territoryOptions = useMemo(() => {
     const values = new Set<string>();
     for (const item of activities) {
@@ -272,7 +288,7 @@ const ActivitySamplingView: React.FC = () => {
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
         page,
-        limit: 50,
+        limit: pageSize,
       }) as any;
 
       if (response.success && response.data) {
@@ -287,7 +303,7 @@ const ActivitySamplingView: React.FC = () => {
           });
         }
         setActivities(activitiesData);
-        setPagination(response.data.pagination || { page: 1, limit: 50, total: 0, pages: 1 });
+        setPagination(response.data.pagination || { page: 1, limit: pageSize, total: 0, pages: 1 });
       }
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to load activities';
@@ -301,11 +317,15 @@ const ActivitySamplingView: React.FC = () => {
   useEffect(() => {
     fetchActivities(1);
     fetchSyncStatus();
-  }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo]);
+  }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo, pageSize]);
 
   useEffect(() => {
     localStorage.setItem('admin.activitySampling.dataSource', dataSource);
   }, [dataSource]);
+
+  useEffect(() => {
+    localStorage.setItem('admin.activitySampling.pageSize', String(pageSize));
+  }, [pageSize]);
 
   useEffect(() => {
     localStorage.setItem('admin.activitySampling.tableSort', JSON.stringify(tableSort));
@@ -388,6 +408,23 @@ const ActivitySamplingView: React.FC = () => {
       await ffaAPI.downloadExcelTemplate();
     } catch (err: any) {
       showError(err?.message || 'Failed to download template');
+    }
+  };
+
+  const handleDownloadActivitiesExport = async () => {
+    setIsExporting(true);
+    try {
+      await adminAPI.downloadActivitiesSamplingExport({
+        ...filters,
+        samplingStatus: filters.samplingStatus || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      showSuccess('Excel downloaded');
+    } catch (err: any) {
+      showError(err?.message || 'Failed to download excel');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -627,6 +664,16 @@ const ActivitySamplingView: React.FC = () => {
             >
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
               Refresh
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadActivitiesExport}
+              disabled={isLoading || isExporting}
+              title="Download the current filtered activity list as Excel"
+            >
+              <ArrowDownToLine size={16} className={isExporting ? 'animate-spin' : ''} />
+              {isExporting ? 'Downloading...' : 'Download Excel'}
             </Button>
             <Button
               variant="primary"
@@ -1388,7 +1435,22 @@ const ActivitySamplingView: React.FC = () => {
                 <p className="text-sm text-slate-600">
                   Page {pagination.page} of {pagination.pages} • {pagination.total} total activities
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      title="Rows per page"
+                    >
+                      {[25, 50, 100].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <Button
                     variant="secondary"
                     size="sm"

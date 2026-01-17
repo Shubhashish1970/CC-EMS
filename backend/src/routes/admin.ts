@@ -5,10 +5,12 @@ import { requireRole } from '../middleware/rbac.js';
 import { AppError } from '../middleware/errorHandler.js';
 import {
   getActivitiesWithSampling,
+  getActivitiesSamplingExportRows,
   getAgentQueues,
   getAgentQueue,
 } from '../services/adminService.js';
 import logger from '../config/logger.js';
+import * as XLSX from 'xlsx';
 
 const router = express.Router();
 
@@ -76,6 +78,103 @@ router.get(
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   GET /api/admin/activities-sampling/export
+ * @desc    Export activity sampling list (filtered) as Excel
+ * @access  Private (MIS Admin only)
+ */
+router.get(
+  '/activities-sampling/export',
+  [
+    query('activityType').optional().isString(),
+    query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
+    query('samplingStatus').optional().isIn(['sampled', 'not_sampled', 'partial']),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('limit').optional().isInt({ min: 1, max: 5000 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const {
+        activityType,
+        territory,
+        zone,
+        bu,
+        samplingStatus,
+        dateFrom,
+        dateTo,
+        limit,
+      } = req.query;
+
+      const dateFromParsed = dateFrom ? new Date(dateFrom as string) : undefined;
+      const dateToParsed = dateTo ? new Date(dateTo as string) : undefined;
+
+      const rows = await getActivitiesSamplingExportRows({
+        activityType: activityType as string,
+        territory: territory as string,
+        zone: zone as string,
+        bu: bu as string,
+        samplingStatus: samplingStatus as any,
+        dateFrom: dateFromParsed,
+        dateTo: dateToParsed,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const fmtDate = (d: Date) =>
+        d && !Number.isNaN(d.getTime()) ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}` : '';
+
+      const sheetRows = rows.map((r) => ({
+        'Activity ID': r.activityId,
+        Type: r.type,
+        Date: fmtDate(r.date),
+        Territory: r.territory,
+        Zone: r.zone,
+        Region: r.region,
+        BU: r.bu,
+        Officer: r.officerName,
+        'Total Farmers': r.totalFarmers,
+        'Farmers Sampled': r.farmersSampled,
+        'Sampling %': r.samplingPercentage,
+        'Sampling Status': r.samplingStatus,
+        'Tasks Total': r.tasksTotal,
+        'Unassigned': r.unassigned,
+        'In Queue': r.sampledInQueue,
+        'In Progress': r.inProgress,
+        Completed: r.completed,
+        'Not Reachable': r.notReachable,
+        'Invalid Number': r.invalidNumber,
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(sheetRows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Activities');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const now = new Date();
+      const filename = `activity_sampling_export_${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(
+        now.getHours()
+      )}${pad2(now.getMinutes())}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
     } catch (error) {
       next(error);
     }
