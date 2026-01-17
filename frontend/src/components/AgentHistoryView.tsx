@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown } from 'lucide-react';
+import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown, ChevronRight, Loader2 } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -17,6 +17,7 @@ type DateRangePreset =
 type HistoryStatus = '' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
 
 type HistoryColumnKey =
+  | 'expand'
   | 'farmer'
   | 'outcome'
   | 'outbound'
@@ -26,6 +27,7 @@ type HistoryColumnKey =
   | 'action';
 
 const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
+  expand: 56,
   farmer: 220,
   outcome: 200,
   outbound: 160,
@@ -103,6 +105,18 @@ const outcomeLabel = (status: string) => {
 };
 
 const outboundLabel = (raw: string) => raw || '-';
+const safeArr = (v: any) => (Array.isArray(v) ? v : v ? [v] : []);
+
+const formatDateTime = (d: any) => {
+  if (!d) return '';
+  try {
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
 
 const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({ onOpenTask }) => {
   const toast = useToast();
@@ -160,6 +174,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   });
   const [stats, setStats] = useState<any | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailById, setDetailById] = useState<Record<string, any>>({});
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
 
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -309,6 +327,25 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
       toast.showError(e?.message || 'Failed to download excel');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const toggleExpand = async (taskId: string) => {
+    const next = expandedId === taskId ? null : taskId;
+    setExpandedId(next);
+    if (!next) return;
+
+    if (detailById[next]) return;
+    setDetailLoadingId(next);
+    try {
+      const res: any = await tasksAPI.getOwnHistoryDetail(next);
+      if (res?.success && res?.data?.task) {
+        setDetailById((p) => ({ ...p, [next]: res.data.task }));
+      }
+    } catch (e: any) {
+      toast.showError(e?.message || 'Failed to load details');
+    } finally {
+      setDetailLoadingId((curr) => (curr === next ? null : curr));
     }
   };
 
@@ -550,6 +587,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 <tr className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   {(
                     [
+                      ['expand', ''],
                       ['farmer', 'Farmer'],
                       ['outcome', 'Outcome'],
                       ['outbound', 'Outbound'],
@@ -568,7 +606,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            if (key === 'action') return;
+                            if (key === 'action' || key === 'expand') return;
                             setTableSort((p) => {
                               const dir = p.key === key ? (p.dir === 'asc' ? 'desc' : 'asc') : 'asc';
                               return { key, dir };
@@ -577,10 +615,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           className="flex items-center gap-2 font-black"
                         >
                           {label}
-                          {key !== 'action' && <ArrowUpDown size={14} className="text-slate-300" />}
+                          {key !== 'action' && key !== 'expand' && <ArrowUpDown size={14} className="text-slate-300" />}
                         </button>
 
-                        {key !== 'action' && (
+                        {key !== 'action' && key !== 'expand' && (
                           <div
                             onMouseDown={(e) => handleResizeStart(key, e.clientX)}
                             className="w-1.5 h-6 cursor-col-resize bg-transparent hover:bg-slate-200 rounded"
@@ -599,9 +637,22 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   const outbound = t.callLog?.callStatus || '';
                   const updated = t.updatedAt ? formatPretty(String(t.updatedAt).slice(0, 10)) : '-';
                   const territory = (activity.territoryName || activity.territory || '').toString();
+                  const isOpen = expandedId === String(t._id);
+                  const detail = detailById[String(t._id)] || null;
                   return (
-                    <tr key={t._id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-2" style={{ width: colWidths.farmer }}>
+                    <React.Fragment key={t._id}>
+                      <tr className="hover:bg-slate-50">
+                        <td className="py-3 pr-2" style={{ width: colWidths.expand }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(String(t._id))}
+                            className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center"
+                            title={isOpen ? 'Collapse' : 'Expand'}
+                          >
+                            {isOpen ? <ChevronDown size={16} className="text-slate-700" /> : <ChevronRight size={16} className="text-slate-700" />}
+                          </button>
+                        </td>
+                        <td className="py-3 pr-2" style={{ width: colWidths.farmer }}>
                         <div className="font-bold text-slate-900">{farmer.name || 'Unknown'}</div>
                         <div className="text-xs text-slate-500">{farmer.mobileNumber || ''}</div>
                       </td>
@@ -633,12 +684,90 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           <span className="text-xs text-slate-400">Read-only</span>
                         )}
                       </td>
-                    </tr>
+                      </tr>
+
+                      {isOpen && (
+                        <tr className="bg-slate-50/50">
+                          <td colSpan={8} className="py-4">
+                            <div className="mx-2 bg-white rounded-2xl border border-slate-200 p-4">
+                              {detailLoadingId === String(t._id) && (
+                                <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
+                                  <Loader2 size={16} className="animate-spin" />
+                                  Loading details…
+                                </div>
+                              )}
+
+                              {!detailLoadingId && !detail && (
+                                <div className="text-sm text-slate-600">No additional details available.</div>
+                              )}
+
+                              {detail && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Farmer</div>
+                                    <div className="text-sm font-bold text-slate-900">{detail.farmerId?.name || 'Unknown'}</div>
+                                    <div className="text-xs text-slate-600">{detail.farmerId?.mobileNumber || ''}</div>
+                                    <div className="text-xs text-slate-600">{detail.farmerId?.location || ''}</div>
+                                    <div className="text-xs text-slate-600">Language: <span className="font-bold">{detail.farmerId?.preferredLanguage || 'Unknown'}</span></div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Activity</div>
+                                    <div className="text-sm font-bold text-slate-900">{detail.activityId?.type || '-'}</div>
+                                    <div className="text-xs text-slate-600">Officer: <span className="font-bold">{detail.activityId?.officerName || '-'}</span></div>
+                                    <div className="text-xs text-slate-600">Territory: <span className="font-bold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></div>
+                                    <div className="text-xs text-slate-600">State: <span className="font-bold">{detail.activityId?.state || '-'}</span></div>
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outbound</div>
+                                        <div className="text-sm font-bold text-slate-900">{detail.callLog?.callStatus || '-'}</div>
+                                      </div>
+                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Call Started</div>
+                                        <div className="text-sm font-bold text-slate-900">{formatDateTime(detail.callStartedAt) || '-'}</div>
+                                      </div>
+                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Duration</div>
+                                        <div className="text-sm font-bold text-slate-900">{Number(detail.callLog?.callDurationSeconds || 0)}s</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Farmer Comments</div>
+                                    <div className="bg-white rounded-xl border border-slate-200 p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                                      {detail.callLog?.farmerComments || '-'}
+                                    </div>
+                                    <div className="mt-2 text-xs text-slate-600">
+                                      Sentiment: <span className="font-bold">{detail.callLog?.sentiment || 'N/A'}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Crops Discussed</div>
+                                      <div className="text-sm font-bold text-slate-900">{safeArr(detail.callLog?.cropsDiscussed).join(', ') || '-'}</div>
+                                    </div>
+                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Products Discussed</div>
+                                      <div className="text-sm font-bold text-slate-900">{safeArr(detail.callLog?.productsDiscussed).join(', ') || '-'}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
                 {!visible.length && (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-500">
+                    <td colSpan={8} className="py-10 text-center text-slate-500">
                       No history found for selected filters.
                     </td>
                   </tr>
