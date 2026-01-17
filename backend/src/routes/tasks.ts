@@ -244,6 +244,7 @@ router.get(
   [
     query('agentId').optional().isMongoId(),
     query('territory').optional().isString(),
+    query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
     query('page').optional().isInt({ min: 1 }),
@@ -259,11 +260,12 @@ router.get(
         });
       }
 
-      const { agentId, territory, dateFrom, dateTo, page, limit } = req.query;
+      const { agentId, territory, search, dateFrom, dateTo, page, limit } = req.query;
 
       const result = await getPendingTasks({
         agentId: agentId as string,
         territory: territory as string,
+        search: (search as string) || undefined,
         dateFrom: dateFrom ? (dateFrom as string) : undefined,
         dateTo: dateTo ? (dateTo as string) : undefined,
         page: page ? Number(page) : undefined,
@@ -274,6 +276,90 @@ router.get(
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/pending/stats
+// @desc    Task statistics for Task Management (filter-based, not paginated)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/pending/stats',
+  requirePermission('tasks.view.team'),
+  [
+    query('agentId').optional().isMongoId(),
+    query('territory').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { agentId, territory, search, dateFrom, dateTo } = req.query;
+      const stats = await (await import('../services/taskService.js')).getPendingTasksStats({
+        agentId: agentId as string,
+        territory: territory as string,
+        search: (search as string) || undefined,
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
+      });
+
+      res.json({ success: true, data: stats });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/pending/export
+// @desc    Export current filtered page of Task Management list as Excel
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/pending/export',
+  requirePermission('tasks.view.team'),
+  [
+    query('agentId').optional().isMongoId(),
+    query('territory').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 500 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { agentId, territory, search, dateFrom, dateTo, page, limit } = req.query;
+      const { filename, buffer } = await (await import('../services/taskService.js')).exportPendingTasksXlsx({
+        agentId: agentId as string,
+        territory: territory as string,
+        search: (search as string) || undefined,
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
     } catch (error) {
       next(error);
     }

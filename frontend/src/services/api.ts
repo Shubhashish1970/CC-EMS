@@ -156,10 +156,11 @@ export const tasksAPI = {
     });
   },
 
-  getPendingTasks: async (filters?: { agentId?: string; territory?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+  getPendingTasks: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     if (filters?.page) params.append('page', String(filters.page));
@@ -167,6 +168,55 @@ export const tasksAPI = {
 
     const query = params.toString();
     return apiRequest(`/tasks/pending${query ? `?${query}` : ''}`);
+  },
+
+  getPendingTasksStats: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.agentId) params.append('agentId', filters.agentId);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/tasks/pending/stats${query ? `?${query}` : ''}`);
+  },
+
+  downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (filters?.agentId) params.append('agentId', filters.agentId);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+
+    const query = params.toString();
+    const res = await fetch(`${API_BASE_URL}/tasks/pending/export${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      const msg = json?.error?.message || json?.message || `Download failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'tasks_export.xlsx';
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   getTeamTasks: async (filters?: { status?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {

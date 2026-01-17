@@ -4,6 +4,7 @@ import { Farmer } from '../models/Farmer.js';
 import { Activity } from '../models/Activity.js';
 import mongoose from 'mongoose';
 import logger from '../config/logger.js';
+import * as XLSX from 'xlsx';
 
 export interface TaskAssignmentOptions {
   agentId?: string;
@@ -122,13 +123,14 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
 export const getPendingTasks = async (filters?: {
   agentId?: string;
   territory?: string;
+  search?: string;
   dateFrom?: Date | string;
   dateTo?: Date | string;
   page?: number;
   limit?: number;
 }) => {
   try {
-    const { agentId, territory, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
+    const { agentId, territory, search, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
     const skip = (page - 1) * limit;
 
     const query: any = {
@@ -141,7 +143,9 @@ export const getPendingTasks = async (filters?: {
 
     // Filter by territory through activity
     if (territory) {
-      const activities = await Activity.find({ territory }).select('_id');
+      const activities = await Activity.find({
+        $or: [{ territoryName: territory }, { territory: territory }],
+      }).select('_id');
       query.activityId = { $in: activities.map(a => a._id) };
     }
 
@@ -160,15 +164,64 @@ export const getPendingTasks = async (filters?: {
       }
     }
 
-    const tasks = await CallTask.find(query)
-      .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-      .populate('activityId', 'type date officerName location territory crops products')
-      .populate('assignedAgentId', 'name email employeeId')
-      .sort({ scheduledDate: 1 })
-      .skip(skip)
-      .limit(limit);
+    const normalizedSearch = (search || '').trim();
 
-    const total = await CallTask.countDocuments(query);
+    let tasks: any[] = [];
+    let total = 0;
+
+    if (normalizedSearch) {
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'i');
+
+      const out = await CallTask.aggregate([
+        { $match: query },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: Activity.collection.name, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: User.collection.name, localField: 'assignedAgentId', foreignField: '_id', as: 'assignedAgentId' } },
+        { $unwind: { path: '$assignedAgentId', preserveNullAndEmptyArrays: true } },
+        {
+          $match: {
+            $or: [
+              { 'farmerId.name': re },
+              { 'farmerId.mobileNumber': re },
+              { 'farmerId.location': re },
+              { 'farmerId.preferredLanguage': re },
+              { 'assignedAgentId.name': re },
+              { 'assignedAgentId.email': re },
+              { 'activityId.type': re },
+              { 'activityId.officerName': re },
+              { 'activityId.location': re },
+              { 'activityId.territoryName': re },
+              { 'activityId.territory': re },
+              { 'activityId.activityId': re }, // FFA Activity ID
+            ],
+          },
+        },
+        { $sort: { scheduledDate: 1 } },
+        {
+          $facet: {
+            data: [{ $skip: skip }, { $limit: limit }],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ]);
+
+      tasks = out?.[0]?.data || [];
+      total = out?.[0]?.total?.[0]?.count || 0;
+    } else {
+      tasks = await CallTask.find(query)
+        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+        .populate('activityId', 'activityId type date officerName tmName location territory territoryName state zoneName buName crops products')
+        .populate('assignedAgentId', 'name email employeeId')
+        .sort({ scheduledDate: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      total = await CallTask.countDocuments(query);
+    }
 
     return {
       tasks,
@@ -183,6 +236,196 @@ export const getPendingTasks = async (filters?: {
     logger.error('Error fetching pending tasks:', error);
     throw error;
   }
+};
+
+export const getPendingTasksStats = async (filters?: {
+  agentId?: string;
+  territory?: string;
+  search?: string;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+}) => {
+  const { agentId, territory, search, dateFrom, dateTo } = filters || {};
+
+  const query: any = {
+    // include all open-ish statuses in the management stats
+    status: { $in: ['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'] },
+  };
+
+  if (agentId) query.assignedAgentId = new mongoose.Types.ObjectId(agentId);
+  if (territory) {
+    const activities = await Activity.find({
+      $or: [{ territoryName: territory }, { territory: territory }],
+    }).select('_id');
+    query.activityId = { $in: activities.map((a) => a._id) };
+  }
+
+  if (dateFrom || dateTo) {
+    query.scheduledDate = {};
+    if (dateFrom) {
+      const fromDate = typeof dateFrom === 'string' ? new Date(dateFrom) : dateFrom;
+      fromDate.setHours(0, 0, 0, 0);
+      query.scheduledDate.$gte = fromDate;
+    }
+    if (dateTo) {
+      const toDate = typeof dateTo === 'string' ? new Date(dateTo) : dateTo;
+      toDate.setHours(23, 59, 59, 999);
+      query.scheduledDate.$lte = toDate;
+    }
+  }
+
+  const normalizedSearch = (search || '').trim();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const base: any[] = [{ $match: query }];
+  if (normalizedSearch) {
+    const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped, 'i');
+    base.push(
+      { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+      { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: Activity.collection.name, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+      { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: User.collection.name, localField: 'assignedAgentId', foreignField: '_id', as: 'assignedAgentId' } },
+      { $unwind: { path: '$assignedAgentId', preserveNullAndEmptyArrays: true } },
+      {
+        $match: {
+          $or: [
+            { 'farmerId.name': re },
+            { 'farmerId.mobileNumber': re },
+            { 'farmerId.location': re },
+            { 'farmerId.preferredLanguage': re },
+            { 'assignedAgentId.name': re },
+            { 'assignedAgentId.email': re },
+            { 'activityId.type': re },
+            { 'activityId.officerName': re },
+            { 'activityId.location': re },
+            { 'activityId.territoryName': re },
+            { 'activityId.territory': re },
+            { 'activityId.activityId': re },
+          ],
+        },
+      }
+    );
+  }
+
+  const agg = await CallTask.aggregate([
+    ...base,
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        overdue: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $lt: ['$scheduledDate', today] },
+                  { $in: ['$status', ['sampled_in_queue', 'in_progress']] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        dueToday: {
+          $sum: {
+            $cond: [
+              { $and: [{ $gte: ['$scheduledDate', today] }, { $lt: ['$scheduledDate', tomorrow] }] },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  let overdue = 0;
+  let dueToday = 0;
+  for (const r of agg) {
+    byStatus[String(r._id)] = Number(r.count || 0);
+    overdue += Number(r.overdue || 0);
+    dueToday += Number(r.dueToday || 0);
+  }
+
+  const total = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
+  return {
+    total,
+    sampled_in_queue: Number(byStatus.sampled_in_queue || 0),
+    in_progress: Number(byStatus.in_progress || 0),
+    completed: Number(byStatus.completed || 0),
+    not_reachable: Number(byStatus.not_reachable || 0),
+    invalid_number: Number(byStatus.invalid_number || 0),
+    unassigned: Number(byStatus.unassigned || 0),
+    overdue,
+    dueToday,
+  };
+};
+
+export const exportPendingTasksXlsx = async (filters?: {
+  agentId?: string;
+  territory?: string;
+  search?: string;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+  page?: number;
+  limit?: number;
+}) => {
+  const { page = 1, limit = 20 } = filters || {};
+  const result = await getPendingTasks({ ...(filters || {}), page, limit });
+
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const fmtDate = (v: any) => {
+    const d = v ? new Date(v) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
+
+  const rows = (result.tasks || []).map((t: any) => {
+    const farmer = t.farmerId || {};
+    const agent = t.assignedAgentId || {};
+    const act = t.activityId || {};
+    const territory = String((act.territoryName || act.territory || '') ?? '').trim();
+    return {
+      'Task Unique ID': String(t._id || ''),
+      Status: String(t.status || ''),
+      'Scheduled Date': fmtDate(t.scheduledDate),
+      'Farmer Name': String(farmer.name || ''),
+      'Farmer Mobile': String(farmer.mobileNumber || ''),
+      'Farmer Location': String(farmer.location || ''),
+      'Farmer Language': String(farmer.preferredLanguage || ''),
+      'Agent Name': String(agent.name || ''),
+      'Agent Email': String(agent.email || ''),
+      'Agent Employee ID': String(agent.employeeId || ''),
+      'Activity ID': String(act.activityId || ''), // FFA Activity ID
+      'Activity Type': String(act.type || ''),
+      'Activity Date': fmtDate(act.date),
+      'Activity Officer': String(act.officerName || ''),
+      'Activity TM': String(act.tmName || ''),
+      'Activity Territory': String(territory || ''),
+      'Activity State': String(act.state || ''),
+      'Activity Zone': String(act.zoneName || ''),
+      'Activity BU': String(act.buName || ''),
+    };
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const now = new Date();
+  const filename = `tasks_export_${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(
+    now.getHours()
+  )}${pad2(now.getMinutes())}.xlsx`;
+
+  return { filename, buffer };
 };
 
 /**

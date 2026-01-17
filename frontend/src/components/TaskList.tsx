@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
-import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle, ChevronDown, ChevronUp, ArrowDownToLine } from 'lucide-react';
 import Button from './shared/Button';
 import TaskDetail from './TaskDetail';
-import { exportToCSV, exportToPDF, exportToExcel, formatTaskForExport } from '../utils/exportUtils';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
 
@@ -52,6 +51,15 @@ const TaskList: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('admin.taskManagement.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 20;
+  });
+  const [statsData, setStatsData] = useState<any | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
     agentId: '',
@@ -71,6 +79,10 @@ const TaskList: React.FC = () => {
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('admin.taskManagement.pageSize', String(pageSize));
+  }, [pageSize]);
 
   // Fetch agents
   useEffect(() => {
@@ -102,16 +114,17 @@ const TaskList: React.FC = () => {
             dateFrom: filters.dateFrom || undefined,
             dateTo: filters.dateTo || undefined,
             page: currentPage,
-            limit: 20,
+            limit: pageSize,
           });
         } else {
           response = await tasksAPI.getPendingTasks({
             agentId: filters.agentId || undefined,
             territory: filters.territory || undefined,
+            search: filters.search || undefined,
             dateFrom: filters.dateFrom || undefined,
             dateTo: filters.dateTo || undefined,
             page: currentPage,
-            limit: 20,
+            limit: pageSize,
           });
         }
 
@@ -134,7 +147,7 @@ const TaskList: React.FC = () => {
     };
 
     loadTasks();
-  }, [user, filters.status, filters.agentId, filters.territory, filters.dateFrom, filters.dateTo, currentPage]);
+  }, [user, filters.status, filters.agentId, filters.territory, filters.search, filters.dateFrom, filters.dateTo, currentPage, pageSize]);
 
   const handleRefresh = () => {
     if (user) {
@@ -149,16 +162,17 @@ const TaskList: React.FC = () => {
               dateFrom: filters.dateFrom || undefined,
               dateTo: filters.dateTo || undefined,
               page: currentPage,
-              limit: 20,
+              limit: pageSize,
             });
           } else {
             response = await tasksAPI.getPendingTasks({
               agentId: filters.agentId || undefined,
               territory: filters.territory || undefined,
+              search: filters.search || undefined,
               dateFrom: filters.dateFrom || undefined,
               dateTo: filters.dateTo || undefined,
               page: currentPage,
-              limit: 20,
+              limit: pageSize,
             });
           }
 
@@ -203,18 +217,63 @@ const TaskList: React.FC = () => {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const filteredTasks = tasks.filter(task => {
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      return (
-        task.farmerId.name.toLowerCase().includes(searchLower) ||
-        task.farmerId.mobileNumber.includes(searchLower) ||
-        task.assignedAgentId.name.toLowerCase().includes(searchLower) ||
-        task.activityId.location.toLowerCase().includes(searchLower)
-      );
+  const toggleExpand = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const fetchStats = async () => {
+    if (!user) return;
+    if (user.role === 'team_lead') return;
+    setIsStatsLoading(true);
+    try {
+      const res: any = await tasksAPI.getPendingTasksStats({
+        agentId: filters.agentId || undefined,
+        territory: filters.territory || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) setStatsData(res.data);
+    } catch (err) {
+      console.error('Failed to fetch task stats:', err);
+    } finally {
+      setIsStatsLoading(false);
     }
-    return true;
-  });
+  };
+
+  useEffect(() => {
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, filters.status, filters.agentId, filters.territory, filters.search, filters.dateFrom, filters.dateTo]);
+
+  const handleDownloadExcel = async () => {
+    if (!user || user.role === 'team_lead') return;
+    setIsExporting(true);
+    try {
+      await tasksAPI.downloadPendingTasksExport({
+        agentId: filters.agentId || undefined,
+        territory: filters.territory || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        page: currentPage,
+        limit: pageSize,
+      });
+      toast.showSuccess('Excel downloaded');
+    } catch (err: any) {
+      toast.showError(err?.message || 'Failed to download excel');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Search is now applied server-side so pagination/export/stats can stay consistent.
+  const filteredTasks = tasks;
 
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     let aValue: any;
@@ -276,6 +335,8 @@ const TaskList: React.FC = () => {
     return stats;
   };
 
+  const statistics = statsData || calculateStatistics();
+
   const getTaskPriority = (task: Task) => {
     const scheduledDate = new Date(task.scheduledDate);
     const now = new Date();
@@ -289,7 +350,7 @@ const TaskList: React.FC = () => {
     return { level: 'on-time', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle, label: 'On Time' };
   };
 
-  const statistics = calculateStatistics();
+  // statistics computed after calculateStatistics (statsData preferred)
 
   const toggleTaskSelection = (taskId: string) => {
     const newSelected = new Set(selectedTasks);
@@ -357,27 +418,15 @@ const TaskList: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToCSV(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
-    if (tasksToExport.length > 0) {
-      toast.showSuccess(`Exported ${tasksToExport.length} task(s) to CSV`);
-    }
+    toast.showWarning('CSV export is disabled. Use Excel download.');
   };
 
   const handleExportPDF = () => {
-    const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToPDF(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
-    if (tasksToExport.length > 0) {
-      toast.showInfo('Opening print dialog for PDF export');
-    }
+    toast.showWarning('PDF export is disabled. Use Excel download.');
   };
 
   const handleExportExcel = () => {
-    const tasksToExport = sortedTasks.map(formatTaskForExport);
-    exportToExcel(tasksToExport, 'tasks', (msg) => toast.showWarning(msg));
-    if (tasksToExport.length > 0) {
-      toast.showSuccess(`Exported ${tasksToExport.length} task(s) to Excel`);
-    }
+    handleDownloadExcel();
   };
 
   // Close export dropdown when clicking outside
@@ -609,11 +658,26 @@ const TaskList: React.FC = () => {
         </div>
 
         {/* Statistics Dashboard */}
-        {!isLoading && filteredTasks.length > 0 && (
+        {!isStatsLoading && (statsData ? (statistics?.total || 0) > 0 : (!isLoading && filteredTasks.length > 0)) && (
           <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="text-green-700" size={20} />
-              <h2 className="text-lg font-black text-slate-900">Task Statistics</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-green-700" size={20} />
+                <h2 className="text-lg font-black text-slate-900">Task Statistics</h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadExcel}
+                disabled={isLoading || isExporting}
+                className={`flex items-center justify-center h-10 w-10 rounded-2xl border transition-colors ${
+                  isExporting
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
+                }`}
+                title="Download Excel (matches current filters and page)"
+              >
+                <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
+              </button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
@@ -701,127 +765,168 @@ const TaskList: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-3 mb-6">
-              {/* Select All Checkbox */}
-              <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
-                  />
-                  <span className="text-sm font-bold text-slate-700">
-                    Select All ({sortedTasks.length} tasks)
-                  </span>
-                </label>
-              </div>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+              <div className="overflow-x-auto">
+                <table className="w-full table-fixed">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="w-14 px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest"> </th>
+                      <th className="w-14 px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
+                          onChange={toggleSelectAll}
+                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                          title="Select all on this page"
+                        />
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Farmer</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Status</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Scheduled</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Agent</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Territory</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Activity</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Officer</th>
+                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Language</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedTasks.map((task) => {
+                      const isExpanded = expandedTaskIds.has(task._id);
+                      const priority = getTaskPriority(task);
+                      const PriorityIcon = priority.icon;
+                      const territory = (task.activityId as any)?.territoryName || task.activityId.territory || '';
+                      return (
+                        <React.Fragment key={task._id}>
+                          <tr className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="px-3 py-3">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(task._id)}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100"
+                                title="Expand / collapse"
+                              >
+                                {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                              </button>
+                            </td>
+                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedTasks.has(task._id)}
+                                onChange={() => toggleTaskSelection(task._id)}
+                                className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                              />
+                            </td>
+                            <td className="px-3 py-3 text-sm">
+                              <button type="button" className="text-left w-full" onClick={() => setSelectedTask(task)}>
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {task.farmerId.photoUrl ? (
+                                    <img
+                                      src={task.farmerId.photoUrl}
+                                      alt={task.farmerId.name}
+                                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = '/images/farmer-default-logo.png';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                                      <UserIcon className="text-slate-400" size={18} />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-black text-slate-900 truncate">{task.farmerId.name}</div>
+                                    <div className="text-xs text-slate-500 truncate">{task.farmerId.mobileNumber}</div>
+                                  </div>
+                                </div>
+                              </button>
+                            </td>
+                            <td className="px-3 py-3 text-sm">{getStatusBadge(task.status)}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700">
+                              <div className="font-bold">{formatDate(task.scheduledDate)}</div>
+                              <span className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
+                                <PriorityIcon size={12} />
+                                {priority.label}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.assignedAgentId?.name || ''}>
+                              {task.assignedAgentId?.name || '-'}
+                            </td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory}>{territory || '-'}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.activityId.type}>{task.activityId.type}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.activityId.officerName}>{task.activityId.officerName}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.farmerId.preferredLanguage}>{task.farmerId.preferredLanguage}</td>
+                          </tr>
 
-              {sortedTasks.map((task) => {
-                const priority = getTaskPriority(task);
-                const PriorityIcon = priority.icon;
-                return (
-                  <div
-                    key={task._id}
-                    className={`bg-white rounded-2xl p-5 border shadow-sm transition-all ${
-                      selectedTasks.has(task._id)
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-slate-200 hover:shadow-md cursor-pointer'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
-                        {/* Checkbox */}
-                        <div className="flex-shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedTasks.has(task._id)}
-                            onChange={() => toggleTaskSelection(task._id)}
-                            className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
-                          />
-                        </div>
-                        {/* Farmer Avatar */}
-                        <div className="flex-shrink-0">
-                          {task.farmerId.photoUrl ? (
-                            <img
-                              src={task.farmerId.photoUrl}
-                              alt={task.farmerId.name}
-                              className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = '/images/farmer-default-logo.png';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
-                              <UserIcon className="text-slate-400" size={24} />
-                            </div>
+                          {isExpanded && (
+                            <tr className="bg-white">
+                              <td colSpan={10} className="px-6 py-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                                  <div className="flex items-center gap-2">
+                                    <Phone size={14} className="text-slate-400" />
+                                    <span className="font-medium">{task.farmerId.mobileNumber}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-slate-400" />
+                                    <span className="truncate">{task.farmerId.location}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-slate-400" />
+                                    <span>Activity Date: {formatDate(task.activityId.date)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <UserIcon size={14} className="text-slate-400" />
+                                    <span>Agent Email: {task.assignedAgentId?.email || '-'}</span>
+                                  </div>
+                                </div>
+                                <div className="mt-3">
+                                  <Button variant="secondary" size="sm" onClick={() => setSelectedTask(task)}>
+                                    Open Task
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </div>
-
-                        {/* Task Info */}
-                        <div
-                          className="flex-1 min-w-0"
-                          onClick={() => setSelectedTask(task)}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-base font-black text-slate-900 truncate">{task.farmerId.name}</h3>
-                            {getStatusBadge(task.status)}
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
-                              <PriorityIcon size={12} />
-                              {priority.label}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
-                            <div className="flex items-center gap-2">
-                              <Phone size={14} />
-                              <span className="font-medium">{task.farmerId.mobileNumber}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <MapPin size={14} />
-                              <span>{task.farmerId.location}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <UserIcon size={14} />
-                              <span>Agent: {task.assignedAgentId.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Calendar size={14} />
-                              <span>Scheduled: {formatDate(task.scheduledDate)}</span>
-                            </div>
-                          </div>
-
-                          <div className="mt-2 pt-2 border-t border-slate-100">
-                            <div className="flex items-center gap-4 text-xs text-slate-500">
-                              <span>Activity: {task.activityId.type}</span>
-                              <span>•</span>
-                              <span>Officer: {task.activityId.officerName}</span>
-                              <span>•</span>
-                              <span>Language: {task.farmerId.preferredLanguage}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Pagination */}
-            {pagination && pagination.pages > 1 && (
+            {pagination && (
               <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <p className="text-sm text-slate-600">
                     Page {pagination.page} of {pagination.pages} • {pagination.total} total tasks
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setCurrentPage(1);
+                          setPageSize(Number(e.target.value));
+                        }}
+                        className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        title="Rows per page"
+                      >
+                        {[10, 20, 50, 100].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1 || isLoading}
+                      disabled={currentPage === 1 || isLoading || pagination.pages <= 1}
                     >
                       Previous
                     </Button>
@@ -829,7 +934,7 @@ const TaskList: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage >= pagination.pages || isLoading}
+                      disabled={currentPage >= pagination.pages || isLoading || pagination.pages <= 1}
                     >
                       Next
                     </Button>
