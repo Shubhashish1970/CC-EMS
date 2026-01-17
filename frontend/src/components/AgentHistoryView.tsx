@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown, ChevronRight, Loader2, User as UserIcon } from 'lucide-react';
+import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ChevronRight, Loader2, User as UserIcon, ChevronUp } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -673,7 +673,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           className="flex items-center gap-2 font-black"
                         >
                           {label}
-                          {key !== 'action' && key !== 'expand' && <ArrowUpDown size={14} className="text-slate-300" />}
+                          {key !== 'action' &&
+                            key !== 'expand' &&
+                            tableSort.key === key &&
+                            (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                         </button>
 
                         {key !== 'action' && key !== 'expand' && (
