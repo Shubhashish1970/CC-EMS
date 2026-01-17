@@ -333,8 +333,9 @@ router.get(
     query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
+    query('exportAll').optional().isBoolean(),
     query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 500 }),
+    query('limit').optional().isInt({ min: 1, max: 5000 }),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -346,13 +347,14 @@ router.get(
         });
       }
 
-      const { agentId, territory, search, dateFrom, dateTo, page, limit } = req.query;
+      const { agentId, territory, search, dateFrom, dateTo, exportAll, page, limit } = req.query;
       const { filename, buffer } = await (await import('../services/taskService.js')).exportPendingTasksXlsx({
         agentId: agentId as string,
         territory: territory as string,
         search: (search as string) || undefined,
         dateFrom: dateFrom ? (dateFrom as string) : undefined,
         dateTo: dateTo ? (dateTo as string) : undefined,
+        exportAll: exportAll === 'true',
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });

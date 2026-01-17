@@ -42,6 +42,31 @@ interface Pagination {
   pages: number;
 }
 
+type TaskTableColumnKey =
+  | 'expand'
+  | 'select'
+  | 'farmer'
+  | 'status'
+  | 'scheduled'
+  | 'agent'
+  | 'territory'
+  | 'activity'
+  | 'officer'
+  | 'language';
+
+const DEFAULT_TASK_TABLE_WIDTHS: Record<TaskTableColumnKey, number> = {
+  expand: 56,
+  select: 56,
+  farmer: 260,
+  status: 170,
+  scheduled: 170,
+  agent: 180,
+  territory: 200,
+  activity: 160,
+  officer: 200,
+  language: 140,
+};
+
 const TaskList: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
@@ -52,6 +77,17 @@ const TaskList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const [tableColumnWidths, setTableColumnWidths] = useState<Record<TaskTableColumnKey, number>>(() => {
+    const raw = localStorage.getItem('admin.taskManagement.tableColumnWidths');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_TASK_TABLE_WIDTHS, ...parsed };
+    } catch {
+      // ignore
+    }
+    return { ...DEFAULT_TASK_TABLE_WIDTHS };
+  });
+  const resizingRef = useRef<{ key: TaskTableColumnKey; startX: number; startWidth: number } | null>(null);
   const [pageSize, setPageSize] = useState<number>(() => {
     const raw = localStorage.getItem('admin.taskManagement.pageSize');
     const n = raw ? Number(raw) : NaN;
@@ -83,6 +119,31 @@ const TaskList: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('admin.taskManagement.pageSize', String(pageSize));
   }, [pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('admin.taskManagement.tableColumnWidths', JSON.stringify(tableColumnWidths));
+  }, [tableColumnWidths]);
+
+  const startResize = (e: React.MouseEvent, key: TaskTableColumnKey) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startWidth = tableColumnWidths[key] ?? DEFAULT_TASK_TABLE_WIDTHS[key];
+    resizingRef.current = { key, startX: e.clientX, startWidth };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const dx = ev.clientX - resizingRef.current.startX;
+      const next = Math.max(80, resizingRef.current.startWidth + dx);
+      setTableColumnWidths((prev) => ({ ...prev, [resizingRef.current!.key]: next }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   // Fetch agents
   useEffect(() => {
@@ -261,8 +322,8 @@ const TaskList: React.FC = () => {
         search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
-        page: currentPage,
-        limit: pageSize,
+        exportAll: true,
+        limit: 5000,
       });
       toast.showSuccess('Excel downloaded');
     } catch (err: any) {
@@ -770,8 +831,16 @@ const TaskList: React.FC = () => {
                 <table className="w-full table-fixed">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="w-14 px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest"> </th>
-                      <th className="w-14 px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">
+                      <th
+                        className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
+                        style={{ width: tableColumnWidths.expand, minWidth: tableColumnWidths.expand }}
+                      >
+                        <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, 'expand')} />
+                      </th>
+                      <th
+                        className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
+                        style={{ width: tableColumnWidths.select, minWidth: tableColumnWidths.select }}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
@@ -779,15 +848,29 @@ const TaskList: React.FC = () => {
                           className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
                           title="Select all on this page"
                         />
+                        <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, 'select')} />
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Farmer</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Status</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Scheduled</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Agent</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Territory</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Activity</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Officer</th>
-                      <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Language</th>
+                      {(
+                        [
+                          { key: 'farmer', label: 'Farmer' },
+                          { key: 'status', label: 'Status' },
+                          { key: 'scheduled', label: 'Scheduled' },
+                          { key: 'agent', label: 'Agent' },
+                          { key: 'territory', label: 'Territory' },
+                          { key: 'activity', label: 'Activity' },
+                          { key: 'officer', label: 'Officer' },
+                          { key: 'language', label: 'Language' },
+                        ] as Array<{ key: TaskTableColumnKey; label: string }>
+                      ).map((c) => (
+                        <th
+                          key={c.key}
+                          className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
+                          style={{ width: tableColumnWidths[c.key], minWidth: tableColumnWidths[c.key] }}
+                        >
+                          <span className="truncate block">{c.label}</span>
+                          <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, c.key)} />
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -799,7 +882,7 @@ const TaskList: React.FC = () => {
                       return (
                         <React.Fragment key={task._id}>
                           <tr className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="px-3 py-3">
+                            <td className="px-3 py-3" style={{ width: tableColumnWidths.expand, minWidth: tableColumnWidths.expand }}>
                               <button
                                 type="button"
                                 onClick={() => toggleExpand(task._id)}
@@ -809,7 +892,7 @@ const TaskList: React.FC = () => {
                                 {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
                               </button>
                             </td>
-                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-3 py-3" style={{ width: tableColumnWidths.select, minWidth: tableColumnWidths.select }} onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selectedTasks.has(task._id)}
@@ -817,7 +900,7 @@ const TaskList: React.FC = () => {
                                 className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
                               />
                             </td>
-                            <td className="px-3 py-3 text-sm">
+                            <td className="px-3 py-3 text-sm" style={{ width: tableColumnWidths.farmer, minWidth: tableColumnWidths.farmer }}>
                               <button type="button" className="text-left w-full" onClick={() => setSelectedTask(task)}>
                                 <div className="flex items-center gap-3 min-w-0">
                                   {task.farmerId.photoUrl ? (
@@ -842,21 +925,21 @@ const TaskList: React.FC = () => {
                                 </div>
                               </button>
                             </td>
-                            <td className="px-3 py-3 text-sm">{getStatusBadge(task.status)}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700">
+                            <td className="px-3 py-3 text-sm" style={{ width: tableColumnWidths.status, minWidth: tableColumnWidths.status }}>{getStatusBadge(task.status)}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700" style={{ width: tableColumnWidths.scheduled, minWidth: tableColumnWidths.scheduled }}>
                               <div className="font-bold">{formatDate(task.scheduledDate)}</div>
                               <span className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${priority.color}`}>
                                 <PriorityIcon size={12} />
                                 {priority.label}
                               </span>
                             </td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.assignedAgentId?.name || ''}>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" style={{ width: tableColumnWidths.agent, minWidth: tableColumnWidths.agent }} title={task.assignedAgentId?.name || ''}>
                               {task.assignedAgentId?.name || '-'}
                             </td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory}>{territory || '-'}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.activityId.type}>{task.activityId.type}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.activityId.officerName}>{task.activityId.officerName}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate" title={task.farmerId.preferredLanguage}>{task.farmerId.preferredLanguage}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" style={{ width: tableColumnWidths.territory, minWidth: tableColumnWidths.territory }} title={territory}>{territory || '-'}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" style={{ width: tableColumnWidths.activity, minWidth: tableColumnWidths.activity }} title={task.activityId.type}>{task.activityId.type}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" style={{ width: tableColumnWidths.officer, minWidth: tableColumnWidths.officer }} title={task.activityId.officerName}>{task.activityId.officerName}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700 truncate" style={{ width: tableColumnWidths.language, minWidth: tableColumnWidths.language }} title={task.farmerId.preferredLanguage}>{task.farmerId.preferredLanguage}</td>
                           </tr>
 
                           {isExpanded && (

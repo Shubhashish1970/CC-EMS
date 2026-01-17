@@ -374,10 +374,14 @@ export const exportPendingTasksXlsx = async (filters?: {
   search?: string;
   dateFrom?: Date | string;
   dateTo?: Date | string;
+  exportAll?: boolean;
   page?: number;
   limit?: number;
 }) => {
-  const { page = 1, limit = 20 } = filters || {};
+  const { exportAll = false } = filters || {};
+  const page = exportAll ? 1 : (filters?.page || 1);
+  // Safety cap: exporting huge datasets can be slow/heavy
+  const limit = exportAll ? Math.min(Math.max(1, Number(filters?.limit || 5000)), 5000) : (filters?.limit || 20);
   const result = await getPendingTasks({ ...(filters || {}), page, limit });
 
   const pad2 = (n: number) => String(n).padStart(2, '0');

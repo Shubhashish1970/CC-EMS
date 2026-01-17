@@ -181,7 +181,7 @@ export const tasksAPI = {
     return apiRequest(`/tasks/pending/stats${query ? `?${query}` : ''}`);
   },
 
-  downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+  downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; exportAll?: boolean; page?: number; limit?: number }) => {
     const token = getAuthToken();
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
@@ -189,6 +189,7 @@ export const tasksAPI = {
     if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.exportAll !== undefined) params.append('exportAll', String(filters.exportAll));
     if (filters?.page) params.append('page', String(filters.page));
     if (filters?.limit) params.append('limit', String(filters.limit));
 
