@@ -7,6 +7,7 @@ import {
   getActivitiesWithSampling,
   getActivitiesSamplingExportRows,
   getActivitiesSamplingStats,
+  getActivitiesSamplingFilterOptions,
   getAgentQueues,
   getAgentQueue,
 } from '../services/adminService.js';
@@ -135,6 +136,62 @@ router.get(
       });
 
       res.json({ success: true, data: stats });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @route   GET /api/admin/activities-sampling/options
+ * @desc    Get distinct dropdown options for activity sampling filters (territory/zone/bu) scoped to current filters (not paginated)
+ * @access  Private (MIS Admin only)
+ */
+router.get(
+  '/activities-sampling/options',
+  [
+    query('activityType').optional().isString(),
+    query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
+    query('samplingStatus').optional().isIn(['sampled', 'not_sampled', 'partial']),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const {
+        activityType,
+        territory,
+        zone,
+        bu,
+        samplingStatus,
+        dateFrom,
+        dateTo,
+      } = req.query;
+
+      const dateFromParsed = dateFrom ? new Date(dateFrom as string) : undefined;
+      const dateToParsed = dateTo ? new Date(dateTo as string) : undefined;
+
+      const options = await getActivitiesSamplingFilterOptions({
+        activityType: activityType as string,
+        territory: territory as string,
+        zone: zone as string,
+        bu: bu as string,
+        samplingStatus: samplingStatus as any,
+        dateFrom: dateFromParsed,
+        dateTo: dateToParsed,
+      });
+
+      res.json({ success: true, data: options });
     } catch (error) {
       next(error);
     }

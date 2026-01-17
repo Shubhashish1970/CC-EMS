@@ -444,6 +444,134 @@ export const exportPendingTasksXlsx = async (filters?: {
   return { filename, buffer };
 };
 
+export const getPendingTasksFilterOptions = async (filters?: {
+  agentId?: string;
+  territory?: string;
+  zone?: string;
+  bu?: string;
+  search?: string;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+}) => {
+  const { agentId, territory, zone, bu, search, dateFrom, dateTo } = filters || {};
+
+  const taskQuery: any = {
+    // match the Task Management list scope (queue + in-progress)
+    status: { $in: ['sampled_in_queue', 'in_progress'] },
+  };
+
+  if (agentId) taskQuery.assignedAgentId = new mongoose.Types.ObjectId(agentId);
+
+  if (dateFrom || dateTo) {
+    taskQuery.scheduledDate = {};
+    if (dateFrom) {
+      const fromDate = typeof dateFrom === 'string' ? new Date(dateFrom) : dateFrom;
+      fromDate.setHours(0, 0, 0, 0);
+      taskQuery.scheduledDate.$gte = fromDate;
+    }
+    if (dateTo) {
+      const toDate = typeof dateTo === 'string' ? new Date(dateTo) : dateTo;
+      toDate.setHours(23, 59, 59, 999);
+      taskQuery.scheduledDate.$lte = toDate;
+    }
+  }
+
+  const normalizedSearch = (search || '').trim();
+  const base: any[] = [{ $match: taskQuery }];
+
+  // If search is present, we need the same join semantics as list/stats to ensure options match.
+  if (normalizedSearch) {
+    const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped, 'i');
+    base.push(
+      { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+      { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: Activity.collection.name, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+      { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: User.collection.name, localField: 'assignedAgentId', foreignField: '_id', as: 'assignedAgentId' } },
+      { $unwind: { path: '$assignedAgentId', preserveNullAndEmptyArrays: true } },
+      {
+        $match: {
+          $or: [
+            { 'farmerId.name': re },
+            { 'farmerId.mobileNumber': re },
+            { 'farmerId.location': re },
+            { 'farmerId.preferredLanguage': re },
+            { 'assignedAgentId.name': re },
+            { 'assignedAgentId.email': re },
+            { 'activityId.type': re },
+            { 'activityId.officerName': re },
+            { 'activityId.location': re },
+            { 'activityId.territoryName': re },
+            { 'activityId.territory': re },
+            { 'activityId.activityId': re },
+          ],
+        },
+      }
+    );
+  } else {
+    base.push(
+      { $lookup: { from: Activity.collection.name, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+      { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }
+    );
+  }
+
+  const buildGeoMatch = (exclude: 'territory' | 'zone' | 'bu') => {
+    const clauses: any[] = [];
+    if (exclude !== 'territory' && territory) clauses.push({ __territory: String(territory).trim() });
+    if (exclude !== 'zone' && zone) clauses.push({ __zone: String(zone).trim() });
+    if (exclude !== 'bu' && bu) clauses.push({ __bu: String(bu).trim() });
+    if (!clauses.length) return null;
+    return clauses.length === 1 ? clauses[0] : { $and: clauses };
+  };
+
+  const agg = await CallTask.aggregate([
+    ...base,
+    {
+      $addFields: {
+        __territory: {
+          $trim: {
+            input: {
+              $ifNull: ['$activityId.territoryName', { $ifNull: ['$activityId.territory', ''] }],
+            },
+          },
+        },
+        __zone: { $trim: { input: { $ifNull: ['$activityId.zoneName', ''] } } },
+        __bu: { $trim: { input: { $ifNull: ['$activityId.buName', ''] } } },
+      },
+    },
+    {
+      $facet: {
+        territory: [
+          ...(buildGeoMatch('territory') ? [{ $match: buildGeoMatch('territory') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__territory' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+        zone: [
+          ...(buildGeoMatch('zone') ? [{ $match: buildGeoMatch('zone') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__zone' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+        bu: [
+          ...(buildGeoMatch('bu') ? [{ $match: buildGeoMatch('bu') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__bu' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+      },
+    },
+  ]);
+
+  const first = agg?.[0] || {};
+  const stripEmpty = (arr: any[]) => arr.filter((v) => v !== '' && v !== null && v !== undefined);
+  const sortAlpha = (a: any, b: any) => String(a).localeCompare(String(b));
+
+  const territoryOptions = stripEmpty(first?.territory?.[0]?.values || []).sort(sortAlpha);
+  const zoneOptions = stripEmpty(first?.zone?.[0]?.values || []).sort(sortAlpha);
+  const buOptions = stripEmpty(first?.bu?.[0]?.values || []).sort(sortAlpha);
+
+  return { territoryOptions, zoneOptions, buOptions };
+};
+
 /**
  * Get unassigned tasks (Team Lead / Admin)
  * These tasks are created by sampling and must be assigned by Team Lead (manual or auto later).

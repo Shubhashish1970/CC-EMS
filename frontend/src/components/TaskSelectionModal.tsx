@@ -393,8 +393,8 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             <p className="text-xs text-slate-500">
               {tasks.length > 0 ? (
                 <>
-                  <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
-                  {sortedTasks.length !== 1 ? 's' : ''} available
+              <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
+              {sortedTasks.length !== 1 ? 's' : ''} available
                   {(searchQuery || filter !== 'all') && tasks.length > sortedTasks.length && (
                     <span> (filtered from {tasks.length})</span>
                   )}

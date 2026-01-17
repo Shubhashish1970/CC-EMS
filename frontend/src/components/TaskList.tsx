@@ -426,35 +426,40 @@ const TaskList: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, filters.status, filters.agentId, filters.territory, filters.zone, filters.bu, filters.search, filters.dateFrom, filters.dateTo]);
 
-  const territoryOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const t of tasks) {
-      const a: any = t.activityId as any;
-      const v = String((a?.territoryName || a?.territory || '') ?? '').trim();
-      if (v) values.add(v);
-    }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [tasks]);
+  const [filterOptions, setFilterOptions] = useState<{ territoryOptions: string[]; zoneOptions: string[]; buOptions: string[] }>({
+    territoryOptions: [],
+    zoneOptions: [],
+    buOptions: [],
+  });
 
-  const zoneOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const t of tasks) {
-      const a: any = t.activityId as any;
-      const v = String(a?.zoneName ?? '').trim();
-      if (v) values.add(v);
+  const fetchFilterOptions = async () => {
+    if (!user || user.role === 'team_lead') return;
+    try {
+      const res: any = await tasksAPI.getPendingTasksFilterOptions({
+        agentId: filters.agentId || undefined,
+        territory: filters.territory || undefined,
+        zone: filters.zone || undefined,
+        bu: filters.bu || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) {
+        setFilterOptions({
+          territoryOptions: Array.isArray(res.data.territoryOptions) ? res.data.territoryOptions : [],
+          zoneOptions: Array.isArray(res.data.zoneOptions) ? res.data.zoneOptions : [],
+          buOptions: Array.isArray(res.data.buOptions) ? res.data.buOptions : [],
+        });
+      }
+    } catch {
+      // ignore; don't block UI
     }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [tasks]);
+  };
 
-  const buOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const t of tasks) {
-      const a: any = t.activityId as any;
-      const v = String(a?.buName ?? '').trim();
-      if (v) values.add(v);
-    }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [tasks]);
+  useEffect(() => {
+    fetchFilterOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, filters.agentId, filters.territory, filters.zone, filters.bu, filters.search, filters.dateFrom, filters.dateTo]);
 
   const handleDownloadExcel = async () => {
     if (!user || user.role === 'team_lead') return;
@@ -756,7 +761,7 @@ const TaskList: React.FC = () => {
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
                       <option value="">All Territories</option>
-                      {territoryOptions.map((t) => (
+                      {filterOptions.territoryOptions.map((t) => (
                         <option key={t} value={t}>
                           {t}
                         </option>
@@ -776,7 +781,7 @@ const TaskList: React.FC = () => {
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
                       <option value="">All Zones</option>
-                      {zoneOptions.map((z) => (
+                      {filterOptions.zoneOptions.map((z) => (
                         <option key={z} value={z}>
                           {z}
                         </option>
@@ -798,7 +803,7 @@ const TaskList: React.FC = () => {
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
                       <option value="">All BUs</option>
-                      {buOptions.map((b) => (
+                      {filterOptions.buOptions.map((b) => (
                         <option key={b} value={b}>
                           {b}
                         </option>

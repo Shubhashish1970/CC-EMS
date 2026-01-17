@@ -185,6 +185,19 @@ export const tasksAPI = {
     return apiRequest(`/tasks/pending/stats${query ? `?${query}` : ''}`);
   },
 
+  getPendingTasksFilterOptions: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.agentId) params.append('agentId', filters.agentId);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/tasks/pending/options${query ? `?${query}` : ''}`);
+  },
+
   downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string; exportAll?: boolean; page?: number; limit?: number }) => {
     const token = getAuthToken();
     const params = new URLSearchParams();
@@ -492,6 +505,27 @@ export const adminAPI = {
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     const query = params.toString();
     return apiRequest(`/admin/activities-sampling/stats${query ? `?${query}` : ''}`);
+  },
+
+  getActivitiesSamplingFilterOptions: async (filters?: {
+    activityType?: string;
+    territory?: string;
+    zone?: string;
+    bu?: string;
+    samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.samplingStatus) params.append('samplingStatus', filters.samplingStatus);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/admin/activities-sampling/options${query ? `?${query}` : ''}`);
   },
 
   downloadActivitiesSamplingExport: async (filters?: {

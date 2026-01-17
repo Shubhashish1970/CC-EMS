@@ -811,6 +811,134 @@ export const getActivitiesSamplingStats = async (filters?: {
   };
 };
 
+export const getActivitiesSamplingFilterOptions = async (filters?: {
+  activityType?: string;
+  territory?: string;
+  zone?: string;
+  bu?: string;
+  samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+  dateFrom?: Date;
+  dateTo?: Date;
+}): Promise<{ territoryOptions: string[]; zoneOptions: string[]; buOptions: string[] }> => {
+  const { activityType, territory, zone, bu, samplingStatus, dateFrom, dateTo } = filters || {};
+
+  const baseMatch: any = {};
+  if (activityType) baseMatch.type = activityType;
+  if (dateFrom || dateTo) {
+    baseMatch.date = {};
+    if (dateFrom) baseMatch.date.$gte = dateFrom;
+    if (dateTo) baseMatch.date.$lte = dateTo;
+  }
+
+  const normalize = (v: any) => String(v || '').trim();
+  const territoryNorm = normalize(territory);
+  const zoneNorm = normalize(zone);
+  const buNorm = normalize(bu);
+
+  const buildGeoMatch = (exclude: 'territory' | 'zone' | 'bu') => {
+    const clauses: any[] = [];
+    if (exclude !== 'territory' && territoryNorm) clauses.push({ __territory: territoryNorm });
+    if (exclude !== 'zone' && zoneNorm) clauses.push({ __zone: zoneNorm });
+    if (exclude !== 'bu' && buNorm) clauses.push({ __bu: buNorm });
+    if (!clauses.length) return null;
+    return clauses.length === 1 ? clauses[0] : { $and: clauses };
+  };
+
+  const pipeline: any[] = [
+    { $match: baseMatch },
+    {
+      $addFields: {
+        __territory: {
+          $trim: {
+            input: {
+              $ifNull: ['$territoryName', { $ifNull: ['$territory', ''] }],
+            },
+          },
+        },
+        __zone: { $trim: { input: { $ifNull: ['$zoneName', ''] } } },
+        __bu: { $trim: { input: { $ifNull: ['$buName', ''] } } },
+      },
+    },
+    {
+      $lookup: {
+        from: SamplingAudit.collection.name,
+        localField: '_id',
+        foreignField: 'activityId',
+        as: '__audit',
+      },
+    },
+    { $unwind: { path: '$__audit', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: CallTask.collection.name,
+        let: { aid: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$activityId', '$$aid'] } } },
+          { $count: 'count' },
+        ],
+        as: '__tasksCount',
+      },
+    },
+    {
+      $addFields: {
+        __taskCount: {
+          $ifNull: [{ $arrayElemAt: ['__$tasksCount.count', 0] }, 0],
+        },
+        __sampledCount: {
+          $ifNull: ['__$audit.sampledCount', 0],
+        },
+        __hasAudit: {
+          $cond: [{ $ifNull: ['__$audit', false] }, true, false],
+        },
+      },
+    },
+    {
+      $addFields: {
+        __samplingStatus: {
+          $cond: [
+            { $eq: ['__$hasAudit', false] },
+            'not_sampled',
+            {
+              $cond: [{ $gte: ['__$taskCount', '$__sampledCount'] }, 'sampled', 'partial'],
+            },
+          ],
+        },
+      },
+    },
+    ...(samplingStatus ? [{ $match: { __samplingStatus: samplingStatus } }] : []),
+    {
+      $facet: {
+        territory: [
+          ...(buildGeoMatch('territory') ? [{ $match: buildGeoMatch('territory') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__territory' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+        zone: [
+          ...(buildGeoMatch('zone') ? [{ $match: buildGeoMatch('zone') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__zone' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+        bu: [
+          ...(buildGeoMatch('bu') ? [{ $match: buildGeoMatch('bu') }] : []),
+          { $group: { _id: null, values: { $addToSet: '$__bu' } } },
+          { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+        ],
+      },
+    },
+  ];
+
+  const out = await Activity.aggregate(pipeline);
+  const first = out?.[0] || {};
+  const stripEmpty = (arr: any[]) => (Array.isArray(arr) ? arr.filter((v) => v !== '' && v !== null && v !== undefined) : []);
+  const sortAlpha = (a: any, b: any) => String(a).localeCompare(String(b));
+
+  const territoryOptions = stripEmpty(first?.territory?.[0]?.values || []).sort(sortAlpha);
+  const zoneOptions = stripEmpty(first?.zone?.[0]?.values || []).sort(sortAlpha);
+  const buOptions = stripEmpty(first?.bu?.[0]?.values || []).sort(sortAlpha);
+
+  return { territoryOptions, zoneOptions, buOptions };
+};
+
 /**
  * Get task queues for all agents with status breakdown
  * Returns summary of all agents with their task counts by status

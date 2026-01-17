@@ -237,35 +237,34 @@ const ActivitySamplingView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const territoryOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const item of activities) {
-      const a: any = (item as any)?.activity;
-      const t = (a?.territoryName || a?.territory || '').trim();
-      if (t) values.add(t);
-    }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [activities]);
+  const [filterOptions, setFilterOptions] = useState<{ territoryOptions: string[]; zoneOptions: string[]; buOptions: string[] }>({
+    territoryOptions: [],
+    zoneOptions: [],
+    buOptions: [],
+  });
 
-  const zoneOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const item of activities) {
-      const a: any = (item as any)?.activity;
-      const z = (a?.zoneName || '').trim();
-      if (z) values.add(z);
+  const fetchFilterOptions = async () => {
+    try {
+      const res: any = await adminAPI.getActivitiesSamplingFilterOptions({
+        activityType: filters.activityType || undefined,
+        territory: filters.territory || undefined,
+        zone: filters.zone || undefined,
+        bu: filters.bu || undefined,
+        samplingStatus: filters.samplingStatus || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) {
+        setFilterOptions({
+          territoryOptions: Array.isArray(res.data.territoryOptions) ? res.data.territoryOptions : [],
+          zoneOptions: Array.isArray(res.data.zoneOptions) ? res.data.zoneOptions : [],
+          buOptions: Array.isArray(res.data.buOptions) ? res.data.buOptions : [],
+        });
+      }
+    } catch {
+      // ignore; don't block UI
     }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [activities]);
-
-  const buOptions = useMemo(() => {
-    const values = new Set<string>();
-    for (const item of activities) {
-      const a: any = (item as any)?.activity;
-      const b = (a?.buName || '').trim();
-      if (b) values.add(b);
-    }
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [activities]);
+  };
 
   useEffect(() => {
     if (!isDatePickerOpen) return;
@@ -279,6 +278,19 @@ const ActivitySamplingView: React.FC = () => {
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [isDatePickerOpen]);
+
+  useEffect(() => {
+    fetchFilterOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.activityType,
+    filters.territory,
+    filters.zone,
+    filters.bu,
+    filters.samplingStatus,
+    filters.dateFrom,
+    filters.dateTo,
+  ]);
 
   const fetchActivities = async (page: number = 1) => {
     setIsLoading(true);
@@ -849,7 +861,7 @@ const ActivitySamplingView: React.FC = () => {
                   className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">All Territories</option>
-                  {territoryOptions.map((t) => (
+                  {filterOptions.territoryOptions.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -865,7 +877,7 @@ const ActivitySamplingView: React.FC = () => {
                   className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">All Zones</option>
-                  {zoneOptions.map((z) => (
+                  {filterOptions.zoneOptions.map((z) => (
                     <option key={z} value={z}>{z}</option>
                   ))}
                 </select>
@@ -881,7 +893,7 @@ const ActivitySamplingView: React.FC = () => {
                   className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">All BUs</option>
-                  {buOptions.map((b) => (
+                  {filterOptions.buOptions.map((b) => (
                     <option key={b} value={b}>{b}</option>
                   ))}
                 </select>

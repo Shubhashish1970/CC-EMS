@@ -11,6 +11,7 @@ import {
   getNextTaskForAgent,
   getAvailableTasksForAgent,
   getPendingTasks,
+  getPendingTasksFilterOptions,
   getTeamTasks,
   getUnassignedTasks,
   assignTaskToAgent,
@@ -280,6 +281,50 @@ router.get(
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/pending/options
+// @desc    Get distinct filter options (territory/zone/bu) for Task Management scoped to current filters (not paginated)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/pending/options',
+  requirePermission('tasks.view.team'),
+  [
+    query('agentId').optional().isMongoId(),
+    query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { agentId, territory, zone, bu, search, dateFrom, dateTo } = req.query as any;
+
+      const options = await getPendingTasksFilterOptions({
+        agentId: agentId as string,
+        territory: territory as string,
+        zone: zone as string,
+        bu: bu as string,
+        search: (search as string) || undefined,
+        dateFrom: dateFrom ? (dateFrom as string) : undefined,
+        dateTo: dateTo ? (dateTo as string) : undefined,
+      });
+
+      res.json({ success: true, data: options });
     } catch (error) {
       next(error);
     }
@@ -654,7 +699,7 @@ router.get(
         };
       });
 
-      // 4) Filter option lists (BU/State) - derived from activities present in the open task pool
+      // 4) Filter option lists (BU/State) - scoped to current filters (date + other geo filters), but each list ignores its own current selection
       const filterOptionsAgg = await CallTask.aggregate([
         { $match: openMatch },
         {
@@ -667,23 +712,38 @@ router.get(
         },
         { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
         {
-          $group: {
-            _id: null,
-            buList: { $addToSet: { $ifNull: ['$activity.buName', ''] } },
-            stateList: { $addToSet: { $ifNull: ['$activity.state', ''] } },
+          $addFields: {
+            __bu: { $trim: { input: { $ifNull: ['$activity.buName', ''] } } },
+            __state: { $trim: { input: { $ifNull: ['$activity.state', ''] } } },
           },
         },
-        { $project: { _id: 0, buList: 1, stateList: 1 } },
+        {
+          $facet: {
+            bu: [
+              ...(state ? [{ $match: { __state: String(state).trim() } }] : []),
+              { $group: { _id: null, values: { $addToSet: '$__bu' } } },
+              { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+            ],
+            state: [
+              ...(bu ? [{ $match: { __bu: String(bu).trim() } }] : []),
+              { $group: { _id: null, values: { $addToSet: '$__state' } } },
+              { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+            ],
+          },
+        },
       ]);
 
-      const buOptions = (filterOptionsAgg?.[0]?.buList || [])
-        .map((s: string) => String(s || '').trim())
+      const stripEmpty = (arr: any[]) => (Array.isArray(arr) ? arr.filter((v) => v !== '' && v !== null && v !== undefined) : []);
+      const sortAlpha = (a: any, b: any) => String(a).localeCompare(String(b));
+
+      const buOptions = stripEmpty(filterOptionsAgg?.[0]?.bu?.[0]?.values || [])
+        .map((s: any) => String(s || '').trim())
         .filter((s: string) => !!s)
-        .sort((a: string, b: string) => a.localeCompare(b));
-      const stateOptions = (filterOptionsAgg?.[0]?.stateList || [])
-        .map((s: string) => String(s || '').trim())
+        .sort(sortAlpha);
+      const stateOptions = stripEmpty(filterOptionsAgg?.[0]?.state?.[0]?.values || [])
+        .map((s: any) => String(s || '').trim())
         .filter((s: string) => !!s)
-        .sort((a: string, b: string) => a.localeCompare(b));
+        .sort(sortAlpha);
 
       res.json({
         success: true,
