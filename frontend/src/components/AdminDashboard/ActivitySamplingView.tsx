@@ -708,12 +708,8 @@ const ActivitySamplingView: React.FC = () => {
                         setExcelFile(f);
                         setImportReport(null);
                       }}
-                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                      className="w-full h-10 px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
                     />
-                    <p className="text-xs text-slate-500 mt-2">
-                      Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
-                      <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
-                    </p>
                   </div>
 
                   <div className="flex items-center gap-3 md:flex-shrink-0">
@@ -731,12 +727,18 @@ const ActivitySamplingView: React.FC = () => {
                     onClick={handleImportExcel}
                     disabled={!excelFile || isImportingExcel}
                     title="Upload and import activities & farmers"
+                    className="h-10"
                   >
                     <ArrowUpToLine size={16} className={isImportingExcel ? 'animate-spin' : ''} />
                     {isImportingExcel ? 'Importing...' : 'Upload & Import'}
                   </Button>
                   </div>
                 </div>
+
+                <p className="text-xs text-slate-500">
+                  Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
+                  <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
+                </p>
               </div>
 
               {importReport && (
