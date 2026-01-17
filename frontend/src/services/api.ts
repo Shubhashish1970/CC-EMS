@@ -163,6 +163,9 @@ export const tasksAPI = {
   getOwnHistory: async (filters?: { status?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
+    // Optional extra filters (Agent History v2 UI)
+    if ((filters as any)?.territory) params.append('territory', (filters as any).territory);
+    if ((filters as any)?.activityType) params.append('activityType', (filters as any).activityType);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
@@ -170,6 +173,68 @@ export const tasksAPI = {
     if (filters?.limit) params.append('limit', String(filters.limit));
     const query = params.toString();
     return apiRequest(`/tasks/own/history${query ? `?${query}` : ''}`);
+  },
+
+  getOwnHistoryOptions: async (filters?: { status?: string; territory?: string; activityType?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/tasks/own/history/options${query ? `?${query}` : ''}`);
+  },
+
+  getOwnHistoryStats: async (filters?: { status?: string; territory?: string; activityType?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/tasks/own/history/stats${query ? `?${query}` : ''}`);
+  },
+
+  downloadOwnHistoryExport: async (filters?: { status?: string; territory?: string; activityType?: string; search?: string; dateFrom?: string; dateTo?: string; limit?: number }) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.limit) params.append('limit', String(filters.limit));
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE_URL}/tasks/own/history/export${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      const msg = json?.error?.message || json?.message || `Download failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'agent_history.xlsx';
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   getOwnHistoryDetail: async (taskId: string) => {

@@ -19,6 +19,7 @@ import {
 } from '../services/taskService.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
+import * as XLSX from 'xlsx';
 
 const router = express.Router();
 
@@ -222,6 +223,8 @@ router.get(
   requirePermission('tasks.view.own'),
   [
     query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('territory').optional().isString(),
+    query('activityType').optional().isString(),
     query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
@@ -241,7 +244,7 @@ router.get(
       const authReq = req as AuthRequest;
       const agentId = authReq.user._id.toString();
 
-      const { status, search, dateFrom, dateTo, page, limit } = req.query as any;
+      const { status, territory, activityType, search, dateFrom, dateTo, page, limit } = req.query as any;
       const p = page ? Number(page) : 1;
       const l = limit ? Number(limit) : 20;
       const skip = (p - 1) * l;
@@ -265,7 +268,9 @@ router.get(
       }
 
       const normalizedSearch = String(search || '').trim();
-      if (normalizedSearch) {
+      const hasActivityFilters = !!String(territory || '').trim() || !!String(activityType || '').trim();
+
+      if (normalizedSearch || hasActivityFilters) {
         const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const re = new RegExp(escaped, 'i');
 
@@ -273,27 +278,46 @@ router.get(
 
         const agg = await CallTask.aggregate([
           { $match: baseMatch },
-          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmer' } },
-          { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activity' } },
-          { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
-          {
-            $match: {
-              $or: [
-                { 'farmer.name': re },
-                { 'farmer.mobileNumber': re },
-                { 'farmer.location': re },
-                { 'farmer.preferredLanguage': re },
-                { 'activity.type': re },
-                { 'activity.officerName': re },
-                { 'activity.tmName': re },
-                { 'activity.territoryName': re },
-                { 'activity.territory': re },
-                { 'activity.state': re },
-                { 'activity.activityId': re },
-              ],
-            },
-          },
+          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+          ...(String(activityType || '').trim()
+            ? [{ $match: { 'activityId.type': String(activityType).trim() } }]
+            : []),
+          ...(String(territory || '').trim()
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { 'activityId.territoryName': String(territory).trim() },
+                      { 'activityId.territory': String(territory).trim() },
+                    ],
+                  },
+                },
+              ]
+            : []),
+          ...(normalizedSearch
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { 'farmerId.name': re },
+                      { 'farmerId.mobileNumber': re },
+                      { 'farmerId.location': re },
+                      { 'farmerId.preferredLanguage': re },
+                      { 'activityId.type': re },
+                      { 'activityId.officerName': re },
+                      { 'activityId.tmName': re },
+                      { 'activityId.territoryName': re },
+                      { 'activityId.territory': re },
+                      { 'activityId.state': re },
+                      { 'activityId.activityId': re },
+                    ],
+                  },
+                },
+              ]
+            : []),
           { $sort: { updatedAt: -1 } },
           {
             $facet: {
@@ -369,6 +393,399 @@ router.get(
       }
 
       res.json({ success: true, data: { task } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/history/options
+// @desc    Distinct filter option lists for Agent History (territory/activityType), scoped by filters (each ignores its own selection)
+// @access  Private (CC Agent)
+router.get(
+  '/own/history/options',
+  requirePermission('tasks.view.own'),
+  [
+    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('territory').optional().isString(),
+    query('activityType').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
+
+      const baseMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' },
+      };
+      if (status) baseMatch.status = String(status) as TaskStatus;
+
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        baseMatch.$or = [
+          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+        ];
+      }
+
+      const normalizedSearch = String(search || '').trim();
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
+
+      const basePipeline: any[] = [
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            __territory: {
+              $trim: {
+                input: {
+                  $ifNull: ['$activityId.territoryName', { $ifNull: ['$activityId.territory', ''] }],
+                },
+              },
+            },
+            __activityType: { $trim: { input: { $ifNull: ['$activityId.type', ''] } } },
+          },
+        },
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
+                },
+              },
+            ]
+          : []),
+      ];
+
+      const stripEmpty = (arr: any[]) => (Array.isArray(arr) ? arr.filter((v) => v !== '' && v !== null && v !== undefined) : []);
+
+      const agg = await CallTask.aggregate([
+        ...basePipeline,
+        {
+          $facet: {
+            territory: [
+              ...(normType ? [{ $match: { __activityType: normType } }] : []), // keep other filter
+              { $group: { _id: null, values: { $addToSet: '$__territory' } } },
+              { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+            ],
+            activityType: [
+              ...(normTerritory ? [{ $match: { __territory: normTerritory } }] : []), // keep other filter
+              { $group: { _id: null, values: { $addToSet: '$__activityType' } } },
+              { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
+            ],
+          },
+        },
+      ]);
+
+      const territoryOptions = stripEmpty(agg?.[0]?.territory?.[0]?.values || [])
+        .map((s: any) => String(s || '').trim())
+        .filter((s: string) => !!s)
+        .sort((a: string, b: string) => a.localeCompare(b));
+
+      const activityTypeOptions = stripEmpty(agg?.[0]?.activityType?.[0]?.values || [])
+        .map((s: any) => String(s || '').trim())
+        .filter((s: string) => !!s)
+        .sort((a: string, b: string) => a.localeCompare(b));
+
+      res.json({ success: true, data: { territoryOptions, activityTypeOptions } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/history/stats
+// @desc    Agent History stats strip (filter-based, not paginated)
+// @access  Private (CC Agent)
+router.get(
+  '/own/history/stats',
+  requirePermission('tasks.view.own'),
+  [
+    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('territory').optional().isString(),
+    query('activityType').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
+
+      const baseMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' },
+      };
+      if (status) baseMatch.status = String(status) as TaskStatus;
+
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        baseMatch.$or = [
+          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+        ];
+      }
+
+      const normalizedSearch = String(search || '').trim();
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
+
+      const agg = await CallTask.aggregate([
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+        ...(normTerritory
+          ? [
+              {
+                $match: {
+                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                },
+              },
+            ]
+          : []),
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
+                },
+              },
+            ]
+          : []),
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]);
+
+      const map: Record<string, number> = {};
+      for (const r of agg) map[String(r._id)] = Number(r.count || 0);
+
+      const inProgress = Number(map.in_progress || 0);
+      const completed = Number(map.completed || 0);
+      const notReachable = Number(map.not_reachable || 0);
+      const invalid = Number(map.invalid_number || 0);
+      const total = inProgress + completed + notReachable + invalid;
+
+      res.json({
+        success: true,
+        data: {
+          total,
+          inProgress,
+          completedConversation: completed,
+          unsuccessful: notReachable,
+          invalid,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/own/history/export
+// @desc    Export agent history (filtered) as Excel (ALL rows for current filters)
+// @access  Private (CC Agent)
+router.get(
+  '/own/history/export',
+  requirePermission('tasks.view.own'),
+  [
+    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('territory').optional().isString(),
+    query('activityType').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('limit').optional().isInt({ min: 1, max: 5000 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const { status, territory, activityType, search, dateFrom, dateTo, limit } = req.query as any;
+      const max = limit ? Number(limit) : 5000;
+
+      const baseMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' },
+      };
+      if (status) baseMatch.status = String(status) as TaskStatus;
+
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        baseMatch.$or = [
+          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+        ];
+      }
+
+      const normalizedSearch = String(search || '').trim();
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
+
+      const tasks = await CallTask.aggregate([
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+        ...(normTerritory
+          ? [
+              {
+                $match: {
+                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                },
+              },
+            ]
+          : []),
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
+                },
+              },
+            ]
+          : []),
+        { $sort: { updatedAt: -1 } },
+        { $limit: max },
+      ]);
+
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const fmtDate = (d: any) => {
+        const dt = d ? new Date(d) : null;
+        return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
+      };
+
+      const sheetRows = tasks.map((t: any) => {
+        const farmer = t.farmerId || {};
+        const activity = t.activityId || {};
+        const territoryStr = String((activity.territoryName || activity.territory || '')).trim();
+        return {
+          'Task ID': String(t._id),
+          'FFA Activity ID': String(activity.activityId || ''),
+          'Activity Type': String(activity.type || ''),
+          Territory: territoryStr,
+          State: String(activity.state || ''),
+          Farmer: String(farmer.name || ''),
+          Mobile: String(farmer.mobileNumber || ''),
+          Language: String(farmer.preferredLanguage || ''),
+          Outcome: String(t.status || ''),
+          'Outbound Status': String(t.callLog?.callStatus || ''),
+          'Call Started': fmtDate(t.callStartedAt || ''),
+          Updated: fmtDate(t.updatedAt || ''),
+          'Farmer Comments': String(t.callLog?.farmerComments || ''),
+          Sentiment: String(t.callLog?.sentiment || ''),
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(sheetRows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Agent History');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const now = new Date();
+      const filename = `agent_history_${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(
+        now.getMinutes()
+      )}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
     } catch (error) {
       next(error);
     }

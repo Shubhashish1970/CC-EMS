@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, RefreshCw, ChevronDown } from 'lucide-react';
+import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ArrowUpDown } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -15,6 +15,25 @@ type DateRangePreset =
   | 'Last 30 days';
 
 type HistoryStatus = '' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
+
+type HistoryColumnKey =
+  | 'farmer'
+  | 'outcome'
+  | 'outbound'
+  | 'activityType'
+  | 'territory'
+  | 'updated'
+  | 'action';
+
+const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
+  farmer: 220,
+  outcome: 200,
+  outbound: 160,
+  activityType: 160,
+  territory: 220,
+  updated: 140,
+  action: 120,
+};
 
 const toISO = (d: Date) => d.toISOString().split('T')[0];
 const formatPretty = (iso: string) => {
@@ -90,13 +109,57 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('agent.history.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 20;
+  });
+  const [tableSort, setTableSort] = useState<{ key: HistoryColumnKey; dir: 'asc' | 'desc' }>(() => {
+    const raw = localStorage.getItem('agent.history.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+    } catch {
+      // ignore
+    }
+    return { key: 'updated', dir: 'desc' };
+  });
+  const [colWidths, setColWidths] = useState<Record<HistoryColumnKey, number>>(() => {
+    const raw = localStorage.getItem('agent.history.colWidths');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_COL_WIDTHS, ...parsed };
+    } catch {
+      // ignore
+    }
+    return { ...DEFAULT_COL_WIDTHS };
+  });
+  const resizingRef = useRef<{ key: HistoryColumnKey; startX: number; startWidth: number } | null>(null);
 
-  const [filters, setFilters] = useState<{ status: HistoryStatus; search: string; dateFrom: string; dateTo: string }>({
+  const [filters, setFilters] = useState<{
+    status: HistoryStatus;
+    territory: string;
+    activityType: string;
+    search: string;
+    dateFrom: string;
+    dateTo: string;
+  }>({
     status: '',
+    territory: '',
+    activityType: '',
     search: '',
     dateFrom: '',
     dateTo: '',
   });
+
+  const [filterOptions, setFilterOptions] = useState<{ territoryOptions: string[]; activityTypeOptions: string[] }>({
+    territoryOptions: [],
+    activityTypeOptions: [],
+  });
+  const [stats, setStats] = useState<any | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
 
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -129,11 +192,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
     try {
       const res: any = await tasksAPI.getOwnHistory({
         status: filters.status || undefined,
+        territory: filters.territory || undefined,
+        activityType: filters.activityType || undefined,
         search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
         page,
-        limit: 20,
+        limit: pageSize,
       });
       setRows(res?.data?.tasks || []);
       setPagination(res?.data?.pagination || null);
@@ -147,133 +212,384 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   useEffect(() => {
     load(1).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.status, filters.search, filters.dateFrom, filters.dateTo]);
+  }, [filters.status, filters.territory, filters.activityType, filters.search, filters.dateFrom, filters.dateTo, pageSize]);
 
   const page = Number(pagination?.page || 1);
   const pages = Number(pagination?.pages || 1);
 
-  const visible = useMemo(() => rows || [], [rows]);
+  useEffect(() => {
+    localStorage.setItem('agent.history.pageSize', String(pageSize));
+  }, [pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('agent.history.tableSort', JSON.stringify(tableSort));
+  }, [tableSort]);
+
+  useEffect(() => {
+    localStorage.setItem('agent.history.colWidths', JSON.stringify(colWidths));
+  }, [colWidths]);
+
+  const handleResizeStart = (key: HistoryColumnKey, startX: number) => {
+    resizingRef.current = { key, startX, startWidth: colWidths[key] };
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const dx = e.clientX - resizingRef.current.startX;
+      const next = Math.max(90, resizingRef.current.startWidth + dx);
+      setColWidths((p) => ({ ...p, [key]: next }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const loadOptions = async () => {
+    try {
+      const res: any = await tasksAPI.getOwnHistoryOptions({
+        status: filters.status || undefined,
+        territory: filters.territory || undefined,
+        activityType: filters.activityType || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) {
+        setFilterOptions({
+          territoryOptions: Array.isArray(res.data.territoryOptions) ? res.data.territoryOptions : [],
+          activityTypeOptions: Array.isArray(res.data.activityTypeOptions) ? res.data.activityTypeOptions : [],
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadStats = async () => {
+    setIsStatsLoading(true);
+    try {
+      const res: any = await tasksAPI.getOwnHistoryStats({
+        status: filters.status || undefined,
+        territory: filters.territory || undefined,
+        activityType: filters.activityType || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) setStats(res.data);
+    } catch {
+      // ignore
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOptions().catch(() => undefined);
+    loadStats().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.status, filters.territory, filters.activityType, filters.search, filters.dateFrom, filters.dateTo]);
+
+  const handleDownloadExcel = async () => {
+    setIsExporting(true);
+    try {
+      await tasksAPI.downloadOwnHistoryExport({
+        status: filters.status || undefined,
+        territory: filters.territory || undefined,
+        activityType: filters.activityType || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        limit: 5000,
+      });
+      toast.showSuccess('Excel downloaded');
+    } catch (e: any) {
+      toast.showError(e?.message || 'Failed to download excel');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const visible = useMemo(() => {
+    const data = Array.isArray(rows) ? [...rows] : [];
+
+    const getText = (t: any, key: HistoryColumnKey) => {
+      const farmer = t.farmerId || t.farmer || {};
+      const activity = t.activityId || t.activity || {};
+      if (key === 'farmer') return String(farmer?.name || '');
+      if (key === 'outcome') return String(t.status || '');
+      if (key === 'outbound') return String(t.callLog?.callStatus || '');
+      if (key === 'activityType') return String(activity?.type || '');
+      if (key === 'territory') return String(activity?.territoryName || activity?.territory || '');
+      if (key === 'updated') return String(t.updatedAt || '');
+      return '';
+    };
+
+    data.sort((a: any, b: any) => {
+      const av = getText(a, tableSort.key);
+      const bv = getText(b, tableSort.key);
+      const dir = tableSort.dir === 'asc' ? 1 : -1;
+      if (tableSort.key === 'updated') {
+        const at = new Date(av).getTime() || 0;
+        const bt = new Date(bv).getTime() || 0;
+        return dir * (at - bt);
+      }
+      return dir * av.localeCompare(bv);
+    });
+
+    return data;
+  }, [rows, tableSort.key, tableSort.dir]);
 
   return (
     <div className="flex-1 overflow-y-auto p-6 bg-[#f1f5f1]">
       <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        {/* Header */}
+        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-900">History</h2>
+              <h2 className="text-2xl font-black text-slate-900 mb-1">History</h2>
               <p className="text-sm text-slate-600">All tasks except “In Queue”.</p>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={isLoading}>
-              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" size="sm" onClick={() => setShowFilters((v) => !v)}>
+                <Filter size={16} />
+                Filters
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={isLoading}>
+                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                Refresh
+              </Button>
+            </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</div>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as any }))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
-              >
-                <option value="">All (except In Queue)</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed Conversation</option>
-                <option value="not_reachable">Unsuccessful</option>
-                <option value="invalid_number">Unsuccessful (Invalid)</option>
-              </select>
-            </div>
+          {/* Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Activity Type</label>
+                  <select
+                    value={filters.activityType}
+                    onChange={(e) => setFilters((p) => ({ ...p, activityType: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All Types</option>
+                    {filterOptions.activityTypeOptions.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="md:col-span-2">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</div>
-              <div className="relative" ref={datePickerRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsDatePickerOpen((v) => !v)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-between"
-                >
-                  <span className="truncate">
-                    {selectedPreset} • {formatPretty(filters.dateFrom)} - {formatPretty(filters.dateTo)}
-                  </span>
-                  <ChevronDown size={16} className="text-slate-400" />
-                </button>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Territory</label>
+                  <select
+                    value={filters.territory}
+                    onChange={(e) => setFilters((p) => ({ ...p, territory: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All Territories</option>
+                    {filterOptions.territoryOptions.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
 
-                {isDatePickerOpen && (
-                  <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
-                        <select
-                          value={selectedPreset}
-                          onChange={(e) => {
-                            const p = e.target.value as DateRangePreset;
-                            setSelectedPreset(p);
-                            const r = getPresetRange(p);
-                            setDraftStart(r.start || draftStart);
-                            setDraftEnd(r.end || draftEnd);
-                          }}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-                        >
-                          {(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">From</div>
-                          <input type="date" value={draftStart} onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To</div>
-                          <input type="date" value={draftEnd} onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 mt-4">
-                      <Button variant="secondary" size="sm" onClick={() => setIsDatePickerOpen(false)}>Cancel</Button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilters((p) => ({ ...p, dateFrom: draftStart, dateTo: draftEnd }));
-                          setIsDatePickerOpen(false);
-                        }}
-                        className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
-                      >
-                        Apply
-                      </button>
-                    </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as any }))}
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">All (except In Queue)</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed Conversation</option>
+                    <option value="not_reachable">Unsuccessful</option>
+                    <option value="invalid_number">Unsuccessful (Invalid)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      value={filters.search}
+                      onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
+                      placeholder="Farmer, mobile, territory, activity..."
+                      className="w-full pl-10 pr-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
                   </div>
-                )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</label>
+                  <div className="relative" ref={datePickerRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsDatePickerOpen((v) => !v)}
+                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-between"
+                    >
+                      <span className="truncate">
+                        {selectedPreset} • {formatPretty(filters.dateFrom)} - {formatPretty(filters.dateTo)}
+                      </span>
+                      <ChevronDown size={16} className="text-slate-400" />
+                    </button>
+
+                    {isDatePickerOpen && (
+                      <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
+                            <select
+                              value={selectedPreset}
+                              onChange={(e) => {
+                                const p = e.target.value as DateRangePreset;
+                                setSelectedPreset(p);
+                                const r = getPresetRange(p);
+                                setDraftStart(r.start || draftStart);
+                                setDraftEnd(r.end || draftEnd);
+                              }}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                            >
+                              {(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">From</div>
+                              <input type="date" value={draftStart} onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To</div>
+                              <input type="date" value={draftEnd} onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 mt-4">
+                          <Button variant="secondary" size="sm" onClick={() => setIsDatePickerOpen(false)}>Cancel</Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilters((p) => ({ ...p, dateFrom: draftStart, dateTo: draftEnd }));
+                              setIsDatePickerOpen(false);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+        </div>
 
-            <div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Search</div>
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={filters.search}
-                  onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
-                  placeholder="Farmer, mobile, territory, activity..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-                />
+        {/* Statistics */}
+        {!isStatsLoading && (stats?.total || 0) > 0 && (
+          <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-green-700" size={20} />
+                <h3 className="text-lg font-black text-slate-900">Statistics</h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadExcel}
+                disabled={isExporting || isLoading}
+                className={`flex items-center justify-center h-10 w-10 rounded-2xl border transition-colors ${
+                  isExporting
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
+                }`}
+                title="Download Excel (matches current filters)"
+              >
+                <Download size={18} className={isExporting ? 'animate-spin' : ''} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                <p className="text-2xl font-black text-slate-900">{stats.total}</p>
+              </div>
+              <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+                <p className="text-xs font-black text-green-700 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-2xl font-black text-green-800">{stats.completedConversation}</p>
+              </div>
+              <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
+                <p className="text-xs font-black text-yellow-700 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-2xl font-black text-yellow-800">{stats.inProgress}</p>
+              </div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <p className="text-xs font-black text-blue-700 uppercase tracking-widest mb-1">Unsuccessful</p>
+                <p className="text-2xl font-black text-blue-800">{stats.unsuccessful}</p>
+              </div>
+              <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
+                <p className="text-xs font-black text-red-700 uppercase tracking-widest mb-1">Invalid</p>
+                <p className="text-2xl font-black text-red-800">{stats.invalid}</p>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="mt-5 overflow-x-auto">
+        {/* Table */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  <th className="text-left py-3 pr-4">Farmer</th>
-                  <th className="text-left py-3 pr-4">Outcome</th>
-                  <th className="text-left py-3 pr-4">Outbound</th>
-                  <th className="text-left py-3 pr-4">Activity</th>
-                  <th className="text-left py-3 pr-4">Territory</th>
-                  <th className="text-left py-3 pr-4">Updated</th>
-                  <th className="text-right py-3">Action</th>
+                  {(
+                    [
+                      ['farmer', 'Farmer'],
+                      ['outcome', 'Outcome'],
+                      ['outbound', 'Outbound'],
+                      ['activityType', 'Activity'],
+                      ['territory', 'Territory'],
+                      ['updated', 'Updated'],
+                      ['action', 'Action'],
+                    ] as Array<[HistoryColumnKey, string]>
+                  ).map(([key, label]) => (
+                    <th
+                      key={key}
+                      className={`text-left py-3 pr-2 select-none ${key === 'action' ? 'text-right' : ''}`}
+                      style={{ width: colWidths[key] }}
+                    >
+                      <div className={`flex items-center ${key === 'action' ? 'justify-end' : 'justify-between'} gap-2`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (key === 'action') return;
+                            setTableSort((p) => {
+                              const dir = p.key === key ? (p.dir === 'asc' ? 'desc' : 'asc') : 'asc';
+                              return { key, dir };
+                            });
+                          }}
+                          className="flex items-center gap-2 font-black"
+                        >
+                          {label}
+                          {key !== 'action' && <ArrowUpDown size={14} className="text-slate-300" />}
+                        </button>
+
+                        {key !== 'action' && (
+                          <div
+                            onMouseDown={(e) => handleResizeStart(key, e.clientX)}
+                            className="w-1.5 h-6 cursor-col-resize bg-transparent hover:bg-slate-200 rounded"
+                            title="Drag to resize"
+                          />
+                        )}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -285,16 +601,26 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   const territory = (activity.territoryName || activity.territory || '').toString();
                   return (
                     <tr key={t._id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-4">
+                      <td className="py-3 pr-2" style={{ width: colWidths.farmer }}>
                         <div className="font-bold text-slate-900">{farmer.name || 'Unknown'}</div>
                         <div className="text-xs text-slate-500">{farmer.mobileNumber || ''}</div>
                       </td>
-                      <td className="py-3 pr-4 font-bold text-slate-700">{outcomeLabel(t.status)}</td>
-                      <td className="py-3 pr-4 text-slate-700">{outboundLabel(outbound)}</td>
-                      <td className="py-3 pr-4 text-slate-700">{activity.type || '-'}</td>
-                      <td className="py-3 pr-4 text-slate-700">{territory || '-'}</td>
-                      <td className="py-3 pr-4 text-slate-600">{updated}</td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 pr-2 font-bold text-slate-700" style={{ width: colWidths.outcome }}>
+                        {outcomeLabel(t.status)}
+                      </td>
+                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.outbound }}>
+                        {outboundLabel(outbound)}
+                      </td>
+                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.activityType }}>
+                        {activity.type || '-'}
+                      </td>
+                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.territory }}>
+                        {territory || '-'}
+                      </td>
+                      <td className="py-3 pr-2 text-slate-600" style={{ width: colWidths.updated }}>
+                        {updated}
+                      </td>
+                      <td className="py-3 text-right" style={{ width: colWidths.action }}>
                         {t.status === 'in_progress' ? (
                           <button
                             type="button"
@@ -312,7 +638,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 })}
                 {!visible.length && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                    <td colSpan={7} className="py-10 text-center text-slate-500">
                       No history found for selected filters.
                     </td>
                   </tr>
@@ -321,21 +647,35 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </table>
           </div>
 
-          {pages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
+          <div className="mt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <div className="text-sm text-slate-600">
                 Page <span className="font-bold">{page}</span> of <span className="font-bold">{pages}</span>
               </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" disabled={page <= 1 || isLoading} onClick={() => load(page - 1)}>
-                  Prev
-                </Button>
-                <Button variant="secondary" size="sm" disabled={page >= pages || isLoading} onClick={() => load(page + 1)}>
-                  Next
-                </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-600">Rows per page</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+                >
+                  {[10, 20, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" disabled={page <= 1 || isLoading} onClick={() => load(page - 1)}>
+                Prev
+              </Button>
+              <Button variant="secondary" size="sm" disabled={page >= pages || isLoading} onClick={() => load(page + 1)}>
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
