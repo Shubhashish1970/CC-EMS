@@ -139,7 +139,7 @@ const AgentAnalyticsView: React.FC = () => {
   const trend = useMemo(() => Array.isArray(data?.trend) ? data.trend : [], [data]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-[#f1f5f1]">
+    <div className="h-full overflow-y-auto p-6 bg-[#f1f5f1]">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">

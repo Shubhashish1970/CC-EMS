@@ -387,7 +387,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   }, [rows, tableSort.key, tableSort.dir]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-[#f1f5f1]">
+    <div className="h-full overflow-y-auto p-6 bg-[#f1f5f1]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
