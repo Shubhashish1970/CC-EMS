@@ -856,17 +856,22 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </table>
           </div>
 
-          <div className="mt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        </div>
+
+        {/* Pagination (match Activity Sampling footer style) */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mt-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              Page {page} of {pages} • {Number(pagination?.total || 0)} total records
+            </p>
             <div className="flex items-center gap-3">
-              <div className="text-sm text-slate-600">
-                Page <span className="font-bold">{page}</span> of <span className="font-bold">{pages}</span>
-              </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600">Rows per page</span>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+                  className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  title="Rows per page"
                 >
                   {[10, 20, 50, 100].map((n) => (
                     <option key={n} value={n}>
@@ -875,12 +880,20 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   ))}
                 </select>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page <= 1 || isLoading} onClick={() => load(page - 1)}>
-                Prev
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => load(page - 1)}
+                disabled={page === 1 || isLoading || pages <= 1}
+              >
+                Previous
               </Button>
-              <Button variant="secondary" size="sm" disabled={page >= pages || isLoading} onClick={() => load(page + 1)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => load(page + 1)}
+                disabled={page >= pages || isLoading || pages <= 1}
+              >
                 Next
               </Button>
             </div>
