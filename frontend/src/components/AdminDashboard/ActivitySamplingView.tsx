@@ -90,6 +90,8 @@ const ActivitySamplingView: React.FC = () => {
   const [activities, setActivities] = useState<ActivitySamplingStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statsData, setStatsData] = useState<any | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [pageSize, setPageSize] = useState<number>(() => {
@@ -314,9 +316,30 @@ const ActivitySamplingView: React.FC = () => {
     }
   };
 
+  const fetchStats = async () => {
+    setIsStatsLoading(true);
+    try {
+      const res: any = await adminAPI.getActivitiesSamplingStats({
+        ...filters,
+        samplingStatus: filters.samplingStatus || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) {
+        setStatsData(res.data);
+      }
+    } catch (err) {
+      // Non-blocking: keep UI usable even if stats fail
+      console.error('Failed to fetch activity sampling stats:', err);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchActivities(1);
     fetchSyncStatus();
+    fetchStats();
   }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo, pageSize]);
 
   useEffect(() => {
@@ -608,7 +631,7 @@ const ActivitySamplingView: React.FC = () => {
     return stats;
   };
 
-  const statistics = calculateStatistics();
+  const statistics = statsData || calculateStatistics();
 
   return (
     <div className="space-y-6">
@@ -1014,7 +1037,7 @@ const ActivitySamplingView: React.FC = () => {
       </div>
 
       {/* Statistics Dashboard */}
-      {!isLoading && activities.length > 0 && (
+      {!isStatsLoading && (statsData ? (statistics?.totalActivities || 0) > 0 : (!isLoading && activities.length > 0)) && (
         <div className="bg-white rounded-3xl p-4 mb-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">

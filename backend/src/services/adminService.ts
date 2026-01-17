@@ -647,6 +647,170 @@ export const getActivitiesSamplingExportRows = async (filters?: {
   return out;
 };
 
+export const getActivitiesSamplingStats = async (filters?: {
+  activityType?: string;
+  territory?: string;
+  zone?: string;
+  bu?: string;
+  samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+  dateFrom?: Date;
+  dateTo?: Date;
+}): Promise<{
+  totalActivities: number;
+  activitiesWithSampling: number;
+  activitiesFullySampled: number;
+  activitiesPartiallySampled: number;
+  activitiesNotSampled: number;
+  totalFarmers: number;
+  farmersSampled: number;
+  totalTasks: number;
+  tasksSampledInQueue: number;
+  tasksInProgress: number;
+  tasksCompleted: number;
+  tasksNotReachable: number;
+  tasksInvalidNumber: number;
+  tasksUnassigned: number;
+}> => {
+  const {
+    activityType,
+    territory,
+    zone,
+    bu,
+    samplingStatus,
+    dateFrom,
+    dateTo,
+  } = filters || {};
+
+  // Build activity query (same semantics as list)
+  const activityQuery: any = {};
+  if (activityType) activityQuery.type = activityType;
+  if (territory) {
+    activityQuery.$or = [{ territoryName: territory }, { territory: territory }];
+  }
+  if (zone) activityQuery.zoneName = zone;
+  if (bu) activityQuery.buName = bu;
+  if (dateFrom || dateTo) {
+    activityQuery.date = {};
+    if (dateFrom) activityQuery.date.$gte = dateFrom;
+    if (dateTo) activityQuery.date.$lte = dateTo;
+  }
+
+  const samplingAuditCollection = SamplingAudit.collection.name;
+
+  const activityAgg = await Activity.aggregate([
+    { $match: activityQuery },
+    {
+      $project: {
+        farmerCount: { $size: { $ifNull: ['$farmerIds', []] } },
+      },
+    },
+    {
+      $lookup: {
+        from: samplingAuditCollection,
+        localField: '_id',
+        foreignField: 'activityId',
+        as: 'audits',
+      },
+    },
+    {
+      $addFields: {
+        sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+      },
+    },
+    {
+      $addFields: {
+        samplingStatus: {
+          $switch: {
+            branches: [
+              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
+              {
+                case: {
+                  $and: [
+                    { $gt: ['$farmerCount', 0] },
+                    { $gte: ['$sampledCount', '$farmerCount'] },
+                  ],
+                },
+                then: 'sampled',
+              },
+            ],
+            default: 'partial',
+          },
+        },
+      },
+    },
+    ...(samplingStatus ? [{ $match: { samplingStatus } }] : []),
+    {
+      $group: {
+        _id: null,
+        totalActivities: { $sum: 1 },
+        totalFarmers: { $sum: '$farmerCount' },
+        farmersSampled: { $sum: '$sampledCount' },
+        activitiesWithSampling: { $sum: { $cond: [{ $gt: ['$sampledCount', 0] }, 1, 0] } },
+        activitiesFullySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'sampled'] }, 1, 0] } },
+        activitiesPartiallySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'partial'] }, 1, 0] } },
+        activitiesNotSampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'not_sampled'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const a0 = activityAgg?.[0] || {};
+
+  // Task aggregation: join tasks to activities and apply same activity filters
+  const taskMatch: any = {};
+  if (activityType) taskMatch['activity.type'] = activityType;
+  if (territory) {
+    taskMatch.$or = [
+      { 'activity.territoryName': territory },
+      { 'activity.territory': territory },
+    ];
+  }
+  if (zone) taskMatch['activity.zoneName'] = zone;
+  if (bu) taskMatch['activity.buName'] = bu;
+  if (dateFrom || dateTo) {
+    taskMatch['activity.date'] = {};
+    if (dateFrom) taskMatch['activity.date'].$gte = dateFrom;
+    if (dateTo) taskMatch['activity.date'].$lte = dateTo;
+  }
+
+  const taskAgg = await CallTask.aggregate([
+    {
+      $lookup: {
+        from: Activity.collection.name,
+        localField: 'activityId',
+        foreignField: '_id',
+        as: 'activity',
+      },
+    },
+    { $unwind: '$activity' },
+    { $match: taskMatch },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  for (const r of taskAgg) {
+    byStatus[String(r._id)] = Number(r.count || 0);
+  }
+
+  const totalTasks = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
+
+  return {
+    totalActivities: Number(a0.totalActivities || 0),
+    activitiesWithSampling: Number(a0.activitiesWithSampling || 0),
+    activitiesFullySampled: Number(a0.activitiesFullySampled || 0),
+    activitiesPartiallySampled: Number(a0.activitiesPartiallySampled || 0),
+    activitiesNotSampled: Number(a0.activitiesNotSampled || 0),
+    totalFarmers: Number(a0.totalFarmers || 0),
+    farmersSampled: Number(a0.farmersSampled || 0),
+    totalTasks,
+    tasksSampledInQueue: Number(byStatus.sampled_in_queue || 0),
+    tasksInProgress: Number(byStatus.in_progress || 0),
+    tasksCompleted: Number(byStatus.completed || 0),
+    tasksNotReachable: Number(byStatus.not_reachable || 0),
+    tasksInvalidNumber: Number(byStatus.invalid_number || 0),
+    tasksUnassigned: Number(byStatus.unassigned || 0),
+  };
+};
+
 /**
  * Get task queues for all agents with status breakdown
  * Returns summary of all agents with their task counts by status

@@ -416,6 +416,27 @@ export const adminAPI = {
     return apiRequest(`/admin/activities-sampling${query ? `?${query}` : ''}`);
   },
 
+  getActivitiesSamplingStats: async (filters?: {
+    activityType?: string;
+    territory?: string;
+    zone?: string;
+    bu?: string;
+    samplingStatus?: 'sampled' | 'not_sampled' | 'partial';
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.samplingStatus) params.append('samplingStatus', filters.samplingStatus);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/admin/activities-sampling/stats${query ? `?${query}` : ''}`);
+  },
+
   downloadActivitiesSamplingExport: async (filters?: {
     activityType?: string;
     territory?: string;
