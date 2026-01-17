@@ -44,7 +44,6 @@ type ExcelFarmerRow = {
   name: string;
   mobileNumber: string;
   location: string;
-  territory?: string;
   photoUrl?: string;
   crops?: string;
 };
@@ -223,7 +222,6 @@ router.get(
           name: 'Farmer Name',
           mobileNumber: '9000000000',
           location: 'Village, District, State',
-          territory: 'Karnataka Zone',
           photoUrl: '',
           crops: 'Rice',
         },
@@ -233,7 +231,6 @@ router.get(
           name: 'Farmer Name 2',
           mobileNumber: '9000000001',
           location: 'Village, District, State',
-          territory: 'Karnataka Zone',
           photoUrl: '',
           crops: 'Wheat',
         },
@@ -375,7 +372,8 @@ router.post(
             const name = normalizeStr((fr as any).name);
             const mobileNumber = normalizeStr((fr as any).mobileNumber);
             const farmerLocation = normalizeStr((fr as any).location);
-            const farmerTerritory = normalizeStr((fr as any).territory || upserted.territoryName || upserted.territory);
+            // Farmer-level territory column is not expected in Excel anymore; derive from Activity.
+            const farmerTerritory = normalizeStr(upserted.territoryName || upserted.territory);
             const photoUrl = normalizeStr((fr as any).photoUrl || '');
 
             if (!name || !mobileNumber || !farmerLocation) {

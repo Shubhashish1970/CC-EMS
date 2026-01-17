@@ -339,7 +339,6 @@ const generateSampleData = () => {
         mobileNumber: mobileNumber,
         location: `${village}, ${district}, ${state}`, // Full location string
         // preferredLanguage: language, // REMOVED - will be derived from state in backend
-        territory: territory,
         crops: [activityCrops[Math.floor(Math.random() * activityCrops.length)]],
         photoUrl: photoUrl,
       };

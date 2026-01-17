@@ -30,7 +30,6 @@ interface FFAFarmer {
   mobileNumber: string;
   location: string;
   // preferredLanguage: string; // REMOVED - will be derived from state
-  territory?: string; // optional; if missing we'll use activity territoryName/territory
   crops?: string[];
   photoUrl?: string;
 }
@@ -261,7 +260,8 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
     logger.debug(`[FFA SYNC] Activity ${ffaActivity.activityId} in state "${resolvedState}" mapped to language "${preferredLanguage}"`);
     
     for (const ffaFarmer of ffaActivity.farmers) {
-      const resolvedFarmerTerritory = (ffaFarmer.territory || ffaActivity.territoryName || ffaActivity.territory || '').trim();
+      // Farmer-level territory is not expected from FFA anymore. Always derive from Activity.
+      const resolvedFarmerTerritory = ((ffaActivity.territoryName || ffaActivity.territory || '') as string).trim();
       // Upsert farmer - preferredLanguage now derived from state
       const farmer = await Farmer.findOneAndUpdate(
         { mobileNumber: ffaFarmer.mobileNumber },
