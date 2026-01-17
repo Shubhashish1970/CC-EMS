@@ -156,10 +156,12 @@ export const tasksAPI = {
     });
   },
 
-  getPendingTasks: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+  getPendingTasks: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
@@ -170,10 +172,12 @@ export const tasksAPI = {
     return apiRequest(`/tasks/pending${query ? `?${query}` : ''}`);
   },
 
-  getPendingTasksStats: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
+  getPendingTasksStats: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string }) => {
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
@@ -181,11 +185,13 @@ export const tasksAPI = {
     return apiRequest(`/tasks/pending/stats${query ? `?${query}` : ''}`);
   },
 
-  downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; search?: string; dateFrom?: string; dateTo?: string; exportAll?: boolean; page?: number; limit?: number }) => {
+  downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string; exportAll?: boolean; page?: number; limit?: number }) => {
     const token = getAuthToken();
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);

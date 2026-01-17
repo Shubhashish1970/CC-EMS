@@ -8,6 +8,16 @@ import TaskDetail from './TaskDetail';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
 
+type DateRangePreset =
+  | 'Custom'
+  | 'Today'
+  | 'Yesterday'
+  | 'This week (Sun - Today)'
+  | 'Last 7 days'
+  | 'Last week (Sun - Sat)'
+  | 'Last 28 days'
+  | 'Last 30 days';
+
 interface Task {
   _id: string;
   status: TaskStatus;
@@ -20,11 +30,17 @@ interface Task {
     photoUrl?: string;
   };
   activityId: {
+    activityId?: string;
     type: string;
     date: string;
     officerName: string;
     location: string;
     territory: string;
+    territoryName?: string;
+    zoneName?: string;
+    buName?: string;
+    state?: string;
+    tmName?: string;
   };
   assignedAgentId: {
     name: string;
@@ -96,10 +112,17 @@ const TaskList: React.FC = () => {
   const [statsData, setStatsData] = useState<any | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
+  const [draftStart, setDraftStart] = useState(''); // YYYY-MM-DD
+  const [draftEnd, setDraftEnd] = useState(''); // YYYY-MM-DD
+  const datePickerRef = useRef<HTMLDivElement | null>(null);
   const [filters, setFilters] = useState({
     status: '',
     agentId: '',
     territory: '',
+    zone: '',
+    bu: '',
     search: '',
     dateFrom: '',
     dateTo: '',
@@ -116,7 +139,90 @@ const TaskList: React.FC = () => {
   const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  // Export dropdown removed (Excel download moved to stats header)
+
+  const toISODate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatPretty = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const end = new Date(today);
+    const start = new Date(today);
+    const day = today.getDay(); // 0=Sun
+
+    switch (preset) {
+      case 'Today':
+        return { start: toISODate(today), end: toISODate(today) };
+      case 'Yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        return { start: toISODate(y), end: toISODate(y) };
+      }
+      case 'This week (Sun - Today)': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - day);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last 7 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 6);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last week (Sun - Sat)': {
+        const lastSat = new Date(today);
+        lastSat.setDate(lastSat.getDate() - (day + 1));
+        const lastSun = new Date(lastSat);
+        lastSun.setDate(lastSun.getDate() - 6);
+        return { start: toISODate(lastSun), end: toISODate(lastSat) };
+      }
+      case 'Last 28 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 27);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Last 30 days': {
+        const s = new Date(today);
+        s.setDate(s.getDate() - 29);
+        return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'Custom':
+      default:
+        return { start: filters.dateFrom || toISODate(start), end: filters.dateTo || toISODate(end) };
+    }
+  };
+
+  const syncDraftFromFilters = () => {
+    const range = getPresetRange(selectedPreset);
+    const start = filters.dateFrom || range.start;
+    const end = filters.dateTo || range.end;
+    setDraftStart(start);
+    setDraftEnd(end);
+  };
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [isDatePickerOpen]);
 
   useEffect(() => {
     localStorage.setItem('admin.taskManagement.pageSize', String(pageSize));
@@ -183,6 +289,8 @@ const TaskList: React.FC = () => {
           response = await tasksAPI.getPendingTasks({
             agentId: filters.agentId || undefined,
             territory: filters.territory || undefined,
+            zone: filters.zone || undefined,
+            bu: filters.bu || undefined,
             search: filters.search || undefined,
             dateFrom: filters.dateFrom || undefined,
             dateTo: filters.dateTo || undefined,
@@ -210,7 +318,7 @@ const TaskList: React.FC = () => {
     };
 
     loadTasks();
-  }, [user, filters.status, filters.agentId, filters.territory, filters.search, filters.dateFrom, filters.dateTo, currentPage, pageSize]);
+  }, [user, filters.status, filters.agentId, filters.territory, filters.zone, filters.bu, filters.search, filters.dateFrom, filters.dateTo, currentPage, pageSize]);
 
   const handleRefresh = () => {
     if (user) {
@@ -231,6 +339,8 @@ const TaskList: React.FC = () => {
             response = await tasksAPI.getPendingTasks({
               agentId: filters.agentId || undefined,
               territory: filters.territory || undefined,
+              zone: filters.zone || undefined,
+              bu: filters.bu || undefined,
               search: filters.search || undefined,
               dateFrom: filters.dateFrom || undefined,
               dateTo: filters.dateTo || undefined,
@@ -297,6 +407,8 @@ const TaskList: React.FC = () => {
       const res: any = await tasksAPI.getPendingTasksStats({
         agentId: filters.agentId || undefined,
         territory: filters.territory || undefined,
+        zone: filters.zone || undefined,
+        bu: filters.bu || undefined,
         search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
@@ -312,7 +424,37 @@ const TaskList: React.FC = () => {
   useEffect(() => {
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, filters.status, filters.agentId, filters.territory, filters.search, filters.dateFrom, filters.dateTo]);
+  }, [user, filters.status, filters.agentId, filters.territory, filters.zone, filters.bu, filters.search, filters.dateFrom, filters.dateTo]);
+
+  const territoryOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const t of tasks) {
+      const a: any = t.activityId as any;
+      const v = String((a?.territoryName || a?.territory || '') ?? '').trim();
+      if (v) values.add(v);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const zoneOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const t of tasks) {
+      const a: any = t.activityId as any;
+      const v = String(a?.zoneName ?? '').trim();
+      if (v) values.add(v);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const buOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const t of tasks) {
+      const a: any = t.activityId as any;
+      const v = String(a?.buName ?? '').trim();
+      if (v) values.add(v);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
 
   const handleDownloadExcel = async () => {
     if (!user || user.role === 'team_lead') return;
@@ -321,6 +463,8 @@ const TaskList: React.FC = () => {
       await tasksAPI.downloadPendingTasksExport({
         agentId: filters.agentId || undefined,
         territory: filters.territory || undefined,
+        zone: filters.zone || undefined,
+        bu: filters.bu || undefined,
         search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
@@ -511,19 +655,7 @@ const TaskList: React.FC = () => {
     handleDownloadExcel();
   };
 
-  // Close export dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (showExportDropdown && !target.closest('.export-dropdown-container')) {
-        setShowExportDropdown(false);
-      }
-    };
-    if (showExportDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showExportDropdown]);
+  // Export dropdown removed
 
   if (selectedTask) {
     return (
@@ -551,33 +683,6 @@ const TaskList: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mr-2">
-                  Sort
-                </label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="scheduledDate">Scheduled Date</option>
-                  <option value="status">Status</option>
-                  <option value="farmerName">Farmer Name</option>
-                  <option value="agentName">Agent Name</option>
-                  <option value="territory">Territory</option>
-                  <option value="activityType">Activity Type</option>
-                  <option value="officerName">Officer Name</option>
-                  <option value="language">Language</option>
-                </select>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-                >
-                  <ArrowUpDown size={14} />
-                </Button>
-              </div>
               <Button
                 variant="secondary"
                 size="sm"
@@ -586,49 +691,6 @@ const TaskList: React.FC = () => {
                 <Filter size={16} />
                 Filters
               </Button>
-              <div className="relative export-dropdown-container">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowExportDropdown(!showExportDropdown)}
-                  disabled={sortedTasks.length === 0}
-                >
-                  <Download size={16} />
-                  Export
-                  <ChevronDown size={14} className="ml-1" />
-                </Button>
-                {showExportDropdown && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl border border-slate-200 shadow-lg z-50">
-                    <button
-                      onClick={() => {
-                        handleExportCSV();
-                        setShowExportDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
-                    >
-                      Export CSV
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportExcel();
-                        setShowExportDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
-                    >
-                      Export XLSX
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportPDF();
-                        setShowExportDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 first:rounded-t-2xl last:rounded-b-2xl transition-colors"
-                    >
-                      Export PDF
-                    </button>
-                  </div>
-                )}
-              </div>
               <Button
                 variant="secondary"
                 size="sm"
@@ -644,7 +706,7 @@ const TaskList: React.FC = () => {
           {/* Filters */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                     Status
@@ -688,41 +750,151 @@ const TaskList: React.FC = () => {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                       Territory
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={filters.territory}
                       onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                      placeholder="Filter by territory"
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
+                    >
+                      <option value="">All Territories</option>
+                      {territoryOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {user?.role !== 'team_lead' && (
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                      Zone
+                    </label>
+                    <select
+                      value={filters.zone}
+                      onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">All Zones</option>
+                      {zoneOptions.map((z) => (
+                        <option key={z} value={z}>
+                          {z}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {user?.role !== 'team_lead' && (
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                      BU
+                    </label>
+                    <select
+                      value={filters.bu}
+                      onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">All BUs</option>
+                      {buOptions.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="md:col-span-2">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Date From
+                    Date Range
                   </label>
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
+                  <div className="relative" ref={datePickerRef}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        syncDraftFromFilters();
+                        setIsDatePickerOpen((v) => !v);
+                      }}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-between"
+                      title="Choose date range"
+                    >
+                      <span className="truncate">
+                        {selectedPreset} • {formatPretty(filters.dateFrom)} - {formatPretty(filters.dateTo)}
+                      </span>
+                      <ChevronDown size={16} className="text-slate-400" />
+                    </button>
+
+                    {isDatePickerOpen && (
+                      <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
+                            <select
+                              value={selectedPreset}
+                              onChange={(e) => {
+                                const p = e.target.value as DateRangePreset;
+                                setSelectedPreset(p);
+                                const r = getPresetRange(p);
+                                setDraftStart(r.start);
+                                setDraftEnd(r.end);
+                              }}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                            >
+                              {(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">From</div>
+                              <input
+                                type="date"
+                                value={draftStart}
+                                onChange={(e) => {
+                                  setSelectedPreset('Custom');
+                                  setDraftStart(e.target.value);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                              />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To</div>
+                              <input
+                                type="date"
+                                value={draftEnd}
+                                onChange={(e) => {
+                                  setSelectedPreset('Custom');
+                                  setDraftEnd(e.target.value);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 mt-4">
+                          <Button variant="secondary" size="sm" onClick={() => setIsDatePickerOpen(false)}>
+                            Cancel
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilters((prev) => ({ ...prev, dateFrom: draftStart, dateTo: draftEnd }));
+                              setIsDatePickerOpen(false);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Date To
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
@@ -739,6 +911,7 @@ const TaskList: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
             </div>
           )}
         </div>

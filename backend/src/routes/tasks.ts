@@ -244,6 +244,8 @@ router.get(
   [
     query('agentId').optional().isMongoId(),
     query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
     query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
@@ -260,11 +262,13 @@ router.get(
         });
       }
 
-      const { agentId, territory, search, dateFrom, dateTo, page, limit } = req.query;
+      const { agentId, territory, zone, bu, search, dateFrom, dateTo, page, limit } = req.query;
 
       const result = await getPendingTasks({
         agentId: agentId as string,
         territory: territory as string,
+        zone: (zone as string) || undefined,
+        bu: (bu as string) || undefined,
         search: (search as string) || undefined,
         dateFrom: dateFrom ? (dateFrom as string) : undefined,
         dateTo: dateTo ? (dateTo as string) : undefined,
@@ -291,6 +295,8 @@ router.get(
   [
     query('agentId').optional().isMongoId(),
     query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
     query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
@@ -305,10 +311,12 @@ router.get(
         });
       }
 
-      const { agentId, territory, search, dateFrom, dateTo } = req.query;
+      const { agentId, territory, zone, bu, search, dateFrom, dateTo } = req.query;
       const stats = await (await import('../services/taskService.js')).getPendingTasksStats({
         agentId: agentId as string,
         territory: territory as string,
+        zone: (zone as string) || undefined,
+        bu: (bu as string) || undefined,
         search: (search as string) || undefined,
         dateFrom: dateFrom ? (dateFrom as string) : undefined,
         dateTo: dateTo ? (dateTo as string) : undefined,
@@ -330,6 +338,8 @@ router.get(
   [
     query('agentId').optional().isMongoId(),
     query('territory').optional().isString(),
+    query('zone').optional().isString(),
+    query('bu').optional().isString(),
     query('search').optional().isString(),
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
@@ -347,10 +357,12 @@ router.get(
         });
       }
 
-      const { agentId, territory, search, dateFrom, dateTo, exportAll, page, limit } = req.query;
+      const { agentId, territory, zone, bu, search, dateFrom, dateTo, exportAll, page, limit } = req.query;
       const { filename, buffer } = await (await import('../services/taskService.js')).exportPendingTasksXlsx({
         agentId: agentId as string,
         territory: territory as string,
+        zone: (zone as string) || undefined,
+        bu: (bu as string) || undefined,
         search: (search as string) || undefined,
         dateFrom: dateFrom ? (dateFrom as string) : undefined,
         dateTo: dateTo ? (dateTo as string) : undefined,

@@ -123,6 +123,8 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
 export const getPendingTasks = async (filters?: {
   agentId?: string;
   territory?: string;
+  zone?: string;
+  bu?: string;
   search?: string;
   dateFrom?: Date | string;
   dateTo?: Date | string;
@@ -130,7 +132,7 @@ export const getPendingTasks = async (filters?: {
   limit?: number;
 }) => {
   try {
-    const { agentId, territory, search, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
+    const { agentId, territory, zone, bu, search, dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
     const skip = (page - 1) * limit;
 
     const query: any = {
@@ -141,12 +143,15 @@ export const getPendingTasks = async (filters?: {
       query.assignedAgentId = new mongoose.Types.ObjectId(agentId);
     }
 
-    // Filter by territory through activity
-    if (territory) {
-      const activities = await Activity.find({
-        $or: [{ territoryName: territory }, { territory: territory }],
-      }).select('_id');
-      query.activityId = { $in: activities.map(a => a._id) };
+    // Filter by geo through activity (territory/zone/bu)
+    if (territory || zone || bu) {
+      const and: any[] = [];
+      if (territory) and.push({ $or: [{ territoryName: territory }, { territory: territory }] });
+      if (zone) and.push({ zoneName: zone });
+      if (bu) and.push({ buName: bu });
+      const activityQuery: any = and.length === 1 ? and[0] : { $and: and };
+      const activities = await Activity.find(activityQuery).select('_id');
+      query.activityId = { $in: activities.map((a) => a._id) };
     }
 
     // Filter by scheduled date range
@@ -241,11 +246,13 @@ export const getPendingTasks = async (filters?: {
 export const getPendingTasksStats = async (filters?: {
   agentId?: string;
   territory?: string;
+  zone?: string;
+  bu?: string;
   search?: string;
   dateFrom?: Date | string;
   dateTo?: Date | string;
 }) => {
-  const { agentId, territory, search, dateFrom, dateTo } = filters || {};
+  const { agentId, territory, zone, bu, search, dateFrom, dateTo } = filters || {};
 
   const query: any = {
     // include all open-ish statuses in the management stats
@@ -253,10 +260,13 @@ export const getPendingTasksStats = async (filters?: {
   };
 
   if (agentId) query.assignedAgentId = new mongoose.Types.ObjectId(agentId);
-  if (territory) {
-    const activities = await Activity.find({
-      $or: [{ territoryName: territory }, { territory: territory }],
-    }).select('_id');
+  if (territory || zone || bu) {
+    const and: any[] = [];
+    if (territory) and.push({ $or: [{ territoryName: territory }, { territory: territory }] });
+    if (zone) and.push({ zoneName: zone });
+    if (bu) and.push({ buName: bu });
+    const activityQuery: any = and.length === 1 ? and[0] : { $and: and };
+    const activities = await Activity.find(activityQuery).select('_id');
     query.activityId = { $in: activities.map((a) => a._id) };
   }
 
@@ -371,6 +381,8 @@ export const getPendingTasksStats = async (filters?: {
 export const exportPendingTasksXlsx = async (filters?: {
   agentId?: string;
   territory?: string;
+  zone?: string;
+  bu?: string;
   search?: string;
   dateFrom?: Date | string;
   dateTo?: Date | string;
