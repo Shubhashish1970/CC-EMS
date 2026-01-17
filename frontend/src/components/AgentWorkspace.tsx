@@ -418,9 +418,6 @@ const AgentWorkspace: React.FC = () => {
       
       {/* Global Navigation (Desktop) */}
       <aside className="hidden lg:flex w-20 flex-col items-center py-8 bg-green-950 text-white shadow-2xl z-30">
-        <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center mb-10 shadow-lg shadow-green-500/20">
-          <Database size={24} className="text-white" />
-        </div>
         <nav className="flex flex-col gap-8">
           <button className="p-3 bg-white/10 rounded-2xl text-green-400 border border-white/10 shadow-xl">
             <Phone size={24} />
