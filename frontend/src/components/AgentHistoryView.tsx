@@ -590,7 +590,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
         </div>
 
         {/* Statistics Dashboard - Matching Activity Sampling */}
-        {!isStatsLoading && (stats?.total || 0) > 0 && (
+        {!isStatsLoading && (stats ? (stats?.total || 0) > 0 : (!isLoading && rows.length > 0)) && (
           <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -616,23 +616,23 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
-                <p className="text-xl font-black text-slate-900">{stats.total}</p>
+                <p className="text-xl font-black text-slate-900">{stats?.total || 0}</p>
               </div>
               <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                 <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
-                <p className="text-xl font-black text-green-800">{stats.completedConversation}</p>
+                <p className="text-xl font-black text-green-800">{stats?.completedConversation || 0}</p>
               </div>
               <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
                 <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Progress</p>
-                <p className="text-xl font-black text-yellow-800">{stats.inProgress}</p>
+                <p className="text-xl font-black text-yellow-800">{stats?.inProgress || 0}</p>
               </div>
               <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
                 <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">Unsuccessful</p>
-                <p className="text-xl font-black text-blue-800">{stats.unsuccessful}</p>
+                <p className="text-xl font-black text-blue-800">{stats?.unsuccessful || 0}</p>
               </div>
               <div className="bg-red-50 rounded-xl p-3 border border-red-200">
                 <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-0.5">Invalid</p>
-                <p className="text-xl font-black text-red-800">{stats.invalid}</p>
+                <p className="text-xl font-black text-red-800">{stats?.invalid || 0}</p>
               </div>
               {/* Placeholder cards to match 8-column layout */}
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
