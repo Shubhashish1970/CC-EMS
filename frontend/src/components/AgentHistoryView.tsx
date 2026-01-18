@@ -876,42 +876,43 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
           {/* Pagination - Matching Activity Sampling */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <p className="text-sm text-slate-600">
-              Page {page} of {pages} • {Number(pagination?.total || 0)} total records
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  title="Rows per page"
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <p className="text-sm text-slate-600">
+                Page {page} of {pages} • {Number(pagination?.total || 0)} total records
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    title="Rows per page"
+                  >
+                    {[10, 20, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => load(page - 1)}
+                  disabled={page === 1 || isLoading || pages <= 1}
                 >
-                  {[10, 20, 50, 100].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => load(page + 1)}
+                  disabled={page >= pages || isLoading || pages <= 1}
+                >
+                  Next
+                </Button>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => load(page - 1)}
-                disabled={page === 1 || isLoading || pages <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => load(page + 1)}
-                disabled={page >= pages || isLoading || pages <= 1}
-              >
-                Next
-              </Button>
             </div>
           </div>
         </div>
