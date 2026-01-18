@@ -388,13 +388,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
   return (
     <div className="h-full overflow-y-auto p-6 bg-[#f1f5f1]">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header Section - Matching Activity Sampling */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-black text-slate-900 mb-1">History</h2>
-              <p className="text-sm text-slate-600">All tasks except “In Queue”.</p>
+              <h2 className="text-xl font-black text-slate-900 mb-1">History</h2>
+              <p className="text-sm text-slate-600">All tasks except "In Queue"</p>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="secondary" size="sm" onClick={() => setShowFilters((v) => !v)}>
@@ -408,9 +408,9 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Filters Section - Matching Activity Sampling */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+            <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Activity Type</label>
@@ -589,13 +589,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
           )}
         </div>
 
-        {/* Statistics */}
+        {/* Statistics Dashboard - Matching Activity Sampling */}
         {!isStatsLoading && (stats?.total || 0) > 0 && (
-          <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <BarChart3 className="text-green-700" size={20} />
-                <h3 className="text-lg font-black text-slate-900">Statistics</h3>
+                <BarChart3 className="text-green-700" size={18} />
+                <h2 className="text-base font-black text-slate-900">Statistics</h2>
               </div>
               <button
                 type="button"
@@ -606,60 +606,67 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                     ? 'bg-green-50 border-green-200 text-green-700'
                     : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
                 }`}
-                title="Download Excel (matches current filters)"
+                title="Download Excel (all records matching current filters)"
               >
                 <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
               </button>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
-                <p className="text-2xl font-black text-slate-900">{stats.total}</p>
+            
+            {/* Compact Statistics Grid - Matching Activity Sampling */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
+                <p className="text-xl font-black text-slate-900">{stats.total}</p>
               </div>
-              <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
-                <p className="text-xs font-black text-green-700 uppercase tracking-widest mb-1">Completed</p>
-                <p className="text-2xl font-black text-green-800">{stats.completedConversation}</p>
+              <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
+                <p className="text-xl font-black text-green-800">{stats.completedConversation}</p>
               </div>
-              <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-                <p className="text-xs font-black text-yellow-700 uppercase tracking-widest mb-1">In Progress</p>
-                <p className="text-2xl font-black text-yellow-800">{stats.inProgress}</p>
+              <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Progress</p>
+                <p className="text-xl font-black text-yellow-800">{stats.inProgress}</p>
               </div>
-              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
-                <p className="text-xs font-black text-blue-700 uppercase tracking-widest mb-1">Unsuccessful</p>
-                <p className="text-2xl font-black text-blue-800">{stats.unsuccessful}</p>
+              <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">Unsuccessful</p>
+                <p className="text-xl font-black text-blue-800">{stats.unsuccessful}</p>
               </div>
-              <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
-                <p className="text-xs font-black text-red-700 uppercase tracking-widest mb-1">Invalid</p>
-                <p className="text-2xl font-black text-red-800">{stats.invalid}</p>
+              <div className="bg-red-50 rounded-xl p-3 border border-red-200">
+                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-0.5">Invalid</p>
+                <p className="text-xl font-black text-red-800">{stats.invalid}</p>
+              </div>
+              {/* Placeholder cards to match 8-column layout */}
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
+                <p className="text-xl font-black text-slate-900">-</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
+                <p className="text-xl font-black text-slate-900">-</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
+                <p className="text-xl font-black text-slate-900">-</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Table */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-black text-slate-900">History Table</h3>
-            <button
-              type="button"
-              onClick={handleDownloadExcel}
-              disabled={isExporting || isLoading}
-              className={`flex items-center justify-center gap-2 h-10 px-4 rounded-2xl border transition-colors ${
-                isExporting
-                  ? 'bg-green-50 border-green-200 text-green-700'
-                  : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
-              }`}
-              title="Download Excel (all records matching current filters)"
-            >
-              <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
-              <span className="text-sm font-black">Export Excel</span>
-            </button>
+        {/* History Table - Matching Activity Sampling */}
+        {isLoading ? (
+          <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
+            <Loader2 className="animate-spin mx-auto mb-4 text-green-700" size={32} />
+            <p className="text-sm text-slate-600 font-medium">Loading history...</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+        ) : !visible.length ? (
+          <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
+            <p className="text-sm text-slate-600 font-medium">No history found for selected filters</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full table-fixed text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
                   {(
                     [
                       ['expand', ''],
@@ -674,41 +681,38 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   ).map(([key, label]) => (
                     <th
                       key={key}
-                      className={`text-left py-3 pr-2 select-none ${key === 'action' ? 'text-right' : ''}`}
-                      style={{ width: colWidths[key] }}
+                      className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
+                      style={{ width: colWidths[key], minWidth: colWidths[key] }}
+                      onClick={key === 'action' || key === 'expand' ? undefined : () => {
+                        setTableSort((p) => {
+                          if (p.key === key) return { key, dir: p.dir === 'asc' ? 'desc' : 'asc' };
+                          return { key, dir: 'asc' };
+                        });
+                      }}
+                      title={key === 'action' || key === 'expand' ? undefined : 'Click to sort'}
                     >
-                      <div className={`flex items-center ${key === 'action' ? 'justify-end' : 'justify-between'} gap-2`}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (key === 'action' || key === 'expand') return;
-                            setTableSort((p) => {
-                              const dir = p.key === key ? (p.dir === 'asc' ? 'desc' : 'asc') : 'asc';
-                              return { key, dir };
-                            });
-                          }}
-                          className="flex items-center gap-2 font-black"
-                        >
-                          {label}
-                          {key !== 'action' &&
-                            key !== 'expand' &&
-                            tableSort.key === key &&
-                            (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
-                        </button>
-
-                        {key !== 'action' && key !== 'expand' && (
-                          <div
-                            onMouseDown={(e) => handleResizeStart(key, e.clientX)}
-                            className="w-1.5 h-6 cursor-col-resize bg-transparent hover:bg-slate-200 rounded"
-                            title="Drag to resize"
-                          />
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{label}</span>
+                        {key !== 'action' && key !== 'expand' && tableSort.key === key && (
+                          tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                         )}
                       </div>
+                      {key !== 'action' && key !== 'expand' && (
+                        <div
+                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleResizeStart(key, e.clientX);
+                          }}
+                          title="Drag to resize"
+                        />
+                      )}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {visible.map((t: any) => {
                   const farmer = t.farmerId || t.farmer || {};
                   const activity = t.activityId || t.activity || {};
@@ -719,18 +723,22 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   const detail = detailById[String(t._id)] || null;
                   return (
                     <React.Fragment key={t._id}>
-                      <tr className="hover:bg-slate-50">
-                        <td className="py-3 pr-2" style={{ width: colWidths.expand }}>
+                      <tr className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-3 py-3 text-sm" style={{ width: colWidths.expand, minWidth: colWidths.expand }}>
                           <button
                             type="button"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 transition-colors"
                             onClick={() => toggleExpand(String(t._id))}
-                            className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center"
-                            title={isOpen ? 'Collapse' : 'Expand'}
+                            title="Expand / collapse"
                           >
-                            {isOpen ? <ChevronDown size={16} className="text-slate-700" /> : <ChevronRight size={16} className="text-slate-700" />}
+                            {isOpen ? (
+                              <ChevronUp size={16} className="text-slate-500" />
+                            ) : (
+                              <ChevronDown size={16} className="text-slate-500" />
+                            )}
                           </button>
                         </td>
-                        <td className="py-3 pr-2" style={{ width: colWidths.farmer }}>
+                        <td className="px-3 py-3 text-sm" style={{ width: colWidths.farmer, minWidth: colWidths.farmer }}>
                           <div className="flex items-center gap-3 min-w-0">
                             {farmer.photoUrl ? (
                               <img
@@ -753,22 +761,22 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                             </div>
                           </div>
                         </td>
-                      <td className="py-3 pr-2 font-bold text-slate-700" style={{ width: colWidths.outcome }}>
-                        {outcomeLabel(t.status)}
-                      </td>
-                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.outbound }}>
-                        {outboundLabel(outbound)}
-                      </td>
-                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.activityType }}>
-                        {activity.type || '-'}
-                      </td>
-                      <td className="py-3 pr-2 text-slate-700" style={{ width: colWidths.territory }}>
-                        {territory || '-'}
-                      </td>
-                      <td className="py-3 pr-2 text-slate-600" style={{ width: colWidths.updated }}>
-                        {updated}
-                      </td>
-                      <td className="py-3 text-right" style={{ width: colWidths.action }}>
+                        <td className="px-3 py-3 text-sm font-bold text-slate-700" style={{ width: colWidths.outcome, minWidth: colWidths.outcome }}>
+                          {outcomeLabel(t.status)}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.outbound, minWidth: colWidths.outbound }}>
+                          {outboundLabel(outbound)}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.activityType, minWidth: colWidths.activityType }}>
+                          {activity.type || '-'}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory || ''} style={{ width: colWidths.territory, minWidth: colWidths.territory }}>
+                          {territory || '-'}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.updated, minWidth: colWidths.updated }}>
+                          {updated}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-right" style={{ width: colWidths.action, minWidth: colWidths.action }}>
                         {t.status === 'in_progress' ? (
                           <button
                             type="button"
@@ -784,8 +792,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       </tr>
 
                       {isOpen && (
-                        <tr className="bg-slate-50/50">
-                          <td colSpan={8} className="py-4">
+                        <tr className="bg-white">
+                          <td colSpan={8} className="px-5 pb-5 pt-4">
                             <div className="mx-2 bg-white rounded-2xl border border-slate-200 p-4">
                               {detailLoadingId === String(t._id) && (
                                 <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
@@ -862,21 +870,12 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                     </React.Fragment>
                   );
                 })}
-                {!visible.length && (
-                  <tr>
-                    <td colSpan={8} className="py-10 text-center text-slate-500">
-                      No history found for selected filters.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
 
-        </div>
-
-        {/* Pagination (match Activity Sampling footer style) */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mt-4">
+          {/* Pagination - Matching Activity Sampling */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <p className="text-sm text-slate-600">
               Page {page} of {pages} • {Number(pagination?.total || 0)} total records
@@ -916,6 +915,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
