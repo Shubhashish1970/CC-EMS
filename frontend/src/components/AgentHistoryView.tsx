@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, Download, Filter, RefreshCw, Search, ChevronRight, Loader2, User as UserIcon, ChevronUp } from 'lucide-react';
+import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, User as UserIcon, ChevronUp } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -608,7 +608,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 }`}
                 title="Download Excel (matches current filters)"
               >
-                <Download size={18} className={isExporting ? 'animate-spin' : ''} />
+                <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
               </button>
             </div>
 
@@ -652,7 +652,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
               }`}
               title="Download Excel (all records matching current filters)"
             >
-              <Download size={18} className={isExporting ? 'animate-spin' : ''} />
+              <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
               <span className="text-sm font-black">Export Excel</span>
             </button>
           </div>
