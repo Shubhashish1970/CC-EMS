@@ -639,6 +639,23 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
         {/* Table */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black text-slate-900">History Table</h3>
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              disabled={isExporting || isLoading}
+              className={`flex items-center justify-center gap-2 h-10 px-4 rounded-2xl border transition-colors ${
+                isExporting
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
+              }`}
+              title="Download Excel (all records matching current filters)"
+            >
+              <Download size={18} className={isExporting ? 'animate-spin' : ''} />
+              <span className="text-sm font-black">Export Excel</span>
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
