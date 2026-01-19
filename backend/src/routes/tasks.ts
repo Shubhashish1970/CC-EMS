@@ -577,60 +577,84 @@ router.get(
       }
 
       const normalizedSearch = String(search || '').trim();
-      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+      const hasActivityFilters = !!String(territory || '').trim() || !!String(activityType || '').trim();
 
-      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-      const normTerritory = String(territory || '').trim();
-      const normType = String(activityType || '').trim();
+      let inProgress = 0;
+      let completed = 0;
+      let notReachable = 0;
+      let invalid = 0;
 
-      const agg = await CallTask.aggregate([
-        { $match: baseMatch },
-        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-        ...(normTerritory
-          ? [
-              {
-                $match: {
-                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+      if (normalizedSearch || hasActivityFilters) {
+        // Use aggregation when we have activity filters or search
+        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+
+        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+        const normTerritory = String(territory || '').trim();
+        const normType = String(activityType || '').trim();
+
+        const agg = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+          ...(normTerritory
+            ? [
+                {
+                  $match: {
+                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                  },
                 },
-              },
-            ]
-          : []),
-        ...(re
-          ? [
-              {
-                $match: {
-                  $or: [
-                    { 'farmerId.name': re },
-                    { 'farmerId.mobileNumber': re },
-                    { 'farmerId.location': re },
-                    { 'farmerId.preferredLanguage': re },
-                    { 'activityId.type': re },
-                    { 'activityId.officerName': re },
-                    { 'activityId.tmName': re },
-                    { 'activityId.territoryName': re },
-                    { 'activityId.territory': re },
-                    { 'activityId.state': re },
-                    { 'activityId.activityId': re },
-                  ],
+              ]
+            : []),
+          ...(re
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { 'farmerId.name': re },
+                      { 'farmerId.mobileNumber': re },
+                      { 'farmerId.location': re },
+                      { 'farmerId.preferredLanguage': re },
+                      { 'activityId.type': re },
+                      { 'activityId.officerName': re },
+                      { 'activityId.tmName': re },
+                      { 'activityId.territoryName': re },
+                      { 'activityId.territory': re },
+                      { 'activityId.state': re },
+                      { 'activityId.activityId': re },
+                    ],
+                  },
                 },
-              },
-            ]
-          : []),
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-      ]);
+              ]
+            : []),
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+        ]);
 
-      const map: Record<string, number> = {};
-      for (const r of agg) map[String(r._id)] = Number(r.count || 0);
+        const map: Record<string, number> = {};
+        for (const r of agg) map[String(r._id)] = Number(r.count || 0);
 
-      const inProgress = Number(map.in_progress || 0);
-      const completed = Number(map.completed || 0);
-      const notReachable = Number(map.not_reachable || 0);
-      const invalid = Number(map.invalid_number || 0);
+        inProgress = Number(map.in_progress || 0);
+        completed = Number(map.completed || 0);
+        notReachable = Number(map.not_reachable || 0);
+        invalid = Number(map.invalid_number || 0);
+      } else {
+        // Use simple countDocuments when no activity filters or search
+        const statusCounts = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+        ]);
+
+        const map: Record<string, number> = {};
+        for (const r of statusCounts) map[String(r._id)] = Number(r.count || 0);
+
+        inProgress = Number(map.in_progress || 0);
+        completed = Number(map.completed || 0);
+        notReachable = Number(map.not_reachable || 0);
+        invalid = Number(map.invalid_number || 0);
+      }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
       const inQueueMatch: any = {
@@ -652,7 +676,13 @@ router.get(
       
       // Apply activity filters to inQueue if needed
       let inQueueCount = 0;
-      if (normTerritory || normType || re) {
+      if (normalizedSearch || hasActivityFilters) {
+        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+        const normTerritory = String(territory || '').trim();
+        const normType = String(activityType || '').trim();
+
         const inQueueAgg = await CallTask.aggregate([
           { $match: inQueueMatch },
           { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
