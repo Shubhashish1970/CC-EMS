@@ -585,7 +585,7 @@ router.get(
       let invalid = 0;
 
       if (normalizedSearch || hasActivityFilters) {
-        // Use aggregation when we have activity filters or search
+        // Use aggregation when we have activity filters or search (same as history endpoint)
         const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
 
@@ -646,25 +646,18 @@ router.get(
         notReachable = Number(map.not_reachable || 0);
         invalid = Number(map.invalid_number || 0);
       } else {
-        // Use simple aggregation when no activity filters or search
-        // Use baseMatch directly, just like the history endpoint does
-        const statusCounts = await CallTask.aggregate([
-          { $match: baseMatch },
-          { $group: { _id: '$status', count: { $sum: 1 } } },
-        ]);
+        // Use find() and count in memory - same approach as history endpoint
+        // This ensures we use exactly the same query logic
+        const allTasks = await CallTask.find(baseMatch).select('status').lean();
 
-        const map: Record<string, number> = {};
-        for (const r of statusCounts) {
-          const statusKey = String(r._id || '').trim();
-          if (statusKey) {
-            map[statusKey] = Number(r.count || 0);
-          }
+        // Count statuses in memory
+        for (const task of allTasks) {
+          const taskStatus = String(task.status || '').trim();
+          if (taskStatus === 'in_progress') inProgress++;
+          else if (taskStatus === 'completed') completed++;
+          else if (taskStatus === 'not_reachable') notReachable++;
+          else if (taskStatus === 'invalid_number') invalid++;
         }
-
-        inProgress = Number(map.in_progress || 0);
-        completed = Number(map.completed || 0);
-        notReachable = Number(map.not_reachable || 0);
-        invalid = Number(map.invalid_number || 0);
       }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
