@@ -613,10 +613,14 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </div>
             
             {/* Compact Statistics Grid - Matching Activity Sampling */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                 <p className="text-xl font-black text-slate-900">{stats?.total ?? pagination?.total ?? 0}</p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                <p className="text-xs font-black text-purple-600 uppercase tracking-widest mb-0.5">In Queue</p>
+                <p className="text-xl font-black text-purple-800">{stats?.inQueue || 0}</p>
               </div>
               <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                 <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>

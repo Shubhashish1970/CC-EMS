@@ -631,12 +631,79 @@ router.get(
       const completed = Number(map.completed || 0);
       const notReachable = Number(map.not_reachable || 0);
       const invalid = Number(map.invalid_number || 0);
-      const total = inProgress + completed + notReachable + invalid;
+      
+      // Get inQueue count separately (sampled_in_queue) for the agent
+      const inQueueMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: 'sampled_in_queue',
+      };
+      
+      // Apply same filters for inQueue count
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        inQueueMatch.$or = [
+          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
+        ];
+      }
+      
+      // Apply activity filters to inQueue if needed
+      let inQueueCount = 0;
+      if (normTerritory || normType || re) {
+        const inQueueAgg = await CallTask.aggregate([
+          { $match: inQueueMatch },
+          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+          ...(normTerritory
+            ? [
+                {
+                  $match: {
+                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                  },
+                },
+              ]
+            : []),
+          ...(re
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { 'farmerId.name': re },
+                      { 'farmerId.mobileNumber': re },
+                      { 'farmerId.location': re },
+                      { 'farmerId.preferredLanguage': re },
+                      { 'activityId.type': re },
+                      { 'activityId.officerName': re },
+                      { 'activityId.tmName': re },
+                      { 'activityId.territoryName': re },
+                      { 'activityId.territory': re },
+                      { 'activityId.state': re },
+                      { 'activityId.activityId': re },
+                    ],
+                  },
+                },
+              ]
+            : []),
+          { $count: 'count' },
+        ]);
+        inQueueCount = Number(inQueueAgg?.[0]?.count || 0);
+      } else {
+        inQueueCount = await CallTask.countDocuments(inQueueMatch);
+      }
+      
+      const total = inProgress + completed + notReachable + invalid + inQueueCount;
 
       res.json({
         success: true,
         data: {
           total,
+          inQueue: inQueueCount,
           inProgress,
           completedConversation: completed,
           unsuccessful: notReachable,
