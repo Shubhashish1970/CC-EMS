@@ -647,21 +647,9 @@ router.get(
         invalid = Number(map.invalid_number || 0);
       } else {
         // Use simple aggregation when no activity filters or search
-        // Ensure status field exists and is not null, while preserving existing status filter
-        const statusMatch: any = { ...baseMatch };
-        if (statusMatch.status && typeof statusMatch.status === 'object' && statusMatch.status.$ne) {
-          // Use $nin to exclude both null and sampled_in_queue
-          statusMatch.status = {
-            $exists: true,
-            $nin: [null, statusMatch.status.$ne],
-          };
-        } else if (!statusMatch.status || (typeof statusMatch.status === 'string' && statusMatch.status)) {
-          // If status is a string or not set, ensure it exists
-          statusMatch.status = statusMatch.status || { $exists: true, $ne: null };
-        }
-
+        // Use baseMatch directly, just like the history endpoint does
         const statusCounts = await CallTask.aggregate([
-          { $match: statusMatch },
+          { $match: baseMatch },
           { $group: { _id: '$status', count: { $sum: 1 } } },
         ]);
 
