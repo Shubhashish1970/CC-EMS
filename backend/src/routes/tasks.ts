@@ -646,18 +646,26 @@ router.get(
         notReachable = Number(map.not_reachable || 0);
         invalid = Number(map.invalid_number || 0);
       } else {
-        // Use find() and count in memory - same approach as history endpoint
-        // This ensures we use exactly the same query logic
-        const allTasks = await CallTask.find(baseMatch).select('status').lean();
+        // Use aggregation to count statuses - use baseMatch directly
+        // The aggregation should work the same as the history endpoint's find()
+        const statusCounts = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+        ]);
 
-        // Count statuses in memory
-        for (const task of allTasks) {
-          const taskStatus = String(task.status || '').trim();
-          if (taskStatus === 'in_progress') inProgress++;
-          else if (taskStatus === 'completed') completed++;
-          else if (taskStatus === 'not_reachable') notReachable++;
-          else if (taskStatus === 'invalid_number') invalid++;
+        // Map the results
+        const map: Record<string, number> = {};
+        for (const r of statusCounts) {
+          const statusKey = r._id ? String(r._id).trim() : '';
+          if (statusKey) {
+            map[statusKey] = Number(r.count || 0);
+          }
         }
+
+        inProgress = Number(map.in_progress || 0);
+        completed = Number(map.completed || 0);
+        notReachable = Number(map.not_reachable || 0);
+        invalid = Number(map.invalid_number || 0);
       }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
