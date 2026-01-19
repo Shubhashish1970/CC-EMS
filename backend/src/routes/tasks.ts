@@ -693,18 +693,30 @@ router.get(
       
       // Apply same filters for inQueue count
       if (dateFrom || dateTo) {
-        const from = dateFrom ? new Date(dateFrom) : null;
-        const to = dateTo ? new Date(dateTo) : null;
-        if (from) from.setHours(0, 0, 0, 0);
-        if (to) to.setHours(23, 59, 59, 999);
+        // dateFrom and dateTo are already Date objects from validation middleware
+        const from = dateFrom instanceof Date && !isNaN(dateFrom.getTime()) ? dateFrom : null;
+        const to = dateTo instanceof Date && !isNaN(dateTo.getTime()) ? dateTo : null;
+        
+        let fromDate: Date | null = null;
+        let toDate: Date | null = null;
+        
+        if (from) {
+          fromDate = new Date(from);
+          fromDate.setHours(0, 0, 0, 0);
+        }
+        
+        if (to) {
+          toDate = new Date(to);
+          toDate.setHours(23, 59, 59, 999);
+        }
         
         // Build date conditions - only include non-null values to avoid empty objects
         const callStartedAtCond: any = {};
         const updatedAtCond: any = {};
-        if (from) callStartedAtCond.$gte = from;
-        if (to) callStartedAtCond.$lte = to;
-        if (from) updatedAtCond.$gte = from;
-        if (to) updatedAtCond.$lte = to;
+        if (fromDate) callStartedAtCond.$gte = fromDate;
+        if (toDate) callStartedAtCond.$lte = toDate;
+        if (fromDate) updatedAtCond.$gte = fromDate;
+        if (toDate) updatedAtCond.$lte = toDate;
         
         // Only add conditions if they have at least one operator
         const orConditions: any[] = [];
