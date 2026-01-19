@@ -613,7 +613,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             </div>
             
             {/* Compact Statistics Grid - Matching Activity Sampling */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                 <p className="text-xl font-black text-slate-900">{stats?.total || 0}</p>
@@ -633,19 +633,6 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
               <div className="bg-red-50 rounded-xl p-3 border border-red-200">
                 <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-0.5">Invalid</p>
                 <p className="text-xl font-black text-red-800">{stats?.invalid || 0}</p>
-              </div>
-              {/* Placeholder cards to match 8-column layout */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
-                <p className="text-xl font-black text-slate-900">-</p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
-                <p className="text-xl font-black text-slate-900">-</p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">-</p>
-                <p className="text-xl font-black text-slate-900">-</p>
               </div>
             </div>
           </div>
