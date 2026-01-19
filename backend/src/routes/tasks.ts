@@ -697,10 +697,27 @@ router.get(
         const to = dateTo ? new Date(dateTo) : null;
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
-        inQueueMatch.$or = [
-          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-        ];
+        
+        // Build date conditions - only include non-null values to avoid empty objects
+        const callStartedAtCond: any = {};
+        const updatedAtCond: any = {};
+        if (from) callStartedAtCond.$gte = from;
+        if (to) callStartedAtCond.$lte = to;
+        if (from) updatedAtCond.$gte = from;
+        if (to) updatedAtCond.$lte = to;
+        
+        // Only add conditions if they have at least one operator
+        const orConditions: any[] = [];
+        if (Object.keys(callStartedAtCond).length > 0) {
+          orConditions.push({ callStartedAt: callStartedAtCond });
+        }
+        if (Object.keys(updatedAtCond).length > 0) {
+          orConditions.push({ updatedAt: updatedAtCond });
+        }
+        
+        if (orConditions.length > 0) {
+          inQueueMatch.$or = orConditions;
+        }
       }
       
       // Apply activity filters to inQueue if needed
