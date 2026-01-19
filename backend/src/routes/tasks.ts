@@ -634,21 +634,47 @@ router.get(
         ]);
 
         const map: Record<string, number> = {};
-        for (const r of agg) map[String(r._id)] = Number(r.count || 0);
+        for (const r of agg) {
+          const statusKey = String(r._id || '').trim();
+          if (statusKey) {
+            map[statusKey] = Number(r.count || 0);
+          }
+        }
 
         inProgress = Number(map.in_progress || 0);
         completed = Number(map.completed || 0);
         notReachable = Number(map.not_reachable || 0);
         invalid = Number(map.invalid_number || 0);
       } else {
-        // Use simple countDocuments when no activity filters or search
+        // Use simple aggregation when no activity filters or search
+        // Ensure status field exists and is not null, while preserving existing status filter
+        const statusMatch: any = { ...baseMatch };
+        if (statusMatch.status && typeof statusMatch.status === 'object' && statusMatch.status.$ne) {
+          // Use $and to combine multiple conditions on status
+          statusMatch.status = {
+            $and: [
+              { $exists: true },
+              { $ne: null },
+              { $ne: statusMatch.status.$ne },
+            ],
+          };
+        } else if (!statusMatch.status || (typeof statusMatch.status === 'string' && statusMatch.status)) {
+          // If status is a string or not set, ensure it exists
+          statusMatch.status = statusMatch.status || { $exists: true, $ne: null };
+        }
+
         const statusCounts = await CallTask.aggregate([
-          { $match: baseMatch },
+          { $match: statusMatch },
           { $group: { _id: '$status', count: { $sum: 1 } } },
         ]);
 
         const map: Record<string, number> = {};
-        for (const r of statusCounts) map[String(r._id)] = Number(r.count || 0);
+        for (const r of statusCounts) {
+          const statusKey = String(r._id || '').trim();
+          if (statusKey) {
+            map[statusKey] = Number(r.count || 0);
+          }
+        }
 
         inProgress = Number(map.in_progress || 0);
         completed = Number(map.completed || 0);
