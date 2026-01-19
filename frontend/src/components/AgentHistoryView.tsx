@@ -590,7 +590,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
         </div>
 
         {/* Statistics Dashboard - Matching Activity Sampling */}
-        {!isStatsLoading && (stats ? (stats?.total || 0) > 0 : (!isLoading && rows.length > 0)) && (
+        {!isStatsLoading && (stats ? (stats?.total || 0) > 0 : (!isLoading && (pagination?.total || 0) > 0)) && (
           <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -616,7 +616,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
-                <p className="text-xl font-black text-slate-900">{stats?.total || 0}</p>
+                <p className="text-xl font-black text-slate-900">{stats?.total ?? pagination?.total ?? 0}</p>
               </div>
               <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                 <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
@@ -644,7 +644,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <Loader2 className="animate-spin mx-auto mb-4 text-green-700" size={32} />
             <p className="text-sm text-slate-600 font-medium">Loading history...</p>
           </div>
-        ) : !visible.length ? (
+        ) : !pagination || (pagination.total || 0) === 0 ? (
           <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
             <p className="text-sm text-slate-600 font-medium">No history found for selected filters</p>
           </div>
