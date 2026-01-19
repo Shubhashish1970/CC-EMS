@@ -650,13 +650,10 @@ router.get(
         // Ensure status field exists and is not null, while preserving existing status filter
         const statusMatch: any = { ...baseMatch };
         if (statusMatch.status && typeof statusMatch.status === 'object' && statusMatch.status.$ne) {
-          // Use $and to combine multiple conditions on status
+          // Use $nin to exclude both null and sampled_in_queue
           statusMatch.status = {
-            $and: [
-              { $exists: true },
-              { $ne: null },
-              { $ne: statusMatch.status.$ne },
-            ],
+            $exists: true,
+            $nin: [null, statusMatch.status.$ne],
           };
         } else if (!statusMatch.status || (typeof statusMatch.status === 'string' && statusMatch.status)) {
           // If status is a string or not set, ensure it exists
