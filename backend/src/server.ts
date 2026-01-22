@@ -8,6 +8,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Load environment variables
 // Testing deployment after adding Cloud Build Editor role
+// Updated: Trigger redeploy to use updated MONGODB_URI secret (Kweka_Call_Centre)
 dotenv.config();
 
 const app: Express = express();
