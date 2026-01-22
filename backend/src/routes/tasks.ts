@@ -613,54 +613,54 @@ router.get(
 
       if (normalizedSearch || hasActivityFilters) {
         // Use aggregation when we have activity filters or search (same as history endpoint)
-        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
 
-        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-        const normTerritory = String(territory || '').trim();
-        const normType = String(activityType || '').trim();
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
 
-        const agg = await CallTask.aggregate([
-          { $match: baseMatch },
-          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-          ...(normTerritory
-            ? [
-                {
-                  $match: {
-                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
-                  },
+      const agg = await CallTask.aggregate([
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+        ...(normTerritory
+          ? [
+              {
+                $match: {
+                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
                 },
-              ]
-            : []),
-          ...(re
-            ? [
-                {
-                  $match: {
-                    $or: [
-                      { 'farmerId.name': re },
-                      { 'farmerId.mobileNumber': re },
-                      { 'farmerId.location': re },
-                      { 'farmerId.preferredLanguage': re },
-                      { 'activityId.type': re },
-                      { 'activityId.officerName': re },
-                      { 'activityId.tmName': re },
-                      { 'activityId.territoryName': re },
-                      { 'activityId.territory': re },
-                      { 'activityId.state': re },
-                      { 'activityId.activityId': re },
-                    ],
-                  },
+              },
+            ]
+          : []),
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
                 },
-              ]
-            : []),
-          { $group: { _id: '$status', count: { $sum: 1 } } },
-        ]);
+              },
+            ]
+          : []),
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]);
 
-        const map: Record<string, number> = {};
+      const map: Record<string, number> = {};
         for (const r of agg) {
           const statusKey = String(r._id || '').trim();
           if (statusKey) {

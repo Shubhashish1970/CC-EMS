@@ -611,7 +611,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
               </button>
             </div>
-            
+
             {/* Compact Statistics Grid - Matching Activity Sampling */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
@@ -654,7 +654,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
           </div>
         ) : (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
               <table className="w-full table-fixed text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -675,11 +675,11 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
                       style={{ width: colWidths[key], minWidth: colWidths[key] }}
                       onClick={key === 'action' || key === 'expand' ? undefined : () => {
-                        setTableSort((p) => {
+                            setTableSort((p) => {
                           if (p.key === key) return { key, dir: p.dir === 'asc' ? 'desc' : 'asc' };
                           return { key, dir: 'asc' };
-                        });
-                      }}
+                            });
+                          }}
                       title={key === 'action' || key === 'expand' ? undefined : 'Click to sort'}
                     >
                       <div className="flex items-center gap-2">
@@ -688,17 +688,17 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                         )}
                       </div>
-                      {key !== 'action' && key !== 'expand' && (
-                        <div
+                        {key !== 'action' && key !== 'expand' && (
+                          <div
                           className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             handleResizeStart(key, e.clientX);
                           }}
-                          title="Drag to resize"
-                        />
-                      )}
+                            title="Drag to resize"
+                          />
+                        )}
                     </th>
                   ))}
                 </tr>
@@ -753,20 +753,20 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           </div>
                         </td>
                         <td className="px-3 py-3 text-sm font-bold text-slate-700" style={{ width: colWidths.outcome, minWidth: colWidths.outcome }}>
-                          {outcomeLabel(t.status)}
-                        </td>
+                        {outcomeLabel(t.status)}
+                      </td>
                         <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.outbound, minWidth: colWidths.outbound }}>
-                          {outboundLabel(outbound)}
-                        </td>
+                        {outboundLabel(outbound)}
+                      </td>
                         <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.activityType, minWidth: colWidths.activityType }}>
-                          {activity.type || '-'}
-                        </td>
+                        {activity.type || '-'}
+                      </td>
                         <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory || ''} style={{ width: colWidths.territory, minWidth: colWidths.territory }}>
-                          {territory || '-'}
-                        </td>
+                        {territory || '-'}
+                      </td>
                         <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.updated, minWidth: colWidths.updated }}>
-                          {updated}
-                        </td>
+                        {updated}
+                      </td>
                         <td className="px-3 py-3 text-sm text-right" style={{ width: colWidths.action, minWidth: colWidths.action }}>
                         {t.status === 'in_progress' ? (
                           <button
@@ -867,45 +867,45 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
           {/* Pagination - Matching Activity Sampling */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <p className="text-sm text-slate-600">
-                Page {page} of {pages} • {Number(pagination?.total || 0)} total records
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    title="Rows per page"
-                  >
-                    {[10, 20, 50, 100].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => load(page - 1)}
-                  disabled={page === 1 || isLoading || pages <= 1}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              Page {page} of {pages} • {Number(pagination?.total || 0)} total records
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  title="Rows per page"
                 >
-                  Previous
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => load(page + 1)}
-                  disabled={page >= pages || isLoading || pages <= 1}
-                >
-                  Next
-                </Button>
+                  {[10, 20, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => load(page - 1)}
+                disabled={page === 1 || isLoading || pages <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => load(page + 1)}
+                disabled={page >= pages || isLoading || pages <= 1}
+              >
+                Next
+              </Button>
             </div>
           </div>
+        </div>
         </div>
         )}
       </div>
