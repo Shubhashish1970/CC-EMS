@@ -183,11 +183,11 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             />
           </div>
 
-          {/* Filter Tabs - Light theme */}
-          <div className="flex items-center gap-2">
+          {/* Filter Tabs - Light theme - Compact */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'all'
                   ? 'bg-green-100 text-green-700'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -197,7 +197,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             </button>
             <button
               onClick={() => setFilter('in_progress')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'in_progress'
                   ? 'bg-green-100 text-green-700'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -207,7 +207,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             </button>
             <button
               onClick={() => setFilter('sampled_in_queue')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'sampled_in_queue'
                   ? 'bg-green-100 text-green-700'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -217,7 +217,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             </button>
             <button
               onClick={() => setFilter('completed')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'completed'
                   ? 'bg-green-100 text-green-700'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
