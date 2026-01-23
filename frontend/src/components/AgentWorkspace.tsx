@@ -23,6 +23,23 @@ const IndianCrops = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', '
 const NACLProducts = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster'];
 const NonPurchaseReasons = ['Price', 'Availability', 'Brand preference', 'No requirement', 'Not convinced', 'Other'];
 
+interface CallLog {
+  timestamp?: string;
+  callStatus?: string;
+  callDurationSeconds?: number;
+  didAttend?: string | null;
+  didRecall?: boolean | null;
+  cropsDiscussed?: string[];
+  productsDiscussed?: string[];
+  hasPurchased?: boolean | null;
+  willingToPurchase?: boolean | null;
+  likelyPurchaseDate?: string;
+  nonPurchaseReason?: string;
+  purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
+  farmerComments?: string;
+  sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
+}
+
 interface TaskData {
   taskId: string;
   farmer: {
@@ -43,6 +60,10 @@ interface TaskData {
     crops?: string[];
     products?: string[];
   };
+  status?: string;
+  callStartedAt?: string;
+  callLog?: CallLog | null;
+  updatedAt?: string;
 }
 
 const AgentWorkspace: React.FC = () => {
@@ -173,6 +194,10 @@ const AgentWorkspace: React.FC = () => {
           crops: d.activity?.crops || [],
           products: d.activity?.products || [],
         },
+        status: d.status,
+        callStartedAt: d.callStartedAt,
+        callLog: d.callLog || null,
+        updatedAt: d.updatedAt,
       };
       setTaskData(formattedTask);
       setActiveSection('dialer');

@@ -1,5 +1,22 @@
 import React from 'react';
-import { MapPin, User, Layout, Phone, UserCircle } from 'lucide-react';
+import { MapPin, User, Layout, Phone, UserCircle, Clock, CheckCircle, XCircle, MessageSquare, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+
+interface CallLog {
+  timestamp?: string;
+  callStatus?: string;
+  callDurationSeconds?: number;
+  didAttend?: string | null;
+  didRecall?: boolean | null;
+  cropsDiscussed?: string[];
+  productsDiscussed?: string[];
+  hasPurchased?: boolean | null;
+  willingToPurchase?: boolean | null;
+  likelyPurchaseDate?: string;
+  nonPurchaseReason?: string;
+  purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
+  farmerComments?: string;
+  sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
+}
 
 interface TaskDetailsPanelProps {
   taskData: {
@@ -19,6 +36,10 @@ interface TaskDetailsPanelProps {
       territory: string;
       state?: string;
     };
+    status?: string;
+    callStartedAt?: string;
+    callLog?: CallLog | null;
+    updatedAt?: string;
   } | null;
   isActive: boolean;
 }
@@ -157,6 +178,213 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
               </div>
             </div>
           </div>
+
+          {/* Call Information - Show if callLog exists (completed tasks) */}
+          {taskData.callLog && (
+            <>
+              {/* Call Status & Duration */}
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
+                  Call Information
+                </label>
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
+                  {taskData.callLog.callStatus && (
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                        taskData.callLog.callStatus === 'Connected'
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-slate-200 text-slate-700 border border-slate-300'
+                      }`}>
+                        {taskData.callLog.callStatus}
+                      </span>
+                    </div>
+                  )}
+                  {taskData.callStartedAt && (
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Clock size={12} className="text-slate-400" />
+                      <span className="font-medium">
+                        Started: {new Date(taskData.callStartedAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {taskData.callLog.callDurationSeconds !== undefined && taskData.callLog.callDurationSeconds > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Clock size={12} className="text-slate-400" />
+                      <span className="font-medium">
+                        Duration: {Math.floor(taskData.callLog.callDurationSeconds / 60)}:{(taskData.callLog.callDurationSeconds % 60).toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                  )}
+                  {taskData.callLog.didAttend && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Meeting Attendance</p>
+                      <p className="text-xs font-bold text-slate-800">{taskData.callLog.didAttend}</p>
+                    </div>
+                  )}
+                  {taskData.callLog.didRecall !== null && taskData.callLog.didRecall !== undefined && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Recall Content</p>
+                      <p className="text-xs font-bold text-slate-800">{taskData.callLog.didRecall ? 'Yes' : 'No'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Crops & Products Discussed */}
+              {(taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0) || 
+               (taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0) ? (
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
+                    Products & Crops Discussed
+                  </label>
+                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
+                    {taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Crops Identified</p>
+                        <div className="flex flex-wrap gap-2">
+                          {taskData.callLog.cropsDiscussed.map((crop, idx) => (
+                            <span
+                              key={idx}
+                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-200"
+                            >
+                              {crop}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">NACL Products Recalled</p>
+                        <div className="flex flex-wrap gap-2">
+                          {taskData.callLog.productsDiscussed.map((product, idx) => (
+                            <span
+                              key={idx}
+                              className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium border border-indigo-200"
+                            >
+                              {product}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Commercial Conversion */}
+              {taskData.callLog.hasPurchased !== null && taskData.callLog.hasPurchased !== undefined && (
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
+                    Commercial Conversion
+                  </label>
+                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Have they purchased?</p>
+                      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
+                        taskData.callLog.hasPurchased
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
+                      }`}>
+                        {taskData.callLog.hasPurchased ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                    {taskData.callLog.hasPurchased && taskData.callLog.purchasedProducts && taskData.callLog.purchasedProducts.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Purchased Products</p>
+                        <div className="space-y-2">
+                          {taskData.callLog.purchasedProducts.map((item, idx) => (
+                            <div key={idx} className="text-xs text-slate-700">
+                              <span className="font-bold">{item.product}</span>
+                              {item.quantity && (
+                                <>
+                                  <span className="text-slate-400 mx-1">•</span>
+                                  <span>{item.quantity} {item.unit}</span>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {!taskData.callLog.hasPurchased && taskData.callLog.willingToPurchase !== null && taskData.callLog.willingToPurchase !== undefined && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Likely to buy in future?</p>
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
+                          taskData.callLog.willingToPurchase
+                            ? 'bg-green-100 text-green-700 border border-green-200'
+                            : 'bg-red-100 text-red-700 border border-red-200'
+                        }`}>
+                          {taskData.callLog.willingToPurchase ? 'Yes' : 'No'}
+                        </span>
+                        {taskData.callLog.willingToPurchase && taskData.callLog.likelyPurchaseDate && (
+                          <p className="text-xs text-slate-600 mt-2">
+                            Likely Date: {new Date(taskData.callLog.likelyPurchaseDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {taskData.callLog.nonPurchaseReason && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Reason for non-purchase</p>
+                        <p className="text-xs font-bold text-slate-800">{taskData.callLog.nonPurchaseReason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Farmer Comments & Sentiment */}
+              {(taskData.callLog.farmerComments || (taskData.callLog.sentiment && taskData.callLog.sentiment !== 'N/A')) && (
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
+                    Farmer Feedback
+                  </label>
+                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
+                    {taskData.callLog.farmerComments && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare size={14} className="text-slate-400" />
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Comments</p>
+                        </div>
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap">{taskData.callLog.farmerComments}</p>
+                      </div>
+                    )}
+                    {taskData.callLog.sentiment && taskData.callLog.sentiment !== 'N/A' && (
+                      <div className={taskData.callLog.farmerComments ? 'pt-2 border-t border-slate-200' : ''}>
+                        <div className="flex items-center gap-2">
+                          {taskData.callLog.sentiment === 'Positive' && <TrendingUp size={14} className="text-green-600" />}
+                          {taskData.callLog.sentiment === 'Negative' && <TrendingDown size={14} className="text-red-600" />}
+                          {taskData.callLog.sentiment === 'Neutral' && <Minus size={14} className="text-slate-600" />}
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Sentiment</p>
+                        </div>
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block mt-2 ${
+                          taskData.callLog.sentiment === 'Positive'
+                            ? 'bg-green-100 text-green-700 border border-green-200'
+                            : taskData.callLog.sentiment === 'Negative'
+                            ? 'bg-red-100 text-red-700 border border-red-200'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          {taskData.callLog.sentiment}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">

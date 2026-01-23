@@ -162,6 +162,9 @@ router.post(
           activity: activityData,
           status: task.status,
           scheduledDate: task.scheduledDate,
+          callStartedAt: task.callStartedAt,
+          callLog: task.callLog || null, // Include callLog for completed tasks
+          updatedAt: task.updatedAt,
         },
       });
     } catch (error) {
