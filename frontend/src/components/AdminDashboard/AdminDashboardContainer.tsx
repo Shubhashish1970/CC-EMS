@@ -22,7 +22,7 @@ const AdminDashboardContainer: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'activities' as const, label: 'Activity Sampling', icon: ActivityIcon },
+    { id: 'activities' as const, label: 'Activity Monitoring', icon: ActivityIcon },
     { id: 'queues' as const, label: 'Agent Queues', icon: Users },
     { id: 'tasks' as const, label: 'Task Management', icon: List },
     { id: 'users' as const, label: 'User Management', icon: UserCog },
@@ -38,7 +38,7 @@ const AdminDashboardContainer: React.FC = () => {
               <BarChart3 className="text-green-700" size={24} />
               <div>
                 <h1 className="text-2xl font-black text-slate-900">Admin Dashboard</h1>
-                <p className="text-sm text-slate-600">Monitor activity sampling and agent queues</p>
+                <p className="text-sm text-slate-600">Monitor activities and agent queues</p>
               </div>
             </div>
             

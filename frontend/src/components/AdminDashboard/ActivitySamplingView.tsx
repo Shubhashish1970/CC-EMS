@@ -651,8 +651,8 @@ const ActivitySamplingView: React.FC = () => {
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-1">Activity Sampling</h2>
-            <p className="text-sm text-slate-600">Monitor FFA activities and their sampling status</p>
+            <h2 className="text-xl font-black text-slate-900 mb-1">Activity Monitoring</h2>
+            <p className="text-sm text-slate-600">Monitor FFA activities and their status</p>
             {syncStatus && (
               <p className="text-xs text-slate-500 mt-1">
                 Last sync: {syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'} • 
