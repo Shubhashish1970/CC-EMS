@@ -60,18 +60,11 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    // Validate required fields
+    // Review modal is for verification only - no validation needed
+    // All required fields should have been answered in the form before opening review
     if (!formData.callStatus) {
       showWarning('Please select call status');
       return;
-    }
-
-    // Only validate detailed fields for Connected calls
-    if (formData.callStatus === 'Connected') {
-      if (formData.didAttend === null || formData.didRecall === null) {
-        showWarning('Please answer all required questions for connected calls');
-        return;
-      }
     }
 
     await onFinalSubmit();
@@ -121,43 +114,47 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
           {/* Show detailed fields only for Connected calls */}
           {formData.callStatus === 'Connected' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
-              {/* Meeting Attendance Details */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-                  2. Meeting Attendance Details
-                </h3>
-                <div className="bg-white p-4 rounded-xl border border-slate-200">
-                  <span className={`px-4 py-2 rounded-lg text-sm font-bold inline-block ${
-                    formData.didAttend === 'Yes, I attended'
-                      ? 'bg-green-700 text-white'
-                      : formData.didAttend === "Don't recall"
-                      ? 'bg-green-400 text-white'
-                      : formData.didAttend
-                      ? 'bg-red-600 text-white'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {formData.didAttend || 'Not selected'}
-                  </span>
+              {/* Meeting Attendance Details - Only show if answered */}
+              {formData.didAttend !== null && (
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    2. Meeting Attendance Details
+                  </h3>
+                  <div className="bg-white p-4 rounded-xl border border-slate-200">
+                    <span className={`px-4 py-2 rounded-lg text-sm font-bold inline-block ${
+                      formData.didAttend === 'Yes, I attended'
+                        ? 'bg-green-700 text-white'
+                        : formData.didAttend === "Don't recall"
+                        ? 'bg-green-400 text-white'
+                        : formData.didAttend
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {formData.didAttend}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Recall Toggle */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-                  3. Do they recall the content?
-                </h3>
-                <div className="bg-white p-4 rounded-xl border border-slate-200">
-                  <span className={`px-4 py-2 rounded-lg text-sm font-bold inline-block ${
-                    formData.didRecall === true
-                      ? 'bg-green-700 text-white'
-                      : formData.didRecall === false
-                      ? 'bg-red-600 text-white'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {formData.didRecall === true ? 'Yes' : formData.didRecall === false ? 'No' : 'Not selected'}
-                  </span>
+              {/* Recall Toggle - Only show if didAttend was "Yes, I attended" or "Don't recall" */}
+              {(formData.didAttend === 'Yes, I attended' || formData.didAttend === "Don't recall") && formData.didRecall !== null && (
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    3. Do they recall the content?
+                  </h3>
+                  <div className="bg-white p-4 rounded-xl border border-slate-200">
+                    <span className={`px-4 py-2 rounded-lg text-sm font-bold inline-block ${
+                      formData.didRecall === true
+                        ? 'bg-green-700 text-white'
+                        : formData.didRecall === false
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {formData.didRecall === true ? 'Yes' : formData.didRecall === false ? 'No' : 'Not selected'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Product & Crop Recall */}
               {(formData.didRecall === true) && (
@@ -204,8 +201,8 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                 </div>
               )}
 
-              {/* Commercial Conversion */}
-              {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && (
+              {/* Commercial Conversion - Only show if crops/products were discussed AND hasPurchased was answered */}
+              {(formData.cropsDiscussed.length > 0 || formData.productsDiscussed.length > 0) && formData.hasPurchased !== null && (
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
                     5. Commercial Conversion
@@ -243,7 +240,7 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                       </div>
                     )}
 
-                    {formData.hasPurchased === false && (
+                    {formData.hasPurchased === false && formData.willingToPurchase !== null && (
                       <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                         <div>
                           <label className="text-xs font-bold text-slate-600 mb-2 block">Likely to buy in future?</label>
