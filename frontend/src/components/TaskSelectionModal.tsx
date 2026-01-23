@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Phone, MapPin, Loader2, Search, Info, Clock } from 'lucide-react';
+import { X, Phone, MapPin, Loader2, Search, Info, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { tasksAPI } from '../services/api';
 
 interface Task {
@@ -264,6 +264,8 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                 const isSelected = selectedTaskId === task.taskId;
                 const isInProgress = task.status === 'in_progress';
                 const isCompleted = task.status === 'completed' || task.status === 'not_reachable' || task.status === 'invalid_number';
+                const isSuccessful = task.status === 'completed';
+                const isUnsuccessful = task.status === 'not_reachable' || task.status === 'invalid_number';
 
                 return (
                   <button
@@ -311,6 +313,18 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                           <Clock size={10} className="text-white animate-pulse" />
                         </div>
                       )}
+                      {/* Completed Status Indicator */}
+                      {isCompleted && (
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-white rounded-full flex items-center justify-center ${
+                          isSuccessful ? 'bg-green-500' : 'bg-red-500'
+                        }`}>
+                          {isSuccessful ? (
+                            <CheckCircle size={10} className="text-white" />
+                          ) : (
+                            <XCircle size={10} className="text-white" />
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Contact Info - Light theme */}
@@ -323,6 +337,15 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                         {isInProgress && (
                           <span className="flex-shrink-0 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200">
                             In Progress
+                          </span>
+                        )}
+                        {isCompleted && (
+                          <span className={`flex-shrink-0 px-2 py-0.5 rounded-lg text-xs font-bold border ${
+                            isSuccessful
+                              ? 'bg-green-100 text-green-700 border-green-200'
+                              : 'bg-red-100 text-red-700 border-red-200'
+                          }`}>
+                            {isSuccessful ? 'Successful' : 'Unsuccessful'}
                           </span>
                         )}
                       </div>
@@ -365,20 +388,34 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                         {formatTime(task.scheduledDate)}
                       </span>
 
-                      {/* Call Button - Green Circle */}
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
-                          isSelected
-                            ? 'bg-green-700 scale-95'
-                            : 'bg-green-600 hover:bg-green-700 active:scale-95'
-                        } ${isLoadingTask ? 'opacity-50' : ''}`}
-                      >
-                        {isSelected && isLoadingTask ? (
-                          <Loader2 size={18} className="animate-spin text-white" />
-                        ) : (
-                          <Phone size={18} className="text-white" />
-                        )}
-                      </div>
+                      {/* Call Button / Status Icon */}
+                      {isCompleted ? (
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
+                            isSuccessful ? 'bg-green-500' : 'bg-red-500'
+                          }`}
+                        >
+                          {isSuccessful ? (
+                            <CheckCircle size={18} className="text-white" />
+                          ) : (
+                            <XCircle size={18} className="text-white" />
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
+                            isSelected
+                              ? 'bg-green-700 scale-95'
+                              : 'bg-green-600 hover:bg-green-700 active:scale-95'
+                          } ${isLoadingTask ? 'opacity-50' : ''}`}
+                        >
+                          {isSelected && isLoadingTask ? (
+                            <Loader2 size={18} className="animate-spin text-white" />
+                          ) : (
+                            <Phone size={18} className="text-white" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
