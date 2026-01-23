@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import UserList from './UserList';
 import UserForm, { UserRole } from './UserForm';
 import AgentLanguageMatrix from './AgentLanguageMatrix';
+import ConfirmationModal from '../shared/ConfirmationModal';
 
 interface User {
   _id: string;
@@ -38,6 +39,10 @@ const UserManagementView: React.FC = () => {
   });
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; user: User | null }>({
+    isOpen: false,
+    user: null,
+  });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -145,14 +150,17 @@ const UserManagementView: React.FC = () => {
     setShowUserForm(true);
   };
 
-  const handleDeleteUser = async (user: User) => {
-    if (!window.confirm(`Are you sure you want to deactivate ${user.name}?`)) {
-      return;
-    }
+  const handleDeleteUser = (user: User) => {
+    setConfirmModal({ isOpen: true, user });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!confirmModal.user) return;
 
     try {
-      await usersAPI.deleteUser(user._id);
+      await usersAPI.deleteUser(confirmModal.user._id);
       showSuccess('User deactivated successfully');
+      setConfirmModal({ isOpen: false, user: null });
       fetchUsers();
       fetchTeamLeads();
     } catch (error: any) {
@@ -340,6 +348,18 @@ const UserManagementView: React.FC = () => {
         onSuccess={handleFormSuccess}
         user={selectedUser}
         teamLeads={teamLeads}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, user: null })}
+        onConfirm={confirmDeleteUser}
+        title="Deactivate User"
+        message={`Are you sure you want to deactivate ${confirmModal.user?.name}?`}
+        confirmText="Deactivate"
+        cancelText="Cancel"
+        confirmVariant="danger"
       />
     </div>
   );
