@@ -79,6 +79,7 @@ router.get(
           status: task.status,
           scheduledDate: task.scheduledDate,
           createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
         };
       });
 

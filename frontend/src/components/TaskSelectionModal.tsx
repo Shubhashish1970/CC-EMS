@@ -25,6 +25,7 @@ interface Task {
   status: 'sampled_in_queue' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
   scheduledDate: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface TaskSelectionModalProps {
@@ -279,7 +280,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                     disabled={isLoadingTask || isCompleted}
                     className={`w-full px-6 py-4 hover:bg-white active:bg-slate-50 transition-colors flex items-center gap-4 ${
                       isSelected ? 'bg-green-50' : ''
-                    } ${(isLoadingTask || isCompleted) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    } ${isLoadingTask ? 'opacity-50 cursor-not-allowed' : isCompleted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     {/* Profile Icon/Photo - Light theme */}
                     <div className="flex-shrink-0 relative">
@@ -383,38 +384,45 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
 
                     {/* Right Side - Time and Action */}
                     <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                      {/* Scheduled Date/Time */}
-                      <span className="text-xs text-slate-500 whitespace-nowrap">
-                        {formatTime(task.scheduledDate)}
-                      </span>
-
                       {/* Call Button / Status Icon */}
                       {isCompleted ? (
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
-                            isSuccessful ? 'bg-green-500' : 'bg-red-500'
-                          }`}
-                        >
-                          {isSuccessful ? (
-                            <CheckCircle size={18} className="text-white" />
-                          ) : (
-                            <XCircle size={18} className="text-white" />
-                          )}
-                        </div>
+                        <>
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
+                              isSuccessful ? 'bg-green-500' : 'bg-red-500'
+                            }`}
+                          >
+                            {isSuccessful ? (
+                              <CheckCircle size={18} className="text-white" />
+                            ) : (
+                              <XCircle size={18} className="text-white" />
+                            )}
+                          </div>
+                          {/* Final Update Date/Time - Below status icon for completed calls */}
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {formatTime(task.updatedAt || task.scheduledDate)}
+                          </span>
+                        </>
                       ) : (
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
-                            isSelected
-                              ? 'bg-green-700 scale-95'
-                              : 'bg-green-600 hover:bg-green-700 active:scale-95'
-                          } ${isLoadingTask ? 'opacity-50' : ''}`}
-                        >
-                          {isSelected && isLoadingTask ? (
-                            <Loader2 size={18} className="animate-spin text-white" />
-                          ) : (
-                            <Phone size={18} className="text-white" />
-                          )}
-                        </div>
+                        <>
+                          {/* Scheduled Date/Time - Above call button for active calls */}
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {formatTime(task.scheduledDate)}
+                          </span>
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
+                              isSelected
+                                ? 'bg-green-700 scale-95'
+                                : 'bg-green-600 hover:bg-green-700 active:scale-95'
+                            } ${isLoadingTask ? 'opacity-50' : ''}`}
+                          >
+                            {isSelected && isLoadingTask ? (
+                              <Loader2 size={18} className="animate-spin text-white" />
+                            ) : (
+                              <Phone size={18} className="text-white" />
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   </button>
