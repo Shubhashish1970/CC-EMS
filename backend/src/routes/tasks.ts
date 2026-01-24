@@ -1076,7 +1076,7 @@ router.get(
             if (!counted) {
               uncountedTasks++;
               logger.warn(`Task not counted in stats (with filters):`, {
-                taskId: task._id,
+                taskId: task._id?.toString() || 'unknown',
                 effectiveOutcome,
                 storedOutcome,
                 status,
@@ -1149,7 +1149,7 @@ router.get(
           if (!counted) {
             uncountedTasks++;
             logger.warn(`Task not counted in stats:`, {
-              taskId: task._id,
+              taskId: task._id?.toString() || 'unknown',
               effectiveOutcome,
               storedOutcome,
               status,
@@ -1158,17 +1158,23 @@ router.get(
           }
         }
         
-        // Helper to safely stringify baseMatch (handle Date objects)
+        // Helper to safely stringify baseMatch (handle Date objects and ObjectIds)
         const safeStringify = (obj: any): string => {
           try {
             return JSON.stringify(obj, (key, value) => {
               if (value instanceof Date) {
                 return value.toISOString();
               }
+              if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'ObjectId') {
+                return value.toString();
+              }
+              if (value && typeof value === 'object' && value._bsontype === 'ObjectId') {
+                return value.toString();
+              }
               return value;
             });
           } catch (e) {
-            return String(obj);
+            return `[Stringify Error: ${String(e)}]`;
           }
         };
         
