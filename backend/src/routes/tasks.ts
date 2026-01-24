@@ -1247,20 +1247,17 @@ router.get(
       // Apply same filters for inQueue count
       // Note: sampled_in_queue tasks typically don't have callStartedAt, so we primarily use updatedAt
       if (dateFrom || dateTo) {
-        // dateFrom and dateTo are already Date objects from validation middleware
-        const from = dateFrom instanceof Date && !isNaN(dateFrom.getTime()) ? dateFrom : null;
-        const to = dateTo instanceof Date && !isNaN(dateTo.getTime()) ? dateTo : null;
-        
+        // Use the same date handling as above
         let fromDate: Date | null = null;
         let toDate: Date | null = null;
         
-        if (from) {
-          fromDate = new Date(from);
+        if (dateFrom) {
+          fromDate = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
           fromDate.setHours(0, 0, 0, 0);
         }
         
-        if (to) {
-          toDate = new Date(to);
+        if (dateTo) {
+          toDate = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
           toDate.setHours(23, 59, 59, 999);
         }
         
@@ -1277,13 +1274,14 @@ router.get(
       // Apply activity filters to inQueue if needed
       let inQueueCount = 0;
       if (normalizedSearch || hasActivityFilters) {
-        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
-        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-        const normTerritory = String(territory || '').trim();
-        const normType = String(activityType || '').trim();
+        try {
+          const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+          const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+          const normTerritory = String(territory || '').trim();
+          const normType = String(activityType || '').trim();
 
-        const inQueueAgg = await CallTask.aggregate([
+          const inQueueAgg = await CallTask.aggregate([
           { $match: inQueueMatch },
           { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
           { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
@@ -1321,10 +1319,27 @@ router.get(
               ]
             : []),
           { $count: 'count' },
-        ]);
-        inQueueCount = Number(inQueueAgg?.[0]?.count || 0);
+          ]);
+          inQueueCount = Number(inQueueAgg?.[0]?.count || 0);
+        } catch (inQueueAggError: any) {
+          logger.error(`Error in inQueue aggregation:`, {
+            error: inQueueAggError?.message || String(inQueueAggError),
+            stack: inQueueAggError?.stack,
+            inQueueMatch: JSON.stringify(inQueueMatch, null, 2),
+          });
+          inQueueCount = 0; // Default to 0 on error
+        }
       } else {
-        inQueueCount = await CallTask.countDocuments(inQueueMatch);
+        try {
+          inQueueCount = await CallTask.countDocuments(inQueueMatch);
+        } catch (countError: any) {
+          logger.error(`Error counting inQueue documents:`, {
+            error: countError?.message || String(countError),
+            stack: countError?.stack,
+            inQueueMatch: JSON.stringify(inQueueMatch, null, 2),
+          });
+          inQueueCount = 0; // Default to 0 on error
+        }
       }
       
       // Use outcome field from database (unsuccessfulCount from aggregation above)
@@ -1334,12 +1349,21 @@ router.get(
       
       // Count invalid separately (for display purposes) - use callLog.callStatus or status
       // This counts tasks with Invalid callStatus OR invalid_number status
-      const invalidAgg = await CallTask.aggregate([
-        { $match: baseMatch },
-        { $match: { $or: [{ 'callLog.callStatus': 'Invalid' }, { status: 'invalid_number' }] } },
-        { $count: 'count' },
-      ]);
-      invalidCount = Number(invalidAgg?.[0]?.count || 0);
+      try {
+        const invalidAgg = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $match: { $or: [{ 'callLog.callStatus': 'Invalid' }, { status: 'invalid_number' }] } },
+          { $count: 'count' },
+        ]);
+        invalidCount = Number(invalidAgg?.[0]?.count || 0);
+      } catch (aggError: any) {
+        logger.error(`Error in invalid count aggregation:`, {
+          error: aggError?.message || String(aggError),
+          stack: aggError?.stack,
+          baseMatch: JSON.stringify(baseMatch, null, 2),
+        });
+        invalidCount = 0; // Default to 0 on error
+      }
       
       const total = inProgress + completed + unsuccessful + inQueueCount;
 
