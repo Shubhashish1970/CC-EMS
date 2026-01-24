@@ -49,7 +49,14 @@ const TaskDashboardView: React.FC = () => {
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
 
-  const toISO = (d: Date) => d.toISOString().split('T')[0];
+  // Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
+  const toLocalISO = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const formatPretty = (iso: string) => {
     try {
       const d = new Date(iso);
@@ -61,46 +68,53 @@ const TaskDashboardView: React.FC = () => {
 
   const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const start = new Date(today);
 
     const startOfWeekSunday = (dt: Date) => {
       const d = new Date(dt);
       const day = d.getDay();
       d.setDate(d.getDate() - day);
+      d.setHours(0, 0, 0, 0);
       return d;
     };
 
     switch (preset) {
       case 'Today':
-        return { start: toISO(today), end: toISO(today) };
+        return { start: toLocalISO(today), end: toLocalISO(today) };
       case 'Yesterday': {
         const y = new Date(today);
         y.setDate(y.getDate() - 1);
-        return { start: toISO(y), end: toISO(y) };
+        return { start: toLocalISO(y), end: toLocalISO(y) };
       }
       case 'This week (Sun - Today)': {
         const s = startOfWeekSunday(today);
-        return { start: toISO(s), end: toISO(today) };
+        return { start: toLocalISO(s), end: toLocalISO(today) };
       }
       case 'Last 7 days': {
+        // Last 7 days including today: today and the previous 6 days
         start.setDate(start.getDate() - 6);
-        return { start: toISO(start), end: toISO(today) };
+        return { start: toLocalISO(start), end: toLocalISO(today) };
       }
       case 'Last week (Sun - Sat)': {
         const thisSun = startOfWeekSunday(today);
         const lastSun = new Date(thisSun);
         lastSun.setDate(lastSun.getDate() - 7);
+        lastSun.setHours(0, 0, 0, 0);
         const lastSat = new Date(thisSun);
         lastSat.setDate(lastSat.getDate() - 1);
-        return { start: toISO(lastSun), end: toISO(lastSat) };
+        lastSat.setHours(0, 0, 0, 0);
+        return { start: toLocalISO(lastSun), end: toLocalISO(lastSat) };
       }
       case 'Last 28 days': {
+        // Last 28 days including today: today and the previous 27 days
         start.setDate(start.getDate() - 27);
-        return { start: toISO(start), end: toISO(today) };
+        return { start: toLocalISO(start), end: toLocalISO(today) };
       }
       case 'Last 30 days': {
+        // Last 30 days including today: today and the previous 29 days
         start.setDate(start.getDate() - 29);
-        return { start: toISO(start), end: toISO(today) };
+        return { start: toLocalISO(start), end: toLocalISO(today) };
       }
       case 'Custom':
       default:

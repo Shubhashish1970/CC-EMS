@@ -15,7 +15,14 @@ type DateRangePreset =
   | 'Last 28 days'
   | 'Last 30 days';
 
-const toISO = (d: Date) => d.toISOString().split('T')[0];
+// Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
+const toLocalISO = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const formatPretty = (iso: string) => {
   if (!iso) return '';
   try {
@@ -35,38 +42,41 @@ const getPresetRange = (preset: DateRangePreset): { start: string; end: string }
 
   switch (preset) {
     case 'Today':
-      return { start: toISO(today), end: toISO(today) };
+      return { start: toLocalISO(today), end: toLocalISO(today) };
     case 'Yesterday': {
       const y = new Date(today);
       y.setDate(y.getDate() - 1);
-      return { start: toISO(y), end: toISO(y) };
+      return { start: toLocalISO(y), end: toLocalISO(y) };
     }
     case 'This week (Sun - Today)': {
       const s = new Date(today);
       s.setDate(s.getDate() - day);
-      return { start: toISO(s), end: toISO(today) };
+      return { start: toLocalISO(s), end: toLocalISO(today) };
     }
     case 'Last 7 days': {
+      // Last 7 days including today: today and the previous 6 days
       const s = new Date(today);
       s.setDate(s.getDate() - 6);
-      return { start: toISO(s), end: toISO(today) };
+      return { start: toLocalISO(s), end: toLocalISO(today) };
     }
     case 'Last week (Sun - Sat)': {
       const lastSat = new Date(today);
       lastSat.setDate(lastSat.getDate() - (day + 1));
       const lastSun = new Date(lastSat);
       lastSun.setDate(lastSun.getDate() - 6);
-      return { start: toISO(lastSun), end: toISO(lastSat) };
+      return { start: toLocalISO(lastSun), end: toLocalISO(lastSat) };
     }
     case 'Last 28 days': {
+      // Last 28 days including today: today and the previous 27 days
       const s = new Date(today);
       s.setDate(s.getDate() - 27);
-      return { start: toISO(s), end: toISO(today) };
+      return { start: toLocalISO(s), end: toLocalISO(today) };
     }
     case 'Last 30 days': {
+      // Last 30 days including today: today and the previous 29 days
       const s = new Date(today);
       s.setDate(s.getDate() - 29);
-      return { start: toISO(s), end: toISO(today) };
+      return { start: toLocalISO(s), end: toLocalISO(today) };
     }
     case 'Custom':
     default:
