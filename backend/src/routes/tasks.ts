@@ -1125,7 +1125,9 @@ router.get(
         let uncountedTasks = 0;
         logger.info(`Starting stats calculation for ${tasks.length} tasks (no filters path)`);
         
+        let taskIndex = 0;
         for (const task of tasks) {
+          taskIndex++;
           const effectiveOutcome = getEffectiveOutcome(task);
           const status = String(task.status || '').trim();
           const storedOutcome = task.outcome ? String(task.outcome).trim() : 'NULL';
@@ -1139,8 +1141,8 @@ router.get(
           let counted = false;
           
           // Debug: Log first few tasks to see what we're getting
-          if (tasks.indexOf(task) < 3) {
-            logger.info(`Sample task ${tasks.indexOf(task) + 1}:`, {
+          if (taskIndex <= 3) {
+            logger.info(`Sample task ${taskIndex}:`, {
               taskId: task._id?.toString(),
               storedOutcome,
               status,
