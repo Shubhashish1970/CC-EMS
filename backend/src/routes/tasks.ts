@@ -803,36 +803,34 @@ router.get(
           }
         }
       } else {
-        // Use the EXACT same query logic as the history endpoint, but count by outcome
-        // The history endpoint uses CallTask.find(baseMatch) when there are no filters
-        // So we should use the same baseMatch for consistency
-        const outcomeCounts = await CallTask.aggregate([
-          { $match: baseMatch },
-          // Handle null/undefined outcomes by grouping them separately
-          { $group: { _id: { $ifNull: ['$outcome', 'NULL'] }, count: { $sum: 1 } } },
-        ]);
-
-        // Map the results by outcome
-        const map: Record<string, number> = {};
+        // Use the EXACT same query as history endpoint - use find() then count outcomes
+        // This ensures we get the exact same records that the history endpoint returns
+        const tasks = await CallTask.find(baseMatch).lean();
+        
+        // Count outcomes from the actual task documents (same as what history endpoint sees)
+        const outcomeMap: Record<string, number> = {};
         let nullOutcomeCount = 0;
-        for (const r of outcomeCounts) {
-          const outcomeKey = r._id === 'NULL' || r._id === null ? null : String(r._id || '').trim();
-          if (outcomeKey) {
-            map[outcomeKey] = Number(r.count || 0);
+        
+        for (const task of tasks) {
+          const outcome = task.outcome ? String(task.outcome).trim() : null;
+          if (outcome) {
+            outcomeMap[outcome] = (outcomeMap[outcome] || 0) + 1;
           } else {
-            // Count tasks with null/undefined outcome for fallback
-            nullOutcomeCount += Number(r.count || 0);
+            nullOutcomeCount++;
+            // For tasks without outcome, use status as fallback
+            const status = String(task.status || '').trim();
+            if (status === 'in_progress') {
+              inProgress = (inProgress || 0) + 1;
+            } else if (status === 'completed') {
+              completed = (completed || 0) + 1;
+            } else if (status === 'not_reachable' || status === 'invalid_number') {
+              unsuccessfulCount = (unsuccessfulCount || 0) + 1;
+            }
           }
         }
-
-        // Count by stored outcome field - iterate through map to handle any case variations
-        // The outcome field should contain: 'Completed Conversation', 'In Progress', 'Unsuccessful', 'Unknown'
-        inProgress = 0;
-        completed = 0;
-        unsuccessfulCount = 0;
         
-        // Check all keys in map (handle any case/whitespace variations)
-        for (const [key, value] of Object.entries(map)) {
+        // Count by stored outcome field
+        for (const [key, value] of Object.entries(outcomeMap)) {
           const normalizedKey = String(key || '').trim();
           if (normalizedKey === 'In Progress') {
             inProgress = Number(value || 0);
@@ -843,31 +841,15 @@ router.get(
           }
         }
         
-        // Debug: Log the map to see what outcomes we're getting
-        const totalFromOutcome = outcomeCounts.reduce((sum, r) => sum + Number(r.count || 0), 0);
-        logger.info(`Stats aggregation results for agent ${agentId}:`, { 
-          map, 
-          nullOutcomeCount, 
-          totalFromOutcome,
+        // Debug logging
+        logger.info(`Stats calculation for agent ${agentId}:`, {
+          totalTasksFound: tasks.length,
+          outcomeMap,
+          nullOutcomeCount,
+          calculatedCounts: { inProgress, completed, unsuccessfulCount },
           baseMatchKeys: Object.keys(baseMatch),
-          dateFilter: baseMatch.$or ? 'present ($or)' : baseMatch.updatedAt ? 'present (updatedAt)' : 'absent',
-          calculatedCounts: { inProgress, completed, unsuccessfulCount }
+          sampleTaskOutcomes: tasks.slice(0, 5).map(t => ({ id: t._id, outcome: t.outcome, status: t.status }))
         });
-        
-        // For tasks without outcome field, count by status as fallback
-        if (nullOutcomeCount > 0) {
-          const fallbackAgg = await CallTask.aggregate([
-            { $match: baseMatch },
-            { $match: { $or: [{ outcome: { $exists: false } }, { outcome: null }] } },
-            { $group: { _id: '$status', count: { $sum: 1 } } },
-          ]);
-          for (const r of fallbackAgg) {
-            const statusKey = String(r._id || '').trim();
-            if (statusKey === 'in_progress') inProgress += Number(r.count || 0);
-            if (statusKey === 'completed') completed += Number(r.count || 0);
-            if (statusKey === 'not_reachable' || statusKey === 'invalid_number') unsuccessfulCount += Number(r.count || 0);
-          }
-        }
       }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
