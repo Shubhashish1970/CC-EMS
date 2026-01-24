@@ -1123,6 +1123,8 @@ router.get(
         };
         
         let uncountedTasks = 0;
+        logger.info(`Starting stats calculation for ${tasks.length} tasks (no filters path)`);
+        
         for (const task of tasks) {
           const effectiveOutcome = getEffectiveOutcome(task);
           const status = String(task.status || '').trim();
@@ -1135,6 +1137,19 @@ router.get(
           // Count by effective outcome (case-insensitive matching)
           const normalizedOutcome = effectiveOutcome.toLowerCase();
           let counted = false;
+          
+          // Debug: Log first few tasks to see what we're getting
+          if (tasks.indexOf(task) < 3) {
+            logger.info(`Sample task ${tasks.indexOf(task) + 1}:`, {
+              taskId: task._id?.toString(),
+              storedOutcome,
+              status,
+              effectiveOutcome,
+              normalizedOutcome,
+              willMatch: normalizedOutcome === 'unsuccessful' || normalizedOutcome === 'completed conversation' || normalizedOutcome === 'in progress'
+            });
+          }
+          
           if (normalizedOutcome === 'in progress') {
             inProgress++;
             counted = true;
@@ -1148,15 +1163,19 @@ router.get(
           
           if (!counted) {
             uncountedTasks++;
-            logger.warn(`Task not counted in stats:`, {
-              taskId: task._id?.toString() || 'unknown',
-              effectiveOutcome,
-              storedOutcome,
-              status,
-              normalizedOutcome
-            });
+            if (uncountedTasks <= 5) {  // Only log first 5 to avoid spam
+              logger.warn(`Task not counted in stats:`, {
+                taskId: task._id?.toString() || 'unknown',
+                effectiveOutcome,
+                storedOutcome,
+                status,
+                normalizedOutcome
+              });
+            }
           }
         }
+        
+        logger.info(`After counting loop: inProgress=${inProgress}, completed=${completed}, unsuccessfulCount=${unsuccessfulCount}, uncountedTasks=${uncountedTasks}`);
         
         // Helper to safely stringify baseMatch (handle Date objects and ObjectIds)
         const safeStringify = (obj: any): string => {
