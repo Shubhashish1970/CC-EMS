@@ -920,6 +920,15 @@ router.get(
         return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
       };
 
+      // Helper function to map status to outcome label (matches frontend outcomeLabel)
+      const getOutcomeLabel = (status: string): string => {
+        if (status === 'completed') return 'Completed Conversation';
+        if (status === 'in_progress') return 'In Progress';
+        if (status === 'invalid_number') return 'Unsuccessful';
+        if (status === 'not_reachable') return 'Unsuccessful';
+        return status || 'Unknown';
+      };
+
       const sheetRows = tasks.map((t: any) => {
         const farmer = t.farmerId || {};
         const activity = t.activityId || {};
@@ -933,7 +942,7 @@ router.get(
           Farmer: String(farmer.name || ''),
           Mobile: String(farmer.mobileNumber || ''),
           Language: String(farmer.preferredLanguage || ''),
-          Outcome: String(t.status || ''),
+          Outcome: getOutcomeLabel(t.status || ''),
           'Outbound Status': String(t.callLog?.callStatus || ''),
           'Call Started': fmtDate(t.callStartedAt || ''),
           Updated: fmtDate(t.updatedAt || ''),

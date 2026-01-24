@@ -99,7 +99,7 @@ const getPresetRange = (preset: DateRangePreset): { start: string; end: string }
 const outcomeLabel = (status: string) => {
   if (status === 'completed') return 'Completed Conversation';
   if (status === 'in_progress') return 'In Progress';
-  if (status === 'invalid_number') return 'Unsuccessful (Invalid)';
+  if (status === 'invalid_number') return 'Unsuccessful';
   if (status === 'not_reachable') return 'Unsuccessful';
   return status || 'Unknown';
 };
@@ -451,7 +451,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed Conversation</option>
                     <option value="not_reachable">Unsuccessful</option>
-                    <option value="invalid_number">Unsuccessful (Invalid)</option>
+                    <option value="invalid_number">Unsuccessful</option>
                   </select>
                 </div>
 
