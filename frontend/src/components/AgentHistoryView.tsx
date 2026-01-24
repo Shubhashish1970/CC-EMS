@@ -120,6 +120,9 @@ const formatDateTime = (d: any) => {
 
 const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({ onOpenTask }) => {
   const toast = useToast();
+  // Initialize default date range once to avoid race condition
+  const defaultDateRange = getPresetRange('Last 7 days');
+  
   const [isLoading, setIsLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
@@ -152,6 +155,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   });
   const resizingRef = useRef<{ key: HistoryColumnKey; startX: number; startWidth: number } | null>(null);
 
+  // Initialize filters with default date range to avoid race condition
   const [filters, setFilters] = useState<{
     status: HistoryStatus;
     territory: string;
@@ -164,8 +168,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
     territory: '',
     activityType: '',
     search: '',
-    dateFrom: '',
-    dateTo: '',
+    dateFrom: defaultDateRange.start,
+    dateTo: defaultDateRange.end,
   });
 
   const [filterOptions, setFilterOptions] = useState<{ territoryOptions: string[]; activityTypeOptions: string[] }>({
@@ -181,8 +185,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [draftStart, setDraftStart] = useState('');
-  const [draftEnd, setDraftEnd] = useState('');
+  const [draftStart, setDraftStart] = useState(defaultDateRange.start);
+  const [draftEnd, setDraftEnd] = useState(defaultDateRange.end);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
 
   const syncDraftFromFilters = () => {
@@ -192,13 +196,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
     setDraftEnd(end);
   };
 
-  // Default date range - set immediately on mount to avoid race condition
+  // Date range is now initialized in state, so this effect is no longer needed
+  // Keeping it for backward compatibility in case filters get reset
   useEffect(() => {
     if (filters.dateFrom || filters.dateTo) return;
     const r = getPresetRange('Last 7 days');
-    // Set both dateFrom and dateTo in a single state update to avoid multiple renders
     setFilters((p) => {
-      if (p.dateFrom || p.dateTo) return p; // Prevent overwriting if already set
+      if (p.dateFrom || p.dateTo) return p;
       return { ...p, dateFrom: r.start, dateTo: r.end };
     });
     setDraftStart(r.start);
