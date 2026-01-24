@@ -1303,6 +1303,14 @@ router.get(
       
       const total = inProgress + completed + unsuccessful + inQueueCount;
 
+      // Log the final response being sent
+      logger.info(`Stats endpoint response for agent ${agentId}:`, {
+        calculatedCounts: { inProgress, completed, unsuccessful, invalidCount, inQueueCount, total },
+        queryParams: { status, territory, activityType, search, dateFrom, dateTo },
+        hasDateFilter: !!(dateFrom || dateTo),
+        hasSearchFilters: !!(normalizedSearch || hasActivityFilters),
+      });
+
       res.json({
         success: true,
         data: {
