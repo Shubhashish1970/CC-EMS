@@ -808,47 +808,43 @@ router.get(
         const tasks = await CallTask.find(baseMatch).lean();
         
         // Count outcomes from the actual task documents (same as what history endpoint sees)
-        const outcomeMap: Record<string, number> = {};
-        let nullOutcomeCount = 0;
-        
+        // Process all tasks and count by outcome, with fallback to status for null outcomes
         for (const task of tasks) {
           const outcome = task.outcome ? String(task.outcome).trim() : null;
           if (outcome) {
-            outcomeMap[outcome] = (outcomeMap[outcome] || 0) + 1;
+            // Task has outcome field - count by outcome
+            const normalizedOutcome = outcome;
+            if (normalizedOutcome === 'In Progress') {
+              inProgress++;
+            } else if (normalizedOutcome === 'Completed Conversation') {
+              completed++;
+            } else if (normalizedOutcome === 'Unsuccessful') {
+              unsuccessfulCount++;
+            }
           } else {
-            nullOutcomeCount++;
-            // For tasks without outcome, use status as fallback
+            // Task doesn't have outcome - use status as fallback
             const status = String(task.status || '').trim();
             if (status === 'in_progress') {
-              inProgress = (inProgress || 0) + 1;
+              inProgress++;
             } else if (status === 'completed') {
-              completed = (completed || 0) + 1;
+              completed++;
             } else if (status === 'not_reachable' || status === 'invalid_number') {
-              unsuccessfulCount = (unsuccessfulCount || 0) + 1;
+              unsuccessfulCount++;
             }
-          }
-        }
-        
-        // Count by stored outcome field
-        for (const [key, value] of Object.entries(outcomeMap)) {
-          const normalizedKey = String(key || '').trim();
-          if (normalizedKey === 'In Progress') {
-            inProgress = Number(value || 0);
-          } else if (normalizedKey === 'Completed Conversation') {
-            completed = Number(value || 0);
-          } else if (normalizedKey === 'Unsuccessful') {
-            unsuccessfulCount = Number(value || 0);
           }
         }
         
         // Debug logging
         logger.info(`Stats calculation for agent ${agentId}:`, {
           totalTasksFound: tasks.length,
-          outcomeMap,
-          nullOutcomeCount,
           calculatedCounts: { inProgress, completed, unsuccessfulCount },
           baseMatchKeys: Object.keys(baseMatch),
-          sampleTaskOutcomes: tasks.slice(0, 5).map(t => ({ id: t._id, outcome: t.outcome, status: t.status }))
+          sampleTaskOutcomes: tasks.slice(0, 10).map(t => ({ 
+            id: t._id, 
+            outcome: t.outcome, 
+            status: t.status,
+            updatedAt: t.updatedAt 
+          }))
         });
       }
       
