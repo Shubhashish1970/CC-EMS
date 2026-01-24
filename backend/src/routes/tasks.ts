@@ -757,10 +757,33 @@ router.get(
           }
         }
 
-        // Count by stored outcome field
-        inProgress = Number(map['In Progress'] || 0);
-        completed = Number(map['Completed Conversation'] || 0);
-        unsuccessfulCount = Number(map['Unsuccessful'] || 0);
+        // Count by stored outcome field - iterate through map to handle any case variations
+        inProgress = 0;
+        completed = 0;
+        unsuccessfulCount = 0;
+        
+        // Check all keys in map (handle any case/whitespace variations)
+        for (const [key, value] of Object.entries(map)) {
+          const normalizedKey = String(key || '').trim();
+          if (normalizedKey === 'In Progress') {
+            inProgress = Number(value || 0);
+          } else if (normalizedKey === 'Completed Conversation') {
+            completed = Number(value || 0);
+          } else if (normalizedKey === 'Unsuccessful') {
+            unsuccessfulCount = Number(value || 0);
+          }
+        }
+        
+        // Debug: Log the map to see what outcomes we're getting
+        const totalFromOutcome = agg.reduce((sum, r) => sum + Number(r.count || 0), 0);
+        logger.info(`Stats aggregation results (with filters) for agent ${agentId}:`, { 
+          map, 
+          nullOutcomeCount, 
+          totalFromOutcome,
+          baseMatchKeys: Object.keys(baseMatch),
+          dateFilter: baseMatch.$or ? 'present ($or)' : baseMatch.updatedAt ? 'present (updatedAt)' : 'absent',
+          calculatedCounts: { inProgress, completed, unsuccessfulCount }
+        });
         
         // For tasks without outcome field, count by status as fallback
         if (nullOutcomeCount > 0) {
@@ -802,11 +825,23 @@ router.get(
           }
         }
 
-        // Count by stored outcome field - check all possible outcome values
+        // Count by stored outcome field - iterate through map to handle any case variations
         // The outcome field should contain: 'Completed Conversation', 'In Progress', 'Unsuccessful', 'Unknown'
-        inProgress = Number(map['In Progress'] || 0);
-        completed = Number(map['Completed Conversation'] || 0);
-        unsuccessfulCount = Number(map['Unsuccessful'] || 0);
+        inProgress = 0;
+        completed = 0;
+        unsuccessfulCount = 0;
+        
+        // Check all keys in map (handle any case/whitespace variations)
+        for (const [key, value] of Object.entries(map)) {
+          const normalizedKey = String(key || '').trim();
+          if (normalizedKey === 'In Progress') {
+            inProgress = Number(value || 0);
+          } else if (normalizedKey === 'Completed Conversation') {
+            completed = Number(value || 0);
+          } else if (normalizedKey === 'Unsuccessful') {
+            unsuccessfulCount = Number(value || 0);
+          }
+        }
         
         // Debug: Log the map to see what outcomes we're getting
         const totalFromOutcome = outcomeCounts.reduce((sum, r) => sum + Number(r.count || 0), 0);
@@ -815,7 +850,8 @@ router.get(
           nullOutcomeCount, 
           totalFromOutcome,
           baseMatchKeys: Object.keys(baseMatch),
-          dateFilter: baseMatch.updatedAt ? 'present' : 'absent'
+          dateFilter: baseMatch.$or ? 'present ($or)' : baseMatch.updatedAt ? 'present (updatedAt)' : 'absent',
+          calculatedCounts: { inProgress, completed, unsuccessfulCount }
         });
         
         // For tasks without outcome field, count by status as fallback
