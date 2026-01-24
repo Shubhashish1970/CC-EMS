@@ -979,20 +979,33 @@ router.get(
         if (taskIds.length > 0) {
           const tasks = await CallTask.find({ _id: { $in: taskIds } }).lean();
           
+          const outcomeBreakdown: Record<string, number> = {};
+          const statusBreakdown: Record<string, number> = {};
+          
           for (const task of tasks) {
             const outcome = task.outcome ? String(task.outcome).trim() : null;
+            const status = String(task.status || '').trim();
+            
+            // Track what we're seeing
+            const outcomeKey = outcome || 'NULL';
+            outcomeBreakdown[outcomeKey] = (outcomeBreakdown[outcomeKey] || 0) + 1;
+            statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+            
+            // Count by outcome (case-insensitive matching for robustness)
             if (outcome) {
-              // Task has outcome field - count by outcome
-              if (outcome === 'In Progress') {
+              const normalizedOutcome = outcome.toLowerCase();
+              if (normalizedOutcome === 'in progress') {
                 inProgress++;
-              } else if (outcome === 'Completed Conversation') {
+              } else if (normalizedOutcome === 'completed conversation') {
                 completed++;
-              } else if (outcome === 'Unsuccessful') {
+              } else if (normalizedOutcome === 'unsuccessful') {
                 unsuccessfulCount++;
+              } else {
+                // Unknown outcome value - log it
+                logger.warn(`Unknown outcome value: "${outcome}" for task ${task._id}`);
               }
             } else {
               // Task doesn't have outcome - use status as fallback
-              const status = String(task.status || '').trim();
               if (status === 'in_progress') {
                 inProgress++;
               } else if (status === 'completed') {
@@ -1007,6 +1020,8 @@ router.get(
             totalTaskIds: taskIds.length,
             totalTasksFetched: tasks.length,
             calculatedCounts: { inProgress, completed, unsuccessfulCount },
+            outcomeBreakdown,
+            statusBreakdown,
             filters: { search: normalizedSearch, territory: normTerritory, activityType: normType }
           });
         }
@@ -1017,21 +1032,33 @@ router.get(
         
         // Count outcomes from the actual task documents (same as what history endpoint sees)
         // Process all tasks and count by outcome, with fallback to status for null outcomes
+        const outcomeBreakdown: Record<string, number> = {};
+        const statusBreakdown: Record<string, number> = {};
+        
         for (const task of tasks) {
           const outcome = task.outcome ? String(task.outcome).trim() : null;
+          const status = String(task.status || '').trim();
+          
+          // Track what we're seeing
+          const outcomeKey = outcome || 'NULL';
+          outcomeBreakdown[outcomeKey] = (outcomeBreakdown[outcomeKey] || 0) + 1;
+          statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+          
+          // Count by outcome (case-insensitive matching for robustness)
           if (outcome) {
-            // Task has outcome field - count by outcome
-            const normalizedOutcome = outcome;
-            if (normalizedOutcome === 'In Progress') {
+            const normalizedOutcome = outcome.toLowerCase();
+            if (normalizedOutcome === 'in progress') {
               inProgress++;
-            } else if (normalizedOutcome === 'Completed Conversation') {
+            } else if (normalizedOutcome === 'completed conversation') {
               completed++;
-            } else if (normalizedOutcome === 'Unsuccessful') {
+            } else if (normalizedOutcome === 'unsuccessful') {
               unsuccessfulCount++;
+            } else {
+              // Unknown outcome value - log it
+              logger.warn(`Unknown outcome value: "${outcome}" for task ${task._id}`);
             }
           } else {
             // Task doesn't have outcome - use status as fallback
-            const status = String(task.status || '').trim();
             if (status === 'in_progress') {
               inProgress++;
             } else if (status === 'completed') {
@@ -1042,23 +1069,14 @@ router.get(
           }
         }
         
-        // Debug logging
-        const outcomeBreakdown: Record<string, number> = {};
-        const statusBreakdown: Record<string, number> = {};
-        for (const task of tasks) {
-          const outcome = task.outcome ? String(task.outcome).trim() : 'NULL';
-          outcomeBreakdown[outcome] = (outcomeBreakdown[outcome] || 0) + 1;
-          const status = String(task.status || '').trim();
-          statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
-        }
-        
         logger.info(`Stats calculation (no filters) for agent ${agentId}:`, {
           totalTasksFound: tasks.length,
           calculatedCounts: { inProgress, completed, unsuccessfulCount },
           outcomeBreakdown,
           statusBreakdown,
-          baseMatch: JSON.stringify(baseMatch),
-          sampleTaskOutcomes: tasks.slice(0, 10).map(t => ({ 
+          baseMatchKeys: Object.keys(baseMatch),
+          baseMatchHasDateFilter: !!(baseMatch.$or || baseMatch.updatedAt),
+          sampleTaskData: tasks.slice(0, 5).map(t => ({ 
             id: t._id, 
             outcome: t.outcome, 
             status: t.status,
