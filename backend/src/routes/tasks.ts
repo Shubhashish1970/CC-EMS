@@ -1294,7 +1294,13 @@ router.get(
           invalid: invalidCount,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
+      logger.error(`Error in /own/history/stats endpoint for agent ${(req as AuthRequest).user._id}:`, {
+        error: error?.message,
+        stack: error?.stack,
+        query: req.query,
+        errorName: error?.name,
+      });
       next(error);
     }
   }
