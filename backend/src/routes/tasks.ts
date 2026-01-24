@@ -1414,8 +1414,15 @@ router.get(
         agentId: (req as AuthRequest).user?._id?.toString() || 'unknown',
       };
       // Use both logger and console.error to ensure we capture the error
-      console.error(`[STATS ERROR] Error in /own/history/stats endpoint:`, errorDetails);
-      logger.error(`Error in /own/history/stats endpoint:`, errorDetails);
+      // Serialize errorDetails to avoid [object Object] in logs
+      const errorString = JSON.stringify(errorDetails, null, 2);
+      console.error(`[STATS ERROR] Error in /own/history/stats endpoint:\n${errorString}`);
+      logger.error(`Error in /own/history/stats endpoint: ${errorDetails.message}`, {
+        errorName: errorDetails.name,
+        errorStack: errorDetails.stack,
+        query: errorDetails.query,
+        agentId: errorDetails.agentId,
+      });
       next(error);
     }
   }
