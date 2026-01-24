@@ -1348,71 +1348,71 @@ const ActivitySamplingView: React.FC = () => {
                               {item.farmers.map((farmer) => (
                                 <div
                                   key={farmer.farmerId}
-                                  className={`p-3 rounded-xl border-2 transition-all ${
+                                  className={`p-2 rounded-lg border transition-all ${
                                     farmer.isSampled
                                       ? 'bg-green-50 border-green-200'
                                       : 'bg-slate-50 border-slate-200'
                                   }`}
                                 >
-                                  <div className="flex items-start gap-3">
+                                  <div className="flex items-start gap-2">
                                     {/* Farmer Avatar */}
                                     <div className="flex-shrink-0">
                                       {farmer.photoUrl ? (
                                         <img
                                           src={farmer.photoUrl}
                                           alt={farmer.name}
-                                          className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
+                                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
                                           onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             target.src = '/images/farmer-default-logo.png';
                                           }}
                                         />
                                       ) : (
-                                        <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${
                                           farmer.isSampled
                                             ? 'bg-green-100 border-green-300'
                                             : 'bg-slate-100 border-slate-300'
                                         }`}>
-                                          <UserIcon size={20} className={farmer.isSampled ? 'text-green-700' : 'text-slate-400'} />
+                                          <UserIcon size={14} className={farmer.isSampled ? 'text-green-700' : 'text-slate-400'} />
                                         </div>
                                       )}
                                     </div>
 
                                     {/* Farmer Info */}
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <p className="text-sm font-black text-slate-900 truncate">{farmer.name}</p>
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        <p className="text-xs font-black text-slate-900 truncate">{farmer.name}</p>
                                         {farmer.isSampled ? (
-                                          <CheckCircle2 size={14} className="text-green-600 flex-shrink-0" />
+                                          <CheckCircle2 size={12} className="text-green-600 flex-shrink-0" />
                                         ) : (
-                                          <XCircle size={14} className="text-slate-400 flex-shrink-0" />
+                                          <XCircle size={12} className="text-slate-400 flex-shrink-0" />
                                         )}
                                       </div>
-                                      <div className="space-y-1 text-xs text-slate-600">
-                                        <div className="flex items-center gap-1.5">
-                                          <Phone size={12} />
-                                          <span className="font-medium">{farmer.mobileNumber}</span>
+                                      <div className="space-y-0.5 text-[10px] text-slate-600">
+                                        <div className="flex items-center gap-1">
+                                          <Phone size={10} />
+                                          <span className="font-medium truncate">{farmer.mobileNumber}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <MapPin size={12} />
+                                        <div className="flex items-center gap-1">
+                                          <MapPin size={10} />
                                           <span className="truncate">{farmer.location}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="font-medium">Language:</span>
-                                          <span>{farmer.preferredLanguage}</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">Lang:</span>
+                                          <span className="truncate">{farmer.preferredLanguage}</span>
                                         </div>
                                       </div>
 
                                       {/* Sampling Status Badge */}
                                       {farmer.isSampled && farmer.taskStatus && (
-                                        <div className="mt-2 pt-2 border-t border-green-200">
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-xs text-green-700 font-medium">Assigned to:</span>
-                                            <span className="text-xs font-bold text-green-800">{farmer.assignedAgentName || 'Unknown'}</span>
+                                        <div className="mt-1.5 pt-1.5 border-t border-green-200">
+                                          <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] text-green-700 font-medium">Agent:</span>
+                                            <span className="text-[10px] font-bold text-green-800 truncate ml-1">{farmer.assignedAgentName || 'Unknown'}</span>
                                           </div>
-                                          <div className="flex items-center justify-between mt-1">
-                                            <span className="text-xs text-green-700 font-medium">Status:</span>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-green-700 font-medium">Status:</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                               farmer.taskStatus === 'sampled_in_queue' ? 'bg-yellow-100 text-yellow-700' :
                                               farmer.taskStatus === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                                               farmer.taskStatus === 'completed' ? 'bg-green-100 text-green-700' :
