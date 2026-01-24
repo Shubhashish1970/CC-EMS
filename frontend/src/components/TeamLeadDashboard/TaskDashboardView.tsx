@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, Loader2 } from 'lucide-react';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
+import ConfirmationModal from '../shared/ConfirmationModal';
+import Button from '../shared/Button';
 
 type DateRangePreset =
   | 'Custom'
@@ -37,6 +39,8 @@ const TaskDashboardView: React.FC = () => {
   const [allocLanguage, setAllocLanguage] = useState<string>('ALL');
   const [allocCount, setAllocCount] = useState<number>(0);
   const [isAllocConfirmOpen, setIsAllocConfirmOpen] = useState(false);
+  const [reallocateAgent, setReallocateAgent] = useState<{ agentId: string; name: string; sampledInQueue: number } | null>(null);
+  const [isReallocating, setIsReallocating] = useState(false);
 
   // Date range dropdown (same UX as Sampling Dashboard)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -309,6 +313,41 @@ const TaskDashboardView: React.FC = () => {
     }
   };
 
+  const handleReallocate = async () => {
+    if (!reallocateAgent) return;
+
+    setIsReallocating(true);
+    try {
+      // Optimistic: show allocation progress immediately
+      setAllocRun({
+        _id: 'optimistic',
+        status: 'running',
+        total: reallocateAgent.sampledInQueue,
+        processed: 0,
+        allocated: 0,
+        skipped: 0,
+        lastProgressAt: new Date().toISOString(),
+      });
+
+      const result: any = await tasksAPI.reallocate(reallocateAgent.agentId);
+      toast.showSuccess(
+        `Reallocated ${result.data?.reallocated || 0} task(s) from ${reallocateAgent.name} to other agents`
+      );
+      setReallocateAgent(null);
+      await Promise.all([loadDashboard(), loadLatestAllocationStatus()]);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to reallocate tasks';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('timed out')) {
+        toast.showSuccess('Reallocation is still running. Keeping this screen active and checking status...');
+        await loadLatestAllocationStatus().catch(() => undefined);
+      } else {
+        toast.showError(msg);
+      }
+    } finally {
+      setIsReallocating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Modal
@@ -361,6 +400,18 @@ const TaskDashboardView: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <ConfirmationModal
+        isOpen={reallocateAgent !== null}
+        onClose={() => setReallocateAgent(null)}
+        onConfirm={handleReallocate}
+        title="Reallocate Tasks"
+        message={`Reallocate ${reallocateAgent?.sampledInQueue || 0} sampled-in-queue task(s) from ${reallocateAgent?.name || ''} to other agents? Tasks will be redistributed based on farmer language and agent language capabilities using round-robin.`}
+        confirmText="Reallocate"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        isLoading={isReallocating}
+      />
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
@@ -702,6 +753,7 @@ const TaskDashboardView: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
                 <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -720,11 +772,24 @@ const TaskDashboardView: React.FC = () => {
                   <td className="px-4 py-3 font-black text-slate-900">
                     {Number(a.sampledInQueue || 0) + Number(a.inProgress || 0)}
                   </td>
+                  <td className="px-4 py-3">
+                    {Number(a.sampledInQueue || 0) > 0 ? (
+                      <button
+                        onClick={() => setReallocateAgent({ agentId: a.agentId, name: a.name, sampledInQueue: a.sampledInQueue })}
+                        disabled={isReallocating || isAllocRunning}
+                        className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Reallocate
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {!agentRows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={6}>
+                  <td className="px-4 py-6 text-slate-600" colSpan={7}>
                     No agents found for this Team Lead.
                   </td>
                 </tr>

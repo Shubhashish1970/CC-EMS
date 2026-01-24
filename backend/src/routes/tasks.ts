@@ -2085,6 +2085,283 @@ router.post(
   }
 );
 
+// @route   POST /api/tasks/reallocate
+// @desc    Reallocate sampled-in-queue tasks from one agent to other agents (round-robin by language)
+// @access  Private (Team Lead, MIS Admin)
+router.post(
+  '/reallocate',
+  requirePermission('tasks.reassign'),
+  [
+    body('agentId').isString().notEmpty().withMessage('Agent ID is required'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const authUserId = authReq.user._id.toString();
+      const { agentId } = req.body;
+
+      const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
+
+      // Verify the agent belongs to this team lead
+      const sourceAgent = await User.findOne({
+        _id: new mongoose.Types.ObjectId(agentId),
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+      }).lean();
+
+      if (!sourceAgent) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agent not found or not under your team' },
+        });
+      }
+
+      // Find all active agents under this team lead (excluding the source agent)
+      const teamAgents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+        _id: { $ne: new mongoose.Types.ObjectId(agentId) }, // Exclude source agent
+      })
+        .select('_id name email languageCapabilities')
+        .sort({ name: 1 })
+        .lean();
+
+      if (!teamAgents.length) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No other active agents available for reallocation' },
+        });
+      }
+
+      // Build agents by language map
+      const agentsByLanguage = new Map<string, any[]>();
+      for (const a of teamAgents as any[]) {
+        const caps: string[] = Array.isArray(a.languageCapabilities) ? a.languageCapabilities : [];
+        for (const cap of caps) {
+          const key = normalize(cap);
+          if (!key) continue;
+          const list = agentsByLanguage.get(key) || [];
+          list.push(a);
+          agentsByLanguage.set(key, list);
+        }
+      }
+
+      // Find all sampled-in-queue tasks assigned to the source agent
+      const tasksToReallocate = await CallTask.aggregate([
+        {
+          $match: {
+            assignedAgentId: new mongoose.Types.ObjectId(agentId),
+            status: 'sampled_in_queue',
+          },
+        },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: '$farmer' },
+        {
+          $project: {
+            _id: 1,
+            farmerLanguage: '$farmer.preferredLanguage',
+          },
+        },
+      ]);
+
+      if (!tasksToReallocate.length) {
+        return res.json({
+          success: true,
+          message: 'No tasks to reallocate',
+          data: { reallocated: 0 },
+        });
+      }
+
+      // Create allocation run tracker
+      const runDoc = await AllocationRun.create({
+        createdByUserId: authUserId ? new mongoose.Types.ObjectId(authUserId) : null,
+        status: 'running',
+        startedAt: new Date(),
+        filters: {
+          reallocateFromAgentId: agentId,
+          reallocateFromAgentName: (sourceAgent as any).name,
+        },
+        total: tasksToReallocate.length,
+        processed: 0,
+        allocated: 0,
+        skipped: 0,
+        skippedByLanguage: {},
+        errorCount: 0,
+        errorMessages: [],
+        lastProgressAt: new Date(),
+      });
+
+      // Round-robin assignment across capable agents (same logic as allocation)
+      const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
+      const languageAgentCursor = new Map<string, number>();
+      const skippedByLanguage: Record<string, number> = {};
+      const errorMessages: string[] = [];
+      let processed = 0;
+      let reallocated = 0;
+      let skipped = 0;
+
+      const BATCH_SIZE = 200;
+      let batchOps: any[] = [];
+
+      const flushBatch = async () => {
+        if (!batchOps.length) return;
+        try {
+          const r = await CallTask.bulkWrite(batchOps as any, { ordered: false });
+          reallocated += r.modifiedCount || 0;
+        } catch (e: any) {
+          errorMessages.push(e?.message || 'Bulk write failed');
+        } finally {
+          batchOps = [];
+        }
+      };
+
+      for (let idx = 0; idx < tasksToReallocate.length; idx++) {
+        const t = tasksToReallocate[idx];
+        const taskId = t._id;
+        const farmerLangKey = normalize(t.farmerLanguage) || 'unknown';
+
+        const langAgents = agentsByLanguage.get(farmerLangKey) || [];
+        if (!langAgents.length) {
+          skippedByLanguage[farmerLangKey] = (skippedByLanguage[farmerLangKey] || 0) + 1;
+          skipped++;
+          processed++;
+          if (processed % 50 === 0) {
+            await AllocationRun.updateOne(
+              { _id: runDoc._id },
+              {
+                $set: {
+                  processed,
+                  allocated: reallocated,
+                  skipped,
+                  skippedByLanguage,
+                  errorCount: errorMessages.length,
+                  errorMessages: errorMessages.slice(-50),
+                  lastProgressAt: new Date(),
+                },
+              }
+            );
+          }
+          continue;
+        }
+
+        const cursor = languageAgentCursor.get(farmerLangKey) || 0;
+        const agent = langAgents[cursor % langAgents.length];
+        languageAgentCursor.set(farmerLangKey, cursor + 1);
+
+        batchOps.push({
+          updateOne: {
+            filter: { _id: taskId, assignedAgentId: new mongoose.Types.ObjectId(agentId), status: STATUS_QUEUED },
+            update: {
+              $set: {
+                assignedAgentId: agent._id,
+              },
+              $push: {
+                interactionHistory: {
+                  timestamp: new Date(),
+                  status: STATUS_QUEUED,
+                  notes: `Reallocated from ${(sourceAgent as any).name} (${(sourceAgent as any).email}) to ${agent.name} (${agent.email}) by Team Lead`,
+                },
+              },
+            },
+          },
+        });
+        processed++;
+
+        if (batchOps.length >= BATCH_SIZE) {
+          await flushBatch();
+        }
+
+        if (processed % 50 === 0) {
+          await AllocationRun.updateOne(
+            { _id: runDoc._id },
+            {
+              $set: {
+                processed,
+                allocated: reallocated,
+                skipped,
+                skippedByLanguage,
+                errorCount: errorMessages.length,
+                errorMessages: errorMessages.slice(-50),
+                lastProgressAt: new Date(),
+              },
+            }
+          );
+        }
+      }
+
+      await flushBatch();
+
+      await AllocationRun.updateOne(
+        { _id: runDoc._id },
+        {
+          $set: {
+            status: 'completed',
+            finishedAt: new Date(),
+            processed,
+            allocated: reallocated,
+            skipped,
+            skippedByLanguage,
+            errorCount: errorMessages.length,
+            errorMessages: errorMessages.slice(-50),
+            lastProgressAt: new Date(),
+          },
+        }
+      );
+
+      res.json({
+        success: true,
+        message: 'Tasks reallocated successfully',
+        data: {
+          runId: runDoc._id.toString(),
+          reallocated,
+          skipped,
+          skippedByLanguage,
+          totalTasks: tasksToReallocate.length,
+        },
+      });
+    } catch (error) {
+      try {
+        const authReq = req as AuthRequest;
+        if (authReq?.user?._id) {
+          await AllocationRun.create({
+            createdByUserId: authReq.user._id,
+            status: 'failed',
+            startedAt: new Date(),
+            finishedAt: new Date(),
+            total: 0,
+            processed: 0,
+            allocated: 0,
+            skipped: 0,
+            errorCount: 1,
+            errorMessages: [error instanceof Error ? error.message : 'Unknown error'],
+          });
+        }
+      } catch {
+        // ignore
+      }
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/tasks/allocate-status/latest
 // @desc    Latest allocation run status for current user (for UI polling)
 // @access  Private (Team Lead, MIS Admin)

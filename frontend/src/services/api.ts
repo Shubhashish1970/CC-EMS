@@ -376,6 +376,18 @@ export const tasksAPI = {
       300000
     );
   },
+  reallocate: async (agentId: string) => {
+    // Reallocation can update many tasks; allow longer timeout
+    return apiRequest(
+      '/tasks/reallocate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ agentId }),
+      },
+      undefined,
+      300000
+    );
+  },
   getLatestAllocationStatus: async () => {
     return apiRequest('/tasks/allocate-status/latest');
   },
