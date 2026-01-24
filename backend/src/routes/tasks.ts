@@ -1158,6 +1158,20 @@ router.get(
           }
         }
         
+        // Helper to safely stringify baseMatch (handle Date objects)
+        const safeStringify = (obj: any): string => {
+          try {
+            return JSON.stringify(obj, (key, value) => {
+              if (value instanceof Date) {
+                return value.toISOString();
+              }
+              return value;
+            });
+          } catch (e) {
+            return String(obj);
+          }
+        };
+        
         logger.info(`Stats calculation (no filters) for agent ${agentId}:`, {
           totalTasksFound: tasks.length,
           calculatedCounts: { inProgress, completed, unsuccessfulCount },
@@ -1166,14 +1180,14 @@ router.get(
           statusBreakdown,
           baseMatchKeys: Object.keys(baseMatch),
           baseMatchHasDateFilter: !!(baseMatch.$or || baseMatch.updatedAt),
-          baseMatchString: JSON.stringify(baseMatch),
+          baseMatchString: safeStringify(baseMatch),
           sampleTaskData: tasks.slice(0, 10).map(t => ({ 
-            id: t._id, 
+            id: t._id?.toString(), 
             outcome: t.outcome, 
             status: t.status,
             effectiveOutcome: getEffectiveOutcome(t),
-            updatedAt: t.updatedAt,
-            callStartedAt: t.callStartedAt
+            updatedAt: t.updatedAt?.toISOString(),
+            callStartedAt: t.callStartedAt?.toISOString()
           }))
         });
       }
@@ -1295,12 +1309,14 @@ router.get(
         },
       });
     } catch (error: any) {
-      logger.error(`Error in /own/history/stats endpoint for agent ${(req as AuthRequest).user._id}:`, {
-        error: error?.message,
-        stack: error?.stack,
+      const errorDetails = {
+        message: error?.message || String(error),
+        name: error?.name || 'UnknownError',
+        stack: error?.stack || 'No stack trace',
         query: req.query,
-        errorName: error?.name,
-      });
+        agentId: (req as AuthRequest).user?._id?.toString() || 'unknown',
+      };
+      logger.error(`Error in /own/history/stats endpoint:`, errorDetails);
       next(error);
     }
   }
