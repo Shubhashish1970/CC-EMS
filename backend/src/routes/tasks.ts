@@ -622,29 +622,22 @@ router.get(
       };
       if (status) baseMatch.status = String(status) as TaskStatus;
 
+      // Date filter: use updatedAt to show all tasks updated in the date range
+      // This must match the history endpoint logic exactly
       if (dateFrom || dateTo) {
         // dateFrom and dateTo are already Date objects from validation middleware (.toDate())
-        // Create copies to avoid mutating the original objects
-        let fromDate: Date | null = null;
-        let toDate: Date | null = null;
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
         
-        if (dateFrom instanceof Date && !isNaN(dateFrom.getTime())) {
-          fromDate = new Date(dateFrom);
-          fromDate.setHours(0, 0, 0, 0);
-        }
-        
-        if (dateTo instanceof Date && !isNaN(dateTo.getTime())) {
-          toDate = new Date(dateTo);
-          toDate.setHours(23, 59, 59, 999);
-        }
-        
-        // Use updatedAt to show all tasks updated in the date range
-        if (fromDate && toDate) {
-          baseMatch.updatedAt = { $gte: fromDate, $lte: toDate };
-        } else if (fromDate) {
-          baseMatch.updatedAt = { $gte: fromDate };
-        } else if (toDate) {
-          baseMatch.updatedAt = { $lte: toDate };
+        // Use updatedAt to show all tasks updated in the date range (same as history endpoint)
+        if (from && to) {
+          baseMatch.updatedAt = { $gte: from, $lte: to };
+        } else if (from) {
+          baseMatch.updatedAt = { $gte: from };
+        } else if (to) {
+          baseMatch.updatedAt = { $lte: to };
         }
       }
 
@@ -743,6 +736,7 @@ router.get(
         }
       } else {
         // Use aggregation to count by outcome field (stored in database) instead of status
+        // This is the simple path when there are no search/activity filters
         const outcomeCounts = await CallTask.aggregate([
           { $match: baseMatch },
           // Handle null/undefined outcomes by grouping them separately
@@ -762,10 +756,19 @@ router.get(
           }
         }
 
-        // Count by stored outcome field
+        // Count by stored outcome field - check all possible outcome values
+        // The outcome field should contain: 'Completed Conversation', 'In Progress', 'Unsuccessful', 'Unknown'
         inProgress = Number(map['In Progress'] || 0);
         completed = Number(map['Completed Conversation'] || 0);
         unsuccessfulCount = Number(map['Unsuccessful'] || 0);
+        
+        // Debug: Log the map to see what outcomes we're getting
+        logger.info(`Stats aggregation results for agent ${agentId}:`, { 
+          map, 
+          nullOutcomeCount, 
+          baseMatch: JSON.stringify(baseMatch),
+          totalTasksInMatch: outcomeCounts.reduce((sum, r) => sum + Number(r.count || 0), 0)
+        });
         
         // For tasks without outcome field, count by status as fallback
         if (nullOutcomeCount > 0) {
