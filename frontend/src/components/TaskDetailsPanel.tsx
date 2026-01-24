@@ -179,28 +179,29 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
             </div>
           </div>
 
-          {/* Call Information - Show if callLog exists (completed tasks) */}
+          {/* Call Information - Show ALL fields for completed tasks */}
           {taskData.callLog && (
             <>
-              {/* Call Status & Duration */}
+              {/* Call Status & Duration - Always show */}
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
                   Call Information
                 </label>
                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
-                  {taskData.callLog.callStatus && (
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
-                        taskData.callLog.callStatus === 'Connected'
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'bg-slate-200 text-slate-700 border border-slate-300'
-                      }`}>
-                        {taskData.callLog.callStatus}
-                      </span>
-                    </div>
-                  )}
+                  {/* Outbound Status - Always show */}
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">1. Outbound Status</p>
+                    <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
+                      taskData.callLog.callStatus === 'Connected'
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : 'bg-slate-200 text-slate-700 border border-slate-300'
+                    }`}>
+                      {taskData.callLog.callStatus || '-'}
+                    </span>
+                  </div>
+                  
                   {taskData.callStartedAt && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-2 border-t border-slate-200">
                       <Clock size={12} className="text-slate-400" />
                       <span className="font-medium">
                         Started: {new Date(taskData.callStartedAt).toLocaleString('en-US', {
@@ -222,32 +223,43 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                       </span>
                     </div>
                   )}
-                  {taskData.callLog.didAttend && (
+                  
+                  {/* Meeting Attendance - Always show if call was Connected */}
+                  {taskData.callLog.callStatus === 'Connected' && (
                     <div className="pt-2 border-t border-slate-200">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Meeting Attendance</p>
-                      <p className="text-xs font-bold text-slate-800">{taskData.callLog.didAttend}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">2. Meeting Attendance</p>
+                      <p className="text-xs font-bold text-slate-800">{taskData.callLog.didAttend || '-'}</p>
                     </div>
                   )}
-                  {taskData.callLog.didRecall !== null && taskData.callLog.didRecall !== undefined && (
+                  
+                  {/* Recall Content - Always show if call was Connected and didAttend was answered */}
+                  {taskData.callLog.callStatus === 'Connected' && taskData.callLog.didAttend && 
+                   (taskData.callLog.didAttend === 'Yes, I attended' || taskData.callLog.didAttend === "Don't recall") && (
                     <div className="pt-2 border-t border-slate-200">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Recall Content</p>
-                      <p className="text-xs font-bold text-slate-800">{taskData.callLog.didRecall ? 'Yes' : 'No'}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">3. Do they recall the content?</p>
+                      <p className="text-xs font-bold text-slate-800">
+                        {taskData.callLog.didRecall !== null && taskData.callLog.didRecall !== undefined 
+                          ? (taskData.callLog.didRecall ? 'Yes' : 'No')
+                          : '-'}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Crops & Products Discussed */}
-              {(taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0) || 
-               (taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0) ? (
+              {/* Products & Crops Discussed - Always show if recall was answered (Yes) */}
+              {taskData.callLog.callStatus === 'Connected' && 
+               taskData.callLog.didAttend && 
+               (taskData.callLog.didAttend === 'Yes, I attended' || taskData.callLog.didAttend === "Don't recall") &&
+               taskData.callLog.didRecall === true && (
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
-                    Products & Crops Discussed
+                    4. Products & Crops Discussed
                   </label>
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
-                    {taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Crops Identified</p>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Crops Identified</p>
+                      {taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {taskData.callLog.cropsDiscussed.map((crop, idx) => (
                             <span
@@ -258,11 +270,13 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                             </span>
                           ))}
                         </div>
-                      </div>
-                    )}
-                    {taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">NACL Products Recalled</p>
+                      ) : (
+                        <p className="text-xs text-slate-500">-</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">NACL Products Recalled</p>
+                      {taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {taskData.callLog.productsDiscussed.map((product, idx) => (
                             <span
@@ -273,102 +287,124 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                             </span>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-slate-500">-</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {/* Commercial Conversion */}
-              {taskData.callLog.hasPurchased !== null && taskData.callLog.hasPurchased !== undefined && (
+              {/* Commercial Conversion - Always show if crops/products were discussed */}
+              {taskData.callLog.callStatus === 'Connected' && 
+               taskData.callLog.didRecall === true &&
+               ((taskData.callLog.cropsDiscussed && taskData.callLog.cropsDiscussed.length > 0) || 
+                (taskData.callLog.productsDiscussed && taskData.callLog.productsDiscussed.length > 0)) && (
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
-                    Commercial Conversion
+                    5. Commercial Conversion
                   </label>
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Have they purchased?</p>
-                      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
-                        taskData.callLog.hasPurchased
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'bg-red-100 text-red-700 border border-red-200'
-                      }`}>
-                        {taskData.callLog.hasPurchased ? 'Yes' : 'No'}
-                      </span>
-                    </div>
-                    {taskData.callLog.hasPurchased && taskData.callLog.purchasedProducts && taskData.callLog.purchasedProducts.length > 0 && (
-                      <div className="pt-2 border-t border-slate-200">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Purchased Products</p>
-                        <div className="space-y-2">
-                          {taskData.callLog.purchasedProducts.map((item, idx) => (
-                            <div key={idx} className="text-xs text-slate-700">
-                              <span className="font-bold">{item.product}</span>
-                              {item.quantity && (
-                                <>
-                                  <span className="text-slate-400 mx-1">•</span>
-                                  <span>{item.quantity} {item.unit}</span>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {!taskData.callLog.hasPurchased && taskData.callLog.willingToPurchase !== null && taskData.callLog.willingToPurchase !== undefined && (
-                      <div className="pt-2 border-t border-slate-200">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Likely to buy in future?</p>
+                      {taskData.callLog.hasPurchased !== null && taskData.callLog.hasPurchased !== undefined ? (
                         <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
-                          taskData.callLog.willingToPurchase
+                          taskData.callLog.hasPurchased
                             ? 'bg-green-100 text-green-700 border border-green-200'
                             : 'bg-red-100 text-red-700 border border-red-200'
                         }`}>
-                          {taskData.callLog.willingToPurchase ? 'Yes' : 'No'}
+                          {taskData.callLog.hasPurchased ? 'Yes' : 'No'}
                         </span>
-                        {taskData.callLog.willingToPurchase && taskData.callLog.likelyPurchaseDate && (
-                          <p className="text-xs text-slate-600 mt-2">
-                            Likely Date: {new Date(taskData.callLog.likelyPurchaseDate).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </p>
+                      ) : (
+                        <p className="text-xs text-slate-500">-</p>
+                      )}
+                    </div>
+                    {taskData.callLog.hasPurchased === true && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Purchased Products</p>
+                        {taskData.callLog.purchasedProducts && taskData.callLog.purchasedProducts.length > 0 ? (
+                          <div className="space-y-2">
+                            {taskData.callLog.purchasedProducts.map((item, idx) => (
+                              <div key={idx} className="text-xs text-slate-700">
+                                <span className="font-bold">{item.product}</span>
+                                {item.quantity && (
+                                  <>
+                                    <span className="text-slate-400 mx-1">•</span>
+                                    <span>{item.quantity} {item.unit}</span>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">-</p>
                         )}
                       </div>
                     )}
-                    {taskData.callLog.nonPurchaseReason && (
-                      <div className="pt-2 border-t border-slate-200">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Reason for non-purchase</p>
-                        <p className="text-xs font-bold text-slate-800">{taskData.callLog.nonPurchaseReason}</p>
-                      </div>
+                    {taskData.callLog.hasPurchased === false && (
+                      <>
+                        {taskData.callLog.willingToPurchase !== null && taskData.callLog.willingToPurchase !== undefined && (
+                          <div className="pt-2 border-t border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Likely to buy in future?</p>
+                            <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block ${
+                              taskData.callLog.willingToPurchase
+                                ? 'bg-green-100 text-green-700 border border-green-200'
+                                : 'bg-red-100 text-red-700 border border-red-200'
+                            }`}>
+                              {taskData.callLog.willingToPurchase ? 'Yes' : 'No'}
+                            </span>
+                            {taskData.callLog.willingToPurchase === true && taskData.callLog.likelyPurchaseDate && (
+                              <p className="text-xs text-slate-600 mt-2">
+                                Likely Date: {new Date(taskData.callLog.likelyPurchaseDate).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {taskData.callLog.nonPurchaseReason && (
+                          <div className="pt-2 border-t border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Reason for non-purchase</p>
+                            <p className="text-xs font-bold text-slate-800">{taskData.callLog.nonPurchaseReason}</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Farmer Comments & Sentiment */}
-              {(taskData.callLog.farmerComments || (taskData.callLog.sentiment && taskData.callLog.sentiment !== 'N/A')) && (
+              {/* Farmer Comments & Sentiment - Always show if callLog exists */}
+              {taskData.callLog && (
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">
-                    Farmer Feedback
+                    6. Farmer Feedback
                   </label>
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4">
-                    {taskData.callLog.farmerComments && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare size={14} className="text-slate-400" />
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Comments</p>
-                        </div>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap">{taskData.callLog.farmerComments}</p>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare size={14} className="text-slate-400" />
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">Comments</p>
                       </div>
-                    )}
-                    {taskData.callLog.sentiment && taskData.callLog.sentiment !== 'N/A' && (
-                      <div className={taskData.callLog.farmerComments ? 'pt-2 border-t border-slate-200' : ''}>
-                        <div className="flex items-center gap-2">
-                          {taskData.callLog.sentiment === 'Positive' && <TrendingUp size={14} className="text-green-600" />}
-                          {taskData.callLog.sentiment === 'Negative' && <TrendingDown size={14} className="text-red-600" />}
-                          {taskData.callLog.sentiment === 'Neutral' && <Minus size={14} className="text-slate-600" />}
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Sentiment</p>
-                        </div>
+                      {taskData.callLog.farmerComments ? (
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap">{taskData.callLog.farmerComments}</p>
+                      ) : (
+                        <p className="text-xs text-slate-500">-</p>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {taskData.callLog.sentiment === 'Positive' && <TrendingUp size={14} className="text-green-600" />}
+                        {taskData.callLog.sentiment === 'Negative' && <TrendingDown size={14} className="text-red-600" />}
+                        {taskData.callLog.sentiment === 'Neutral' && <Minus size={14} className="text-slate-600" />}
+                        {!taskData.callLog.sentiment || taskData.callLog.sentiment === 'N/A' ? (
+                          <Minus size={14} className="text-slate-400" />
+                        ) : null}
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">Sentiment</p>
+                      </div>
+                      {taskData.callLog.sentiment && taskData.callLog.sentiment !== 'N/A' ? (
                         <span className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-block mt-2 ${
                           taskData.callLog.sentiment === 'Positive'
                             ? 'bg-green-100 text-green-700 border border-green-200'
@@ -378,8 +414,10 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                         }`}>
                           {taskData.callLog.sentiment}
                         </span>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-slate-500 mt-2">-</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
