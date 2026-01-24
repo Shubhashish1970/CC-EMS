@@ -829,7 +829,9 @@ router.get(
         inQueueCount = await CallTask.countDocuments(inQueueMatch);
       }
       
-      const total = inProgress + completed + notReachable + invalid + inQueueCount;
+      // Calculate unsuccessful: includes both not_reachable and invalid_number (both map to "Unsuccessful" outcome)
+      const unsuccessful = notReachable + invalid;
+      const total = inProgress + completed + unsuccessful + inQueueCount;
 
       res.json({
         success: true,
@@ -838,7 +840,7 @@ router.get(
           inQueue: inQueueCount,
           inProgress,
           completedConversation: completed,
-          unsuccessful: notReachable,
+          unsuccessful,
           invalid,
         },
       });
