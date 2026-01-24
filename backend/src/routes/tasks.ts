@@ -695,112 +695,93 @@ router.get(
       let invalidCount = 0;
 
       if (normalizedSearch || hasActivityFilters) {
-        // Use aggregation when we have activity filters or search (same as history endpoint)
-      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+        // Use aggregation to get tasks matching filters (same as history endpoint)
+        // Then count outcomes from the actual task documents to ensure consistency
+        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
 
-      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-      const normTerritory = String(territory || '').trim();
-      const normType = String(activityType || '').trim();
+        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+        const normTerritory = String(territory || '').trim();
+        const normType = String(activityType || '').trim();
 
-      const agg = await CallTask.aggregate([
-        { $match: baseMatch },
-        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-        ...(normTerritory
-          ? [
-              {
-                $match: {
-                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+        // Get the task IDs that match all filters (same aggregation as history endpoint)
+        const taskIdsAgg = await CallTask.aggregate([
+          { $match: baseMatch },
+          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+          ...(normTerritory
+            ? [
+                {
+                  $match: {
+                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                  },
                 },
-              },
-            ]
-          : []),
-        ...(re
-          ? [
-              {
-                $match: {
-                  $or: [
-                    { 'farmerId.name': re },
-                    { 'farmerId.mobileNumber': re },
-                    { 'farmerId.location': re },
-                    { 'farmerId.preferredLanguage': re },
-                    { 'activityId.type': re },
-                    { 'activityId.officerName': re },
-                    { 'activityId.tmName': re },
-                    { 'activityId.territoryName': re },
-                    { 'activityId.territory': re },
-                    { 'activityId.state': re },
-                    { 'activityId.activityId': re },
-                  ],
+              ]
+            : []),
+          ...(re
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { 'farmerId.name': re },
+                      { 'farmerId.mobileNumber': re },
+                      { 'farmerId.location': re },
+                      { 'farmerId.preferredLanguage': re },
+                      { 'activityId.type': re },
+                      { 'activityId.officerName': re },
+                      { 'activityId.tmName': re },
+                      { 'activityId.territoryName': re },
+                      { 'activityId.territory': re },
+                      { 'activityId.state': re },
+                      { 'activityId.activityId': re },
+                    ],
+                  },
                 },
-              },
-            ]
-          : []),
-        // Group by outcome field (stored in database) instead of status
-        // Also handle null/undefined outcomes by grouping them separately
-        { $group: { _id: { $ifNull: ['$outcome', 'NULL'] }, count: { $sum: 1 } } },
-      ]);
+              ]
+            : []),
+          { $project: { _id: 1 } }, // Only get IDs
+        ]);
 
-      const map: Record<string, number> = {};
-      let nullOutcomeCount = 0;
-        for (const r of agg) {
-          const outcomeKey = r._id === 'NULL' || r._id === null ? null : String(r._id || '').trim();
-          if (outcomeKey) {
-            map[outcomeKey] = Number(r.count || 0);
-          } else {
-            // Count tasks with null/undefined outcome for fallback
-            nullOutcomeCount += Number(r.count || 0);
-          }
-        }
+        // Extract task IDs
+        const taskIds = taskIdsAgg.map((r: any) => r._id);
 
-        // Count by stored outcome field - iterate through map to handle any case variations
-        inProgress = 0;
-        completed = 0;
-        unsuccessfulCount = 0;
-        
-        // Check all keys in map (handle any case/whitespace variations)
-        for (const [key, value] of Object.entries(map)) {
-          const normalizedKey = String(key || '').trim();
-          if (normalizedKey === 'In Progress') {
-            inProgress = Number(value || 0);
-          } else if (normalizedKey === 'Completed Conversation') {
-            completed = Number(value || 0);
-          } else if (normalizedKey === 'Unsuccessful') {
-            unsuccessfulCount = Number(value || 0);
+        // Fetch the actual tasks and count outcomes (same logic as "no filters" path)
+        if (taskIds.length > 0) {
+          const tasks = await CallTask.find({ _id: { $in: taskIds } }).lean();
+          
+          for (const task of tasks) {
+            const outcome = task.outcome ? String(task.outcome).trim() : null;
+            if (outcome) {
+              // Task has outcome field - count by outcome
+              if (outcome === 'In Progress') {
+                inProgress++;
+              } else if (outcome === 'Completed Conversation') {
+                completed++;
+              } else if (outcome === 'Unsuccessful') {
+                unsuccessfulCount++;
+              }
+            } else {
+              // Task doesn't have outcome - use status as fallback
+              const status = String(task.status || '').trim();
+              if (status === 'in_progress') {
+                inProgress++;
+              } else if (status === 'completed') {
+                completed++;
+              } else if (status === 'not_reachable' || status === 'invalid_number') {
+                unsuccessfulCount++;
+              }
+            }
           }
-        }
-        
-        // Debug: Log the map to see what outcomes we're getting
-        const totalFromOutcome = agg.reduce((sum, r) => sum + Number(r.count || 0), 0);
-        logger.info(`Stats aggregation results (with filters) for agent ${agentId}:`, { 
-          map, 
-          nullOutcomeCount, 
-          totalFromOutcome,
-          baseMatchKeys: Object.keys(baseMatch),
-          dateFilter: baseMatch.$or ? 'present ($or)' : baseMatch.updatedAt ? 'present (updatedAt)' : 'absent',
-          calculatedCounts: { inProgress, completed, unsuccessfulCount }
-        });
-        
-        // For tasks without outcome field, count by status as fallback
-        if (nullOutcomeCount > 0) {
-          const fallbackAgg = await CallTask.aggregate([
-            { $match: baseMatch },
-            { $match: { $or: [{ outcome: { $exists: false } }, { outcome: null }] } },
-            ...(normType ? [{ $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { 'activityId.type': normType } }] : []),
-            ...(normTerritory ? [{ $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }] } }] : []),
-            ...(re ? [{ $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } }, { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } }, { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { $or: [{ 'farmerId.name': re }, { 'farmerId.mobileNumber': re }, { 'farmerId.location': re }, { 'farmerId.preferredLanguage': re }, { 'activityId.type': re }, { 'activityId.officerName': re }, { 'activityId.tmName': re }, { 'activityId.territoryName': re }, { 'activityId.territory': re }, { 'activityId.state': re }, { 'activityId.activityId': re }] } }] : []),
-            { $group: { _id: '$status', count: { $sum: 1 } } },
-          ]);
-          for (const r of fallbackAgg) {
-            const statusKey = String(r._id || '').trim();
-            if (statusKey === 'in_progress') inProgress += Number(r.count || 0);
-            if (statusKey === 'completed') completed += Number(r.count || 0);
-            if (statusKey === 'not_reachable' || statusKey === 'invalid_number') unsuccessfulCount += Number(r.count || 0);
-          }
+          
+          logger.info(`Stats calculation (with filters) for agent ${agentId}:`, {
+            totalTaskIds: taskIds.length,
+            totalTasksFetched: tasks.length,
+            calculatedCounts: { inProgress, completed, unsuccessfulCount },
+            filters: { search: normalizedSearch, territory: normTerritory, activityType: normType }
+          });
         }
       } else {
         // Use the EXACT same query as history endpoint - use find() then count outcomes
