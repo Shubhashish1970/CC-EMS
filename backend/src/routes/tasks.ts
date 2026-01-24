@@ -622,8 +622,8 @@ router.get(
       };
       if (status) baseMatch.status = String(status) as TaskStatus;
 
-      // Date filter: use updatedAt to show all tasks updated in the date range
-      // This must match the history endpoint logic exactly
+      // Date filter: MUST match history endpoint logic exactly
+      // History endpoint uses $or with both updatedAt and callStartedAt
       if (dateFrom || dateTo) {
         // dateFrom and dateTo are already Date objects from validation middleware (.toDate())
         const from = dateFrom ? new Date(dateFrom) : null;
@@ -631,13 +631,58 @@ router.get(
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
         
-        // Use updatedAt to show all tasks updated in the date range (same as history endpoint)
+        // Use the EXACT same date filter logic as history endpoint
+        // Primary: updatedAt in range (catches all tasks updated on the date)
+        // Secondary: callStartedAt in range but updatedAt not set or outside range
+        const dateConditions: any[] = [];
+        
         if (from && to) {
-          baseMatch.updatedAt = { $gte: from, $lte: to };
+          dateConditions.push(
+            { updatedAt: { $gte: from, $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
         } else if (from) {
-          baseMatch.updatedAt = { $gte: from };
+          dateConditions.push(
+            { updatedAt: { $gte: from } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } }
+                ]}
+              ]
+            }
+          );
         } else if (to) {
-          baseMatch.updatedAt = { $lte: to };
+          dateConditions.push(
+            { updatedAt: { $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
+        }
+        
+        if (dateConditions.length > 0) {
+          baseMatch.$or = dateConditions;
         }
       }
 
