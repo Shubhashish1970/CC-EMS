@@ -192,11 +192,15 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
     setDraftEnd(end);
   };
 
-  // Default date range
+  // Default date range - set immediately on mount to avoid race condition
   useEffect(() => {
     if (filters.dateFrom || filters.dateTo) return;
     const r = getPresetRange('Last 7 days');
-    setFilters((p) => ({ ...p, dateFrom: r.start, dateTo: r.end }));
+    // Set both dateFrom and dateTo in a single state update to avoid multiple renders
+    setFilters((p) => {
+      if (p.dateFrom || p.dateTo) return p; // Prevent overwriting if already set
+      return { ...p, dateFrom: r.start, dateTo: r.end };
+    });
     setDraftStart(r.start);
     setDraftEnd(r.end);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -262,16 +262,38 @@ router.get(
       };
       if (status) baseMatch.status = String(status) as TaskStatus;
 
-      // Date filter: primarily by callStartedAt; fallback to updatedAt for older records.
+      // Date filter: match if callStartedAt OR updatedAt is in range
+      // This handles tasks without callStartedAt by checking updatedAt
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom) : null;
         const to = dateTo ? new Date(dateTo) : null;
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
-        baseMatch.$or = [
-          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-        ];
+        
+        // Use $or to match either callStartedAt or updatedAt (for tasks without callStartedAt)
+        const dateConditions: any[] = [];
+        
+        if (from && to) {
+          // Match if callStartedAt exists and is in range, OR updatedAt is in range
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
+            { updatedAt: { $gte: from, $lte: to } }
+          );
+        } else if (from) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: from } },
+            { updatedAt: { $gte: from } }
+          );
+        } else if (to) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $lte: to } },
+            { updatedAt: { $lte: to } }
+          );
+        }
+        
+        if (dateConditions.length > 0) {
+          baseMatch.$or = dateConditions;
+        }
       }
 
       const normalizedSearch = String(search || '').trim();
@@ -588,25 +610,28 @@ router.get(
           toDate.setHours(23, 59, 59, 999);
         }
         
-        // Build date conditions - only include non-null values to avoid empty objects
-        const callStartedAtCond: any = {};
-        const updatedAtCond: any = {};
-        if (fromDate) callStartedAtCond.$gte = fromDate;
-        if (toDate) callStartedAtCond.$lte = toDate;
-        if (fromDate) updatedAtCond.$gte = fromDate;
-        if (toDate) updatedAtCond.$lte = toDate;
+        // Build date conditions - match if callStartedAt OR updatedAt is in range
+        const dateConditions: any[] = [];
         
-        // Only add conditions if they have at least one operator
-        const orConditions: any[] = [];
-        if (Object.keys(callStartedAtCond).length > 0) {
-          orConditions.push({ callStartedAt: callStartedAtCond });
-        }
-        if (Object.keys(updatedAtCond).length > 0) {
-          orConditions.push({ updatedAt: updatedAtCond });
+        if (fromDate && toDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate, $lte: toDate } },
+            { updatedAt: { $gte: fromDate, $lte: toDate } }
+          );
+        } else if (fromDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate } },
+            { updatedAt: { $gte: fromDate } }
+          );
+        } else if (toDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $lte: toDate } },
+            { updatedAt: { $lte: toDate } }
+          );
         }
         
-        if (orConditions.length > 0) {
-          baseMatch.$or = orConditions;
+        if (dateConditions.length > 0) {
+          baseMatch.$or = dateConditions;
         }
       }
 
@@ -709,6 +734,7 @@ router.get(
       };
       
       // Apply same filters for inQueue count
+      // Note: sampled_in_queue tasks typically don't have callStartedAt, so we primarily use updatedAt
       if (dateFrom || dateTo) {
         // dateFrom and dateTo are already Date objects from validation middleware
         const from = dateFrom instanceof Date && !isNaN(dateFrom.getTime()) ? dateFrom : null;
@@ -727,25 +753,28 @@ router.get(
           toDate.setHours(23, 59, 59, 999);
         }
         
-        // Build date conditions - only include non-null values to avoid empty objects
-        const callStartedAtCond: any = {};
-        const updatedAtCond: any = {};
-        if (fromDate) callStartedAtCond.$gte = fromDate;
-        if (toDate) callStartedAtCond.$lte = toDate;
-        if (fromDate) updatedAtCond.$gte = fromDate;
-        if (toDate) updatedAtCond.$lte = toDate;
+        // For inQueue tasks, match if callStartedAt OR updatedAt is in range
+        const dateConditions: any[] = [];
         
-        // Only add conditions if they have at least one operator
-        const orConditions: any[] = [];
-        if (Object.keys(callStartedAtCond).length > 0) {
-          orConditions.push({ callStartedAt: callStartedAtCond });
-        }
-        if (Object.keys(updatedAtCond).length > 0) {
-          orConditions.push({ updatedAt: updatedAtCond });
+        if (fromDate && toDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate, $lte: toDate } },
+            { updatedAt: { $gte: fromDate, $lte: toDate } }
+          );
+        } else if (fromDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate } },
+            { updatedAt: { $gte: fromDate } }
+          );
+        } else if (toDate) {
+          dateConditions.push(
+            { callStartedAt: { $exists: true, $ne: null, $lte: toDate } },
+            { updatedAt: { $lte: toDate } }
+          );
         }
         
-        if (orConditions.length > 0) {
-          inQueueMatch.$or = orConditions;
+        if (dateConditions.length > 0) {
+          inQueueMatch.$or = dateConditions;
         }
       }
       
