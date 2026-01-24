@@ -262,32 +262,60 @@ router.get(
       };
       if (status) baseMatch.status = String(status) as TaskStatus;
 
-      // Date filter: match if callStartedAt OR updatedAt is in range
-      // This handles tasks without callStartedAt by checking updatedAt
+      // Date filter: use updatedAt as primary filter to show all tasks updated in the date range
+      // Also include tasks where callStartedAt is in range but updatedAt might be null/outside range
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom) : null;
         const to = dateTo ? new Date(dateTo) : null;
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
         
-        // Use $or to match either callStartedAt or updatedAt (for tasks without callStartedAt)
+        // Primary: updatedAt in range (catches all tasks updated on the date)
+        // Secondary: callStartedAt in range but updatedAt not set or outside range
         const dateConditions: any[] = [];
         
         if (from && to) {
-          // Match if callStartedAt exists and is in range, OR updatedAt is in range
           dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
-            { updatedAt: { $gte: from, $lte: to } }
+            { updatedAt: { $gte: from, $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
           );
         } else if (from) {
           dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: from } },
-            { updatedAt: { $gte: from } }
+            { updatedAt: { $gte: from } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } }
+                ]}
+              ]
+            }
           );
         } else if (to) {
           dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $lte: to } },
-            { updatedAt: { $lte: to } }
+            { updatedAt: { $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
           );
         }
         
@@ -610,28 +638,13 @@ router.get(
           toDate.setHours(23, 59, 59, 999);
         }
         
-        // Build date conditions - match if callStartedAt OR updatedAt is in range
-        const dateConditions: any[] = [];
-        
+        // Use updatedAt to show all tasks updated in the date range
         if (fromDate && toDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate, $lte: toDate } },
-            { updatedAt: { $gte: fromDate, $lte: toDate } }
-          );
+          baseMatch.updatedAt = { $gte: fromDate, $lte: toDate };
         } else if (fromDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate } },
-            { updatedAt: { $gte: fromDate } }
-          );
+          baseMatch.updatedAt = { $gte: fromDate };
         } else if (toDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $lte: toDate } },
-            { updatedAt: { $lte: toDate } }
-          );
-        }
-        
-        if (dateConditions.length > 0) {
-          baseMatch.$or = dateConditions;
+          baseMatch.updatedAt = { $lte: toDate };
         }
       }
 
@@ -753,28 +766,13 @@ router.get(
           toDate.setHours(23, 59, 59, 999);
         }
         
-        // For inQueue tasks, match if callStartedAt OR updatedAt is in range
-        const dateConditions: any[] = [];
-        
+        // For inQueue tasks, use updatedAt (they typically don't have callStartedAt yet)
         if (fromDate && toDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate, $lte: toDate } },
-            { updatedAt: { $gte: fromDate, $lte: toDate } }
-          );
+          inQueueMatch.updatedAt = { $gte: fromDate, $lte: toDate };
         } else if (fromDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $gte: fromDate } },
-            { updatedAt: { $gte: fromDate } }
-          );
+          inQueueMatch.updatedAt = { $gte: fromDate };
         } else if (toDate) {
-          dateConditions.push(
-            { callStartedAt: { $exists: true, $ne: null, $lte: toDate } },
-            { updatedAt: { $lte: toDate } }
-          );
-        }
-        
-        if (dateConditions.length > 0) {
-          inQueueMatch.$or = dateConditions;
+          inQueueMatch.updatedAt = { $lte: toDate };
         }
       }
       
