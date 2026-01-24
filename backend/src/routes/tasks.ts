@@ -737,6 +737,7 @@ router.get(
       } else {
         // Use aggregation to count by outcome field (stored in database) instead of status
         // This is the simple path when there are no search/activity filters
+        // Use the same baseMatch as the history endpoint to ensure consistency
         const outcomeCounts = await CallTask.aggregate([
           { $match: baseMatch },
           // Handle null/undefined outcomes by grouping them separately
@@ -763,11 +764,13 @@ router.get(
         unsuccessfulCount = Number(map['Unsuccessful'] || 0);
         
         // Debug: Log the map to see what outcomes we're getting
+        const totalFromOutcome = outcomeCounts.reduce((sum, r) => sum + Number(r.count || 0), 0);
         logger.info(`Stats aggregation results for agent ${agentId}:`, { 
           map, 
           nullOutcomeCount, 
-          baseMatch: JSON.stringify(baseMatch),
-          totalTasksInMatch: outcomeCounts.reduce((sum, r) => sum + Number(r.count || 0), 0)
+          totalFromOutcome,
+          baseMatchKeys: Object.keys(baseMatch),
+          dateFilter: baseMatch.updatedAt ? 'present' : 'absent'
         });
         
         // For tasks without outcome field, count by status as fallback
