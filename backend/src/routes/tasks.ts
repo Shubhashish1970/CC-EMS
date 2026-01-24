@@ -735,9 +735,9 @@ router.get(
           }
         }
       } else {
-        // Use aggregation to count by outcome field (stored in database) instead of status
-        // This is the simple path when there are no search/activity filters
-        // Use the same baseMatch as the history endpoint to ensure consistency
+        // Use the EXACT same query logic as the history endpoint, but count by outcome
+        // The history endpoint uses CallTask.find(baseMatch) when there are no filters
+        // So we should use the same baseMatch for consistency
         const outcomeCounts = await CallTask.aggregate([
           { $match: baseMatch },
           // Handle null/undefined outcomes by grouping them separately
