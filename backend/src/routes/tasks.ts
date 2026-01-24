@@ -703,14 +703,19 @@ router.get(
             ]
           : []),
         // Group by outcome field (stored in database) instead of status
-        { $group: { _id: '$outcome', count: { $sum: 1 } } },
+        // Also handle null/undefined outcomes by grouping them separately
+        { $group: { _id: { $ifNull: ['$outcome', 'NULL'] }, count: { $sum: 1 } } },
       ]);
 
       const map: Record<string, number> = {};
+      let nullOutcomeCount = 0;
         for (const r of agg) {
-          const outcomeKey = String(r._id || '').trim();
+          const outcomeKey = r._id === 'NULL' || r._id === null ? null : String(r._id || '').trim();
           if (outcomeKey) {
             map[outcomeKey] = Number(r.count || 0);
+          } else {
+            // Count tasks with null/undefined outcome for fallback
+            nullOutcomeCount += Number(r.count || 0);
           }
         }
 
@@ -718,19 +723,42 @@ router.get(
         inProgress = Number(map['In Progress'] || 0);
         completed = Number(map['Completed Conversation'] || 0);
         unsuccessfulCount = Number(map['Unsuccessful'] || 0);
+        
+        // For tasks without outcome field, count by status as fallback
+        if (nullOutcomeCount > 0) {
+          const fallbackAgg = await CallTask.aggregate([
+            { $match: baseMatch },
+            { $match: { $or: [{ outcome: { $exists: false } }, { outcome: null }] } },
+            ...(normType ? [{ $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { 'activityId.type': normType } }] : []),
+            ...(normTerritory ? [{ $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }] } }] : []),
+            ...(re ? [{ $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } }, { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } }, { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } }, { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } }, { $match: { $or: [{ 'farmerId.name': re }, { 'farmerId.mobileNumber': re }, { 'farmerId.location': re }, { 'farmerId.preferredLanguage': re }, { 'activityId.type': re }, { 'activityId.officerName': re }, { 'activityId.tmName': re }, { 'activityId.territoryName': re }, { 'activityId.territory': re }, { 'activityId.state': re }, { 'activityId.activityId': re }] } }] : []),
+            { $group: { _id: '$status', count: { $sum: 1 } } },
+          ]);
+          for (const r of fallbackAgg) {
+            const statusKey = String(r._id || '').trim();
+            if (statusKey === 'in_progress') inProgress += Number(r.count || 0);
+            if (statusKey === 'completed') completed += Number(r.count || 0);
+            if (statusKey === 'not_reachable' || statusKey === 'invalid_number') unsuccessfulCount += Number(r.count || 0);
+          }
+        }
       } else {
         // Use aggregation to count by outcome field (stored in database) instead of status
         const outcomeCounts = await CallTask.aggregate([
           { $match: baseMatch },
-          { $group: { _id: '$outcome', count: { $sum: 1 } } },
+          // Handle null/undefined outcomes by grouping them separately
+          { $group: { _id: { $ifNull: ['$outcome', 'NULL'] }, count: { $sum: 1 } } },
         ]);
 
         // Map the results by outcome
         const map: Record<string, number> = {};
+        let nullOutcomeCount = 0;
         for (const r of outcomeCounts) {
-          const outcomeKey = r._id ? String(r._id).trim() : '';
+          const outcomeKey = r._id === 'NULL' || r._id === null ? null : String(r._id || '').trim();
           if (outcomeKey) {
             map[outcomeKey] = Number(r.count || 0);
+          } else {
+            // Count tasks with null/undefined outcome for fallback
+            nullOutcomeCount += Number(r.count || 0);
           }
         }
 
@@ -738,6 +766,21 @@ router.get(
         inProgress = Number(map['In Progress'] || 0);
         completed = Number(map['Completed Conversation'] || 0);
         unsuccessfulCount = Number(map['Unsuccessful'] || 0);
+        
+        // For tasks without outcome field, count by status as fallback
+        if (nullOutcomeCount > 0) {
+          const fallbackAgg = await CallTask.aggregate([
+            { $match: baseMatch },
+            { $match: { $or: [{ outcome: { $exists: false } }, { outcome: null }] } },
+            { $group: { _id: '$status', count: { $sum: 1 } } },
+          ]);
+          for (const r of fallbackAgg) {
+            const statusKey = String(r._id || '').trim();
+            if (statusKey === 'in_progress') inProgress += Number(r.count || 0);
+            if (statusKey === 'completed') completed += Number(r.count || 0);
+            if (statusKey === 'not_reachable' || statusKey === 'invalid_number') unsuccessfulCount += Number(r.count || 0);
+          }
+        }
       }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
