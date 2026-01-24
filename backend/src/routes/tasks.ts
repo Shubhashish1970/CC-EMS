@@ -419,6 +419,198 @@ router.get(
   }
 );
 
+// @route   GET /api/tasks/own/history/export
+// @desc    Export agent history (filtered) as Excel (ALL rows for current filters)
+// @access  Private (CC Agent)
+// NOTE: This route must come BEFORE /own/history/:id to avoid "export" being treated as an ID
+router.get(
+  '/own/history/export',
+  requirePermission('tasks.view.own'),
+  [
+    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('territory').optional().isString(),
+    query('activityType').optional().isString(),
+    query('search').optional().isString(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('limit').optional().isInt({ min: 1, max: 5000 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const { status, territory, activityType, search, dateFrom, dateTo, limit } = req.query as any;
+      const max = limit ? Number(limit) : 5000;
+
+      const baseMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+        status: { $ne: 'sampled_in_queue' },
+      };
+      if (status) baseMatch.status = String(status) as TaskStatus;
+
+      // Use same date filter logic as history endpoint
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to = dateTo ? new Date(dateTo) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        
+        const dateConditions: any[] = [];
+        
+        if (from && to) {
+          dateConditions.push(
+            { updatedAt: { $gte: from, $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
+        } else if (from) {
+          dateConditions.push(
+            { updatedAt: { $gte: from } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } }
+                ]}
+              ]
+            }
+          );
+        } else if (to) {
+          dateConditions.push(
+            { updatedAt: { $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
+        }
+        
+        if (dateConditions.length > 0) {
+          baseMatch.$or = dateConditions;
+        }
+      }
+
+      const normalizedSearch = String(search || '').trim();
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
+
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
+
+      const tasks = await CallTask.aggregate([
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+        ...(normTerritory
+          ? [
+              {
+                $match: {
+                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                },
+              },
+            ]
+          : []),
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
+                },
+              },
+            ]
+          : []),
+        { $sort: { updatedAt: -1 } },
+        { $limit: max },
+      ]);
+
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const fmtDate = (d: any) => {
+        const dt = d ? new Date(d) : null;
+        return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
+      };
+
+      const sheetRows = tasks.map((t: any) => {
+        const farmer = t.farmerId || {};
+        const activity = t.activityId || {};
+        const territoryStr = String((activity.territoryName || activity.territory || '')).trim();
+        return {
+          'Task ID': String(t._id),
+          'FFA Activity ID': String(activity.activityId || ''),
+          'Activity Type': String(activity.type || ''),
+          Territory: territoryStr,
+          State: String(activity.state || ''),
+          Farmer: String(farmer.name || ''),
+          Mobile: String(farmer.mobileNumber || ''),
+          Language: String(farmer.preferredLanguage || ''),
+          Outcome: String(t.outcome || ''),
+          'Outbound Status': String(t.callLog?.callStatus || ''),
+          'Call Started': fmtDate(t.callStartedAt || ''),
+          Updated: fmtDate(t.updatedAt || ''),
+          'Farmer Comments': String(t.callLog?.farmerComments || ''),
+          Sentiment: String(t.callLog?.sentiment || ''),
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(sheetRows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Agent History');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const now = new Date();
+      const filename = `agent_history_${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(
+        now.getMinutes()
+      )}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/tasks/own/history/:id
 // @desc    Agent History detail for a specific task
 // @access  Private (CC Agent)
@@ -816,15 +1008,27 @@ router.get(
         }
         
         // Debug logging
-        logger.info(`Stats calculation for agent ${agentId}:`, {
+        const outcomeBreakdown: Record<string, number> = {};
+        const statusBreakdown: Record<string, number> = {};
+        for (const task of tasks) {
+          const outcome = task.outcome ? String(task.outcome).trim() : 'NULL';
+          outcomeBreakdown[outcome] = (outcomeBreakdown[outcome] || 0) + 1;
+          const status = String(task.status || '').trim();
+          statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+        }
+        
+        logger.info(`Stats calculation (no filters) for agent ${agentId}:`, {
           totalTasksFound: tasks.length,
           calculatedCounts: { inProgress, completed, unsuccessfulCount },
-          baseMatchKeys: Object.keys(baseMatch),
+          outcomeBreakdown,
+          statusBreakdown,
+          baseMatch: JSON.stringify(baseMatch),
           sampleTaskOutcomes: tasks.slice(0, 10).map(t => ({ 
             id: t._id, 
             outcome: t.outcome, 
             status: t.status,
-            updatedAt: t.updatedAt 
+            updatedAt: t.updatedAt,
+            callStartedAt: t.callStartedAt
           }))
         });
       }
@@ -951,148 +1155,6 @@ router.get(
   }
 );
 
-// @route   GET /api/tasks/own/history/export
-// @desc    Export agent history (filtered) as Excel (ALL rows for current filters)
-// @access  Private (CC Agent)
-router.get(
-  '/own/history/export',
-  requirePermission('tasks.view.own'),
-  [
-    query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
-    query('territory').optional().isString(),
-    query('activityType').optional().isString(),
-    query('search').optional().isString(),
-    query('dateFrom').optional().isISO8601().toDate(),
-    query('dateTo').optional().isISO8601().toDate(),
-    query('limit').optional().isInt({ min: 1, max: 5000 }),
-  ],
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: { message: 'Validation failed', errors: errors.array() },
-        });
-      }
-
-      const authReq = req as AuthRequest;
-      const agentId = authReq.user._id.toString();
-      const { status, territory, activityType, search, dateFrom, dateTo, limit } = req.query as any;
-      const max = limit ? Number(limit) : 5000;
-
-      const baseMatch: any = {
-        assignedAgentId: new mongoose.Types.ObjectId(agentId),
-        status: { $ne: 'sampled_in_queue' },
-      };
-      if (status) baseMatch.status = String(status) as TaskStatus;
-
-      if (dateFrom || dateTo) {
-        const from = dateFrom ? new Date(dateFrom) : null;
-        const to = dateTo ? new Date(dateTo) : null;
-        if (from) from.setHours(0, 0, 0, 0);
-        if (to) to.setHours(23, 59, 59, 999);
-        baseMatch.$or = [
-          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-        ];
-      }
-
-      const normalizedSearch = String(search || '').trim();
-      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
-
-      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-      const normTerritory = String(territory || '').trim();
-      const normType = String(activityType || '').trim();
-
-      const tasks = await CallTask.aggregate([
-        { $match: baseMatch },
-        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-        ...(normTerritory
-          ? [
-              {
-                $match: {
-                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
-                },
-              },
-            ]
-          : []),
-        ...(re
-          ? [
-              {
-                $match: {
-                  $or: [
-                    { 'farmerId.name': re },
-                    { 'farmerId.mobileNumber': re },
-                    { 'farmerId.location': re },
-                    { 'farmerId.preferredLanguage': re },
-                    { 'activityId.type': re },
-                    { 'activityId.officerName': re },
-                    { 'activityId.tmName': re },
-                    { 'activityId.territoryName': re },
-                    { 'activityId.territory': re },
-                    { 'activityId.state': re },
-                    { 'activityId.activityId': re },
-                  ],
-                },
-              },
-            ]
-          : []),
-        { $sort: { updatedAt: -1 } },
-        { $limit: max },
-      ]);
-
-      const pad2 = (n: number) => String(n).padStart(2, '0');
-      const fmtDate = (d: any) => {
-        const dt = d ? new Date(d) : null;
-        return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
-      };
-
-      const sheetRows = tasks.map((t: any) => {
-        const farmer = t.farmerId || {};
-        const activity = t.activityId || {};
-        const territoryStr = String((activity.territoryName || activity.territory || '')).trim();
-        return {
-          'Task ID': String(t._id),
-          'FFA Activity ID': String(activity.activityId || ''),
-          'Activity Type': String(activity.type || ''),
-          Territory: territoryStr,
-          State: String(activity.state || ''),
-          Farmer: String(farmer.name || ''),
-          Mobile: String(farmer.mobileNumber || ''),
-          Language: String(farmer.preferredLanguage || ''),
-          Outcome: String(t.outcome || ''),
-          'Outbound Status': String(t.callLog?.callStatus || ''),
-          'Call Started': fmtDate(t.callStartedAt || ''),
-          Updated: fmtDate(t.updatedAt || ''),
-          'Farmer Comments': String(t.callLog?.farmerComments || ''),
-          Sentiment: String(t.callLog?.sentiment || ''),
-        };
-      });
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(sheetRows);
-      XLSX.utils.book_append_sheet(wb, ws, 'Agent History');
-      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-      const now = new Date();
-      const filename = `agent_history_${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(
-        now.getMinutes()
-      )}.xlsx`;
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(buffer);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
 
 // @route   GET /api/tasks/own/analytics
 // @desc    Agent performance analytics (attempts + outcomes) with time-bucket toggle
