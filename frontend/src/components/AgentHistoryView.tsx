@@ -784,72 +784,78 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
                       {isOpen && (
                         <tr className="bg-white">
-                          <td colSpan={8} className="px-5 pb-5 pt-4">
-                            <div className="mx-2 bg-white rounded-2xl border border-slate-200 p-4">
+                          <td colSpan={8} className="px-3 pb-3 pt-2">
+                            <div className="mx-1 bg-white rounded-xl border border-slate-200 p-3">
                               {detailLoadingId === String(t._id) && (
-                                <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
-                                  <Loader2 size={16} className="animate-spin" />
+                                <div className="flex items-center gap-2 text-slate-600 text-xs font-bold">
+                                  <Loader2 size={14} className="animate-spin" />
                                   Loading details…
                                 </div>
                               )}
 
                               {!detailLoadingId && !detail && (
-                                <div className="text-sm text-slate-600">No additional details available.</div>
+                                <div className="text-xs text-slate-600">No additional details available.</div>
                               )}
 
                               {detail && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Farmer</div>
-                                    <div className="text-sm font-bold text-slate-900">{detail.farmerId?.name || 'Unknown'}</div>
-                                    <div className="text-xs text-slate-600">{detail.farmerId?.mobileNumber || ''}</div>
-                                    <div className="text-xs text-slate-600">{detail.farmerId?.location || ''}</div>
-                                    <div className="text-xs text-slate-600">Language: <span className="font-bold">{detail.farmerId?.preferredLanguage || 'Unknown'}</span></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Farmer</div>
+                                    <div className="text-xs font-bold text-slate-900">{detail.farmerId?.name || 'Unknown'}</div>
+                                    <div className="text-[10px] text-slate-600 space-y-0.5">
+                                      <div>{detail.farmerId?.mobileNumber || ''}</div>
+                                      <div>{detail.farmerId?.location || ''}</div>
+                                      <div>Language: <span className="font-bold">{detail.farmerId?.preferredLanguage || 'Unknown'}</span></div>
+                                    </div>
                                   </div>
 
-                                  <div className="space-y-2">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Activity</div>
-                                    <div className="text-sm font-bold text-slate-900">{detail.activityId?.type || '-'}</div>
-                                    <div className="text-xs text-slate-600">Officer: <span className="font-bold">{detail.activityId?.officerName || '-'}</span></div>
-                                    <div className="text-xs text-slate-600">Territory: <span className="font-bold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></div>
-                                    <div className="text-xs text-slate-600">State: <span className="font-bold">{detail.activityId?.state || '-'}</span></div>
-                                  </div>
-
-                                  <div className="md:col-span-2">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outbound</div>
-                                        <div className="text-sm font-bold text-slate-900">{detail.callLog?.callStatus || '-'}</div>
-                                      </div>
-                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Call Started</div>
-                                        <div className="text-sm font-bold text-slate-900">{formatDateTime(detail.callStartedAt) || '-'}</div>
-                                      </div>
-                                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Duration</div>
-                                        <div className="text-sm font-bold text-slate-900">{Number(detail.callLog?.callDurationSeconds || 0)}s</div>
-                                      </div>
+                                  <div className="space-y-1">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Activity</div>
+                                    <div className="text-xs font-bold text-slate-900">{detail.activityId?.type || '-'}</div>
+                                    <div className="text-[10px] text-slate-600 space-y-0.5">
+                                      <div>Officer: <span className="font-bold">{detail.activityId?.officerName || '-'}</span></div>
+                                      <div>Territory: <span className="font-bold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></div>
+                                      <div>State: <span className="font-bold">{detail.activityId?.state || '-'}</span></div>
                                     </div>
                                   </div>
 
                                   <div className="md:col-span-2">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Farmer Comments</div>
-                                    <div className="bg-white rounded-xl border border-slate-200 p-3 text-sm text-slate-700 whitespace-pre-wrap">
-                                      {detail.callLog?.farmerComments || '-'}
-                                    </div>
-                                    <div className="mt-2 text-xs text-slate-600">
-                                      Sentiment: <span className="font-bold">{detail.callLog?.sentiment || 'N/A'}</span>
+                                    <div className="flex items-center gap-3 flex-wrap text-[10px]">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400 font-bold uppercase">Outbound:</span>
+                                        <span className="text-slate-700 font-medium">{detail.callLog?.callStatus || '-'}</span>
+                                      </div>
+                                      <span className="text-slate-300">•</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400 font-bold uppercase">Started:</span>
+                                        <span className="text-slate-700 font-medium">{formatDateTime(detail.callStartedAt) || '-'}</span>
+                                      </div>
+                                      <span className="text-slate-300">•</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400 font-bold uppercase">Duration:</span>
+                                        <span className="text-slate-700 font-medium">{Number(detail.callLog?.callDurationSeconds || 0)}s</span>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Crops Discussed</div>
-                                      <div className="text-sm font-bold text-slate-900">{safeArr(detail.callLog?.cropsDiscussed).join(', ') || '-'}</div>
+                                  <div className="md:col-span-2">
+                                    <div className="flex items-center gap-2 text-[10px]">
+                                      <span className="text-slate-400 font-bold uppercase">Comments:</span>
+                                      <span className="text-slate-700 flex-1">{detail.callLog?.farmerComments || '-'}</span>
+                                      <span className="text-slate-400">•</span>
+                                      <span className="text-slate-400">Sentiment:</span>
+                                      <span className="text-slate-700 font-bold">{detail.callLog?.sentiment || 'N/A'}</span>
                                     </div>
-                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Products Discussed</div>
-                                      <div className="text-sm font-bold text-slate-900">{safeArr(detail.callLog?.productsDiscussed).join(', ') || '-'}</div>
+                                  </div>
+
+                                  <div className="md:col-span-2 grid grid-cols-2 gap-2">
+                                    <div className="text-[10px]">
+                                      <span className="text-slate-400 font-bold uppercase">Crops:</span>
+                                      <span className="text-slate-700 ml-1">{safeArr(detail.callLog?.cropsDiscussed).join(', ') || '-'}</span>
+                                    </div>
+                                    <div className="text-[10px]">
+                                      <span className="text-slate-400 font-bold uppercase">Products:</span>
+                                      <span className="text-slate-700 ml-1">{safeArr(detail.callLog?.productsDiscussed).join(', ') || '-'}</span>
                                     </div>
                                   </div>
                                 </div>
