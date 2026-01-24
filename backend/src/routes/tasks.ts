@@ -898,6 +898,13 @@ router.get(
       const authReq = req as AuthRequest;
       const agentId = authReq.user._id.toString();
       const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
+      
+      // Log incoming request for debugging
+      logger.info(`Stats endpoint called for agent ${agentId}:`, {
+        queryParams: { status, territory, activityType, search, dateFrom, dateTo },
+        dateFromType: typeof dateFrom,
+        dateToType: typeof dateTo,
+      });
 
       const baseMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
@@ -975,6 +982,18 @@ router.get(
         if (dateConditions.length > 0) {
           baseMatch.$or = dateConditions;
         }
+      }
+      
+      // Log baseMatch after construction for debugging
+      try {
+        logger.info(`baseMatch constructed for agent ${agentId}:`, {
+          hasStatus: !!baseMatch.status,
+          hasOr: !!baseMatch.$or,
+          orLength: baseMatch.$or ? baseMatch.$or.length : 0,
+          baseMatchKeys: Object.keys(baseMatch),
+        });
+      } catch (logError) {
+        // Ignore logging errors
       }
 
       const normalizedSearch = String(search || '').trim();
