@@ -873,26 +873,12 @@ router.get(
       }
       
       // Use outcome field from database (unsuccessfulCount from aggregation above)
-      // For tasks without outcome field, fallback to calculating from status
+      // The unsuccessfulCount already includes tasks with outcome='Unsuccessful'
+      // We also need to handle any tasks that might have null outcome but should be counted
       let unsuccessful = unsuccessfulCount;
-      if (unsuccessful === 0) {
-        // Fallback: count by status for old records without outcome field
-        const fallbackAgg = await CallTask.aggregate([
-          { $match: baseMatch },
-          { $match: { $or: [{ outcome: { $exists: false } }, { outcome: null }] } },
-          { $group: { _id: '$status', count: { $sum: 1 } } },
-        ]);
-        let fallbackNotReachable = 0;
-        let fallbackInvalid = 0;
-        for (const r of fallbackAgg) {
-          const statusKey = String(r._id || '').trim();
-          if (statusKey === 'not_reachable') fallbackNotReachable = Number(r.count || 0);
-          if (statusKey === 'invalid_number') fallbackInvalid = Number(r.count || 0);
-        }
-        unsuccessful = fallbackNotReachable + fallbackInvalid;
-      }
       
       // Count invalid separately (for display purposes) - use callLog.callStatus or status
+      // This counts tasks with Invalid callStatus OR invalid_number status
       const invalidAgg = await CallTask.aggregate([
         { $match: baseMatch },
         { $match: { $or: [{ 'callLog.callStatus': 'Invalid' }, { status: 'invalid_number' }] } },
