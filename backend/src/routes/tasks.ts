@@ -565,15 +565,48 @@ router.get(
       ]);
 
       const pad2 = (n: number) => String(n).padStart(2, '0');
+      
+      // Format date-time as DD/MM/YYYY HH:MM:SS
+      const fmtDateTime = (d: any) => {
+        const dt = d ? new Date(d) : null;
+        if (!dt || Number.isNaN(dt.getTime())) return '';
+        return `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}`;
+      };
+      
+      // Format date as DD/MM/YYYY (for Updated column)
       const fmtDate = (d: any) => {
         const dt = d ? new Date(d) : null;
         return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
+      };
+      
+      // Format duration from seconds to HH:MM:SS or MM:SS
+      const fmtDuration = (seconds: number | null | undefined): string => {
+        if (!seconds || seconds <= 0) return '';
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        if (hrs > 0) {
+          return `${hrs}:${pad2(mins)}:${pad2(secs)}`;
+        }
+        return `${mins}:${pad2(secs)}`;
+      };
+      
+      // Calculate call end time from start time + duration
+      const getCallEndTime = (callStartedAt: any, callDurationSeconds: number | null | undefined): Date | null => {
+        if (!callStartedAt || !callDurationSeconds || callDurationSeconds <= 0) return null;
+        const start = new Date(callStartedAt);
+        if (Number.isNaN(start.getTime())) return null;
+        return new Date(start.getTime() + callDurationSeconds * 1000);
       };
 
       const sheetRows = tasks.map((t: any) => {
         const farmer = t.farmerId || {};
         const activity = t.activityId || {};
         const territoryStr = String((activity.territoryName || activity.territory || '')).trim();
+        const callStartedAt = t.callStartedAt;
+        const callDurationSeconds = t.callLog?.callDurationSeconds;
+        const callEndedAt = getCallEndTime(callStartedAt, callDurationSeconds);
+        
         return {
           'Task ID': String(t._id),
           'FFA Activity ID': String(activity.activityId || ''),
@@ -585,7 +618,9 @@ router.get(
           Language: String(farmer.preferredLanguage || ''),
           Outcome: String(t.outcome || ''),
           'Outbound Status': String(t.callLog?.callStatus || ''),
-          'Call Started': fmtDate(t.callStartedAt || ''),
+          'Call Started': fmtDateTime(callStartedAt),
+          'Call Ended': fmtDateTime(callEndedAt),
+          'Duration': fmtDuration(callDurationSeconds),
           Updated: fmtDate(t.updatedAt || ''),
           'Farmer Comments': String(t.callLog?.farmerComments || ''),
           Sentiment: String(t.callLog?.sentiment || ''),
