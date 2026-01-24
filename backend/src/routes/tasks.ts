@@ -982,37 +982,34 @@ router.get(
           const outcomeBreakdown: Record<string, number> = {};
           const statusBreakdown: Record<string, number> = {};
           
-          for (const task of tasks) {
-            const outcome = task.outcome ? String(task.outcome).trim() : null;
+          // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
+          const getEffectiveOutcome = (task: any): string => {
+            if (task.outcome) return String(task.outcome).trim();
             const status = String(task.status || '').trim();
+            // Match frontend outcomeLabel logic
+            if (status === 'completed') return 'Completed Conversation';
+            if (status === 'in_progress') return 'In Progress';
+            if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
+            return status || 'Unknown';
+          };
+          
+          for (const task of tasks) {
+            const effectiveOutcome = getEffectiveOutcome(task);
+            const status = String(task.status || '').trim();
+            const storedOutcome = task.outcome ? String(task.outcome).trim() : 'NULL';
             
             // Track what we're seeing
-            const outcomeKey = outcome || 'NULL';
-            outcomeBreakdown[outcomeKey] = (outcomeBreakdown[outcomeKey] || 0) + 1;
+            outcomeBreakdown[effectiveOutcome] = (outcomeBreakdown[effectiveOutcome] || 0) + 1;
             statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
             
-            // Count by outcome (case-insensitive matching for robustness)
-            if (outcome) {
-              const normalizedOutcome = outcome.toLowerCase();
-              if (normalizedOutcome === 'in progress') {
-                inProgress++;
-              } else if (normalizedOutcome === 'completed conversation') {
-                completed++;
-              } else if (normalizedOutcome === 'unsuccessful') {
-                unsuccessfulCount++;
-              } else {
-                // Unknown outcome value - log it
-                logger.warn(`Unknown outcome value: "${outcome}" for task ${task._id}`);
-              }
-            } else {
-              // Task doesn't have outcome - use status as fallback
-              if (status === 'in_progress') {
-                inProgress++;
-              } else if (status === 'completed') {
-                completed++;
-              } else if (status === 'not_reachable' || status === 'invalid_number') {
-                unsuccessfulCount++;
-              }
+            // Count by effective outcome (case-insensitive matching)
+            const normalizedOutcome = effectiveOutcome.toLowerCase();
+            if (normalizedOutcome === 'in progress') {
+              inProgress++;
+            } else if (normalizedOutcome === 'completed conversation') {
+              completed++;
+            } else if (normalizedOutcome === 'unsuccessful') {
+              unsuccessfulCount++;
             }
           }
           
@@ -1031,41 +1028,38 @@ router.get(
         const tasks = await CallTask.find(baseMatch).lean();
         
         // Count outcomes from the actual task documents (same as what history endpoint sees)
-        // Process all tasks and count by outcome, with fallback to status for null outcomes
+        // Use the same logic as frontend: outcome || outcomeLabel(status)
         const outcomeBreakdown: Record<string, number> = {};
         const statusBreakdown: Record<string, number> = {};
         
-        for (const task of tasks) {
-          const outcome = task.outcome ? String(task.outcome).trim() : null;
+        // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
+        const getEffectiveOutcome = (task: any): string => {
+          if (task.outcome) return String(task.outcome).trim();
           const status = String(task.status || '').trim();
+          // Match frontend outcomeLabel logic
+          if (status === 'completed') return 'Completed Conversation';
+          if (status === 'in_progress') return 'In Progress';
+          if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
+          return status || 'Unknown';
+        };
+        
+        for (const task of tasks) {
+          const effectiveOutcome = getEffectiveOutcome(task);
+          const status = String(task.status || '').trim();
+          const storedOutcome = task.outcome ? String(task.outcome).trim() : 'NULL';
           
           // Track what we're seeing
-          const outcomeKey = outcome || 'NULL';
-          outcomeBreakdown[outcomeKey] = (outcomeBreakdown[outcomeKey] || 0) + 1;
+          outcomeBreakdown[effectiveOutcome] = (outcomeBreakdown[effectiveOutcome] || 0) + 1;
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
           
-          // Count by outcome (case-insensitive matching for robustness)
-          if (outcome) {
-            const normalizedOutcome = outcome.toLowerCase();
-            if (normalizedOutcome === 'in progress') {
-              inProgress++;
-            } else if (normalizedOutcome === 'completed conversation') {
-              completed++;
-            } else if (normalizedOutcome === 'unsuccessful') {
-              unsuccessfulCount++;
-            } else {
-              // Unknown outcome value - log it
-              logger.warn(`Unknown outcome value: "${outcome}" for task ${task._id}`);
-            }
-          } else {
-            // Task doesn't have outcome - use status as fallback
-            if (status === 'in_progress') {
-              inProgress++;
-            } else if (status === 'completed') {
-              completed++;
-            } else if (status === 'not_reachable' || status === 'invalid_number') {
-              unsuccessfulCount++;
-            }
+          // Count by effective outcome (case-insensitive matching)
+          const normalizedOutcome = effectiveOutcome.toLowerCase();
+          if (normalizedOutcome === 'in progress') {
+            inProgress++;
+          } else if (normalizedOutcome === 'completed conversation') {
+            completed++;
+          } else if (normalizedOutcome === 'unsuccessful') {
+            unsuccessfulCount++;
           }
         }
         
