@@ -909,10 +909,18 @@ router.get(
       // History endpoint uses $or with both updatedAt and callStartedAt
       if (dateFrom || dateTo) {
         // dateFrom and dateTo are already Date objects from validation middleware (.toDate())
-        const from = dateFrom ? new Date(dateFrom) : null;
-        const to = dateTo ? new Date(dateTo) : null;
-        if (from) from.setHours(0, 0, 0, 0);
-        if (to) to.setHours(23, 59, 59, 999);
+        // But handle both Date objects and strings defensively
+        let from: Date | null = null;
+        let to: Date | null = null;
+        
+        if (dateFrom) {
+          from = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
+          from.setHours(0, 0, 0, 0);
+        }
+        if (dateTo) {
+          to = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
+          to.setHours(23, 59, 59, 999);
+        }
         
         // Use the EXACT same date filter logic as history endpoint
         // Primary: updatedAt in range (catches all tasks updated on the date)
@@ -1104,7 +1112,18 @@ router.get(
       } else {
         // Use the EXACT same query as history endpoint - use find() then count outcomes
         // This ensures we get the exact same records that the history endpoint returns
-        const tasks = await CallTask.find(baseMatch).lean();
+        let tasks: any[] = [];
+        try {
+          tasks = await CallTask.find(baseMatch).lean();
+        } catch (queryError: any) {
+          logger.error(`Error querying tasks in stats endpoint:`, {
+            error: queryError?.message || String(queryError),
+            stack: queryError?.stack,
+            baseMatch: JSON.stringify(baseMatch, null, 2),
+            agentId
+          });
+          throw queryError;
+        }
         
         // Count outcomes from the actual task documents (same as what history endpoint sees)
         // Use the same logic as frontend: outcome || outcomeLabel(status)
@@ -1351,6 +1370,8 @@ router.get(
         query: req.query,
         agentId: (req as AuthRequest).user?._id?.toString() || 'unknown',
       };
+      // Use both logger and console.error to ensure we capture the error
+      console.error(`[STATS ERROR] Error in /own/history/stats endpoint:`, errorDetails);
       logger.error(`Error in /own/history/stats endpoint:`, errorDetails);
       next(error);
     }
