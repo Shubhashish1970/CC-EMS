@@ -1270,23 +1270,23 @@ const ActivitySamplingView: React.FC = () => {
 
                   {isExpanded && (
                           <tr className="bg-white">
-                            <td colSpan={13} className="px-5 pb-5 pt-4">
-                              <div className="space-y-4">
+                            <td colSpan={13} className="px-3 pb-3 pt-2">
+                              <div className="space-y-2">
                         {/* Assigned Agents */}
                         {item.assignedAgents.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-black text-slate-700 mb-2">Assigned Agents</h4>
-                            <div className="space-y-2">
+                            <h4 className="text-xs font-black text-slate-700 mb-1">Assigned Agents</h4>
+                            <div className="space-y-1.5">
                               {item.assignedAgents.map((agent) => (
                                 <div
                                   key={agent.agentId}
-                                  className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200"
+                                  className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200"
                                 >
                                   <div>
-                                    <p className="text-sm font-medium text-slate-900">{agent.agentName}</p>
-                                    <p className="text-xs text-slate-600">{agent.agentEmail}</p>
+                                    <p className="text-xs font-medium text-slate-900">{agent.agentName}</p>
+                                    <p className="text-[10px] text-slate-600">{agent.agentEmail}</p>
                                   </div>
-                                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium">
                                     {agent.tasksCount} task{agent.tasksCount !== 1 ? 's' : ''}
                                   </span>
                                 </div>
@@ -1298,19 +1298,19 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Sampling Audit Details */}
                         {item.samplingAudit && (
                           <div>
-                            <h4 className="text-sm font-black text-slate-700 mb-2">Sampling Details</h4>
-                            <div className="grid grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Sampling Percentage</p>
-                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.samplingPercentage}%</p>
+                            <h4 className="text-xs font-black text-slate-700 mb-1">Sampling Details</h4>
+                            <div className="flex items-center gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-500">Sampling %:</span>
+                                <span className="text-xs font-bold text-slate-900">{item.samplingAudit.samplingPercentage}%</span>
                               </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Total Farmers</p>
-                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.totalFarmers}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-500">Total:</span>
+                                <span className="text-xs font-bold text-slate-900">{item.samplingAudit.totalFarmers}</span>
                               </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Sampled Count</p>
-                                <p className="text-sm font-bold text-slate-900">{item.samplingAudit.sampledCount}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-500">Sampled:</span>
+                                <span className="text-xs font-bold text-slate-900">{item.samplingAudit.sampledCount}</span>
                               </div>
                             </div>
                           </div>
@@ -1319,15 +1319,15 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Crops and Products */}
                         {(item.activity.crops?.length > 0 || item.activity.products?.length > 0) && (
                           <div>
-                            <h4 className="text-sm font-black text-slate-700 mb-2">Activity Details</h4>
-                            <div className="flex flex-wrap gap-2">
+                            <h4 className="text-xs font-black text-slate-700 mb-1">Activity Details</h4>
+                            <div className="flex flex-wrap gap-1.5">
                               {item.activity.crops?.map((crop, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-green-50 text-green-700 rounded-xl text-xs font-medium border border-green-200">
+                                <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
                                   {crop}
                                 </span>
                               ))}
                               {item.activity.products?.map((product, idx) => (
-                                <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium border border-blue-200">
+                                <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
                                   {product}
                                 </span>
                               ))}
@@ -1338,13 +1338,13 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Farmers List */}
                         {item.farmers && item.farmers.length > 0 ? (
                           <div>
-                            <h4 className="text-sm font-black text-slate-700 mb-3">
+                            <h4 className="text-xs font-black text-slate-700 mb-1.5">
                               Farmers List ({item.farmers.length} of {item.activity.farmerIds?.length || 0})
-                              <span className="ml-2 text-xs font-normal text-slate-500">
+                              <span className="ml-2 text-[10px] font-normal text-slate-500">
                                 ({item.farmers.filter(f => f.isSampled).length} sampled, {item.farmers.filter(f => !f.isSampled).length} not sampled)
                               </span>
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 max-h-80 overflow-y-auto">
                               {item.farmers.map((farmer) => (
                                 <div
                                   key={farmer.farmerId}
