@@ -17,6 +17,7 @@ import {
   assignTaskToAgent,
   updateTaskStatus,
 } from '../services/taskService.js';
+import { getOutcomeFromStatus } from '../utils/outcomeHelper.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
 import * as XLSX from 'xlsx';
@@ -204,7 +205,6 @@ router.post(
         if (!(task as any).callStartedAt) {
           (task as any).callStartedAt = new Date();
         }
-        const { getOutcomeFromStatus } = await import('../utils/outcomeHelper.js');
         task.status = 'in_progress';
         task.outcome = getOutcomeFromStatus('in_progress');
         task.interactionHistory.push({
@@ -2262,7 +2262,6 @@ router.post(
       }
 
       // Calculate and set outcome based on final status
-      const { getOutcomeFromStatus } = await import('../utils/outcomeHelper.js');
       const finalOutcome = getOutcomeFromStatus(finalStatus);
 
       // Add to interaction history (record previous status before update)

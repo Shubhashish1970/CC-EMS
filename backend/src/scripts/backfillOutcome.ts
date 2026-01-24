@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { CallTask } from '../models/CallTask.js';
+import { CallTask, TaskStatus } from '../models/CallTask.js';
 import { getOutcomeFromStatus } from '../utils/outcomeHelper.js';
 import logger from '../config/logger.js';
 import dotenv from 'dotenv';
@@ -16,7 +16,7 @@ if (!mongoUri) {
 async function backfillOutcome() {
   try {
     logger.info('Connecting to MongoDB...');
-    await mongoose.connect(mongoUri, {
+    await mongoose.connect(mongoUri as string, {
       maxPoolSize: 50,
       minPoolSize: 5,
       socketTimeoutMS: 45000,
@@ -43,7 +43,11 @@ async function backfillOutcome() {
       
       for (const task of batch) {
         try {
-          const outcome = getOutcomeFromStatus(task.status);
+          if (!task.status) {
+            logger.warn(`Task ${task._id} has no status, skipping`);
+            continue;
+          }
+          const outcome = getOutcomeFromStatus(task.status as TaskStatus);
           await CallTask.updateOne(
             { _id: task._id },
             { $set: { outcome } }
@@ -72,7 +76,11 @@ async function backfillOutcome() {
       
       for (const task of nullTasks) {
         try {
-          const outcome = getOutcomeFromStatus(task.status);
+          if (!task.status) {
+            logger.warn(`Task ${task._id} has no status, skipping`);
+            continue;
+          }
+          const outcome = getOutcomeFromStatus(task.status as TaskStatus);
           await CallTask.updateOne(
             { _id: task._id },
             { $set: { outcome } }
