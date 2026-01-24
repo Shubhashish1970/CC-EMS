@@ -71,70 +71,81 @@ jobs:
           echo "🔨 Building Docker image..."
           echo "Repository: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }}"
           
-          # Submit build and wait for completion
+          # Submit build (may fail due to log streaming, but build will still run)
+          set +e  # Don't exit on error - build might still be running
           BUILD_OUTPUT=$(gcloud builds submit \
             --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
             --timeout=20m \
-            2>&1) || {
-            echo "❌ Build submission failed"
-            echo "$BUILD_OUTPUT"
-            exit 1
-          }
+            --async \
+            2>&1)
+          SUBMIT_EXIT_CODE=$?
+          set -e
           
-          # Extract build ID from output
+          # Extract build ID from output (even if command failed)
           BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oP 'Created \[https://cloudbuild.googleapis.com/v1/projects/[^/]+/locations/[^/]+/builds/\K[^\]]+' || echo "")
           
           if [ -z "$BUILD_ID" ]; then
             # Try to get latest build ID as fallback
+            echo "Extracting build ID from output..."
+            BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || echo "")
+          fi
+          
+          if [ -z "$BUILD_ID" ]; then
+            # Last resort: get the most recent build
+            echo "Getting latest build ID..."
             BUILD_ID=$(gcloud builds list --limit=1 --format="value(id)" --region=${{ env.REGION }} --sort-by=~createTime 2>/dev/null || echo "")
           fi
           
-          if [ -n "$BUILD_ID" ]; then
-            echo "Build ID: $BUILD_ID"
-            echo "View full logs at:"
-            echo "https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$BUILD_ID?project=${{ secrets.GCP_PROJECT_ID }}"
-            
-            # Wait for build to complete and check status
-            echo "Waiting for build to complete..."
-            MAX_WAIT=1200  # 20 minutes
-            ELAPSED=0
-            while [ $ELAPSED -lt $MAX_WAIT ]; do
-              BUILD_STATUS=$(gcloud builds describe "$BUILD_ID" --region=${{ env.REGION }} --format="value(status)" 2>/dev/null || echo "UNKNOWN")
-              echo "Build status: $BUILD_STATUS (waited ${ELAPSED}s)"
-              
-              if [ "$BUILD_STATUS" = "SUCCESS" ]; then
-                echo "✅ Build completed successfully"
-                exit 0
-              elif [ "$BUILD_STATUS" = "FAILURE" ] || [ "$BUILD_STATUS" = "CANCELLED" ] || [ "$BUILD_STATUS" = "EXPIRED" ] || [ "$BUILD_STATUS" = "TIMEOUT" ]; then
-                echo "❌ Build failed with status: $BUILD_STATUS"
-                echo "Fetching build logs..."
-                gcloud builds log "$BUILD_ID" --region=${{ env.REGION }} 2>&1 | tail -100 || echo "Could not fetch logs"
-                exit 1
-              elif [ "$BUILD_STATUS" = "WORKING" ] || [ "$BUILD_STATUS" = "QUEUED" ]; then
-                sleep 5
-                ELAPSED=$((ELAPSED + 5))
-              else
-                echo "⚠️ Unknown build status: $BUILD_STATUS"
-                sleep 5
-                ELAPSED=$((ELAPSED + 5))
-              fi
-            done
-            
-            # If we've waited too long, check final status
-            FINAL_STATUS=$(gcloud builds describe "$BUILD_ID" --region=${{ env.REGION }} --format="value(status)" 2>/dev/null || echo "UNKNOWN")
-            if [ "$FINAL_STATUS" = "SUCCESS" ]; then
-              echo "✅ Build completed successfully (after wait)"
-              exit 0
-            else
-              echo "❌ Build did not complete in time. Final status: $FINAL_STATUS"
-              echo "View logs at: https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$BUILD_ID?project=${{ secrets.GCP_PROJECT_ID }}"
-              exit 1
-            fi
-          else
+          if [ -z "$BUILD_ID" ]; then
             echo "❌ Could not determine build ID"
             echo "Build output:"
             echo "$BUILD_OUTPUT"
+            exit 1
+          fi
+          
+          echo "Build ID: $BUILD_ID"
+          echo "View full logs at:"
+          echo "https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$BUILD_ID?project=${{ secrets.GCP_PROJECT_ID }}"
+          
+          # Wait for build to complete and check status
+          echo "Waiting for build to complete..."
+          MAX_WAIT=1200  # 20 minutes
+          ELAPSED=0
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            BUILD_STATUS=$(gcloud builds describe "$BUILD_ID" --region=${{ env.REGION }} --format="value(status)" 2>/dev/null || echo "UNKNOWN")
+            echo "Build status: $BUILD_STATUS (waited ${ELAPSED}s)"
+            
+            if [ "$BUILD_STATUS" = "SUCCESS" ]; then
+              echo "✅ Build completed successfully"
+              exit 0
+            elif [ "$BUILD_STATUS" = "FAILURE" ] || [ "$BUILD_STATUS" = "CANCELLED" ] || [ "$BUILD_STATUS" = "EXPIRED" ] || [ "$BUILD_STATUS" = "TIMEOUT" ]; then
+              echo "❌ Build failed with status: $BUILD_STATUS"
+              echo "Fetching build error details..."
+              BUILD_ERRORS=$(gcloud builds describe "$BUILD_ID" --region=${{ env.REGION }} --format="value(failureInfo.detail)" 2>/dev/null || echo "")
+              if [ -n "$BUILD_ERRORS" ]; then
+                echo "Build errors: $BUILD_ERRORS"
+              fi
+              echo "View full logs at: https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$BUILD_ID?project=${{ secrets.GCP_PROJECT_ID }}"
+              exit 1
+            elif [ "$BUILD_STATUS" = "WORKING" ] || [ "$BUILD_STATUS" = "QUEUED" ]; then
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            else
+              echo "⚠️ Unknown build status: $BUILD_STATUS"
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+            fi
+          done
+          
+          # If we've waited too long, check final status
+          FINAL_STATUS=$(gcloud builds describe "$BUILD_ID" --region=${{ env.REGION }} --format="value(status)" 2>/dev/null || echo "UNKNOWN")
+          if [ "$FINAL_STATUS" = "SUCCESS" ]; then
+            echo "✅ Build completed successfully (after wait)"
+            exit 0
+          else
+            echo "❌ Build did not complete in time. Final status: $FINAL_STATUS"
+            echo "View logs at: https://console.cloud.google.com/cloud-build/builds;region=${{ env.REGION }}/$BUILD_ID?project=${{ secrets.GCP_PROJECT_ID }}"
             exit 1
           fi
 
