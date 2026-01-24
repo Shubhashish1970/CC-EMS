@@ -717,15 +717,66 @@ router.get(
       };
       if (status) baseMatch.status = String(status) as TaskStatus;
 
+      // Use same date filter logic as history endpoint for consistency
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom) : null;
         const to = dateTo ? new Date(dateTo) : null;
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
-        baseMatch.$or = [
-          { callStartedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-          { updatedAt: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } },
-        ];
+        
+        // Use the EXACT same date filter logic as history endpoint
+        // Primary: updatedAt in range (catches all tasks updated on the date)
+        // Secondary: callStartedAt in range but updatedAt not set or outside range
+        const dateConditions: any[] = [];
+        
+        if (from && to) {
+          dateConditions.push(
+            { updatedAt: { $gte: from, $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
+        } else if (from) {
+          dateConditions.push(
+            { updatedAt: { $gte: from } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $gte: from } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $lt: from } }
+                ]}
+              ]
+            }
+          );
+        } else if (to) {
+          dateConditions.push(
+            { updatedAt: { $lte: to } },
+            { 
+              $and: [
+                { callStartedAt: { $exists: true, $ne: null, $lte: to } },
+                { $or: [
+                  { updatedAt: { $exists: false } },
+                  { updatedAt: null },
+                  { updatedAt: { $gt: to } }
+                ]}
+              ]
+            }
+          );
+        }
+        
+        if (dateConditions.length > 0) {
+          baseMatch.$or = dateConditions;
+        }
       }
 
       const normalizedSearch = String(search || '').trim();
@@ -809,7 +860,12 @@ router.get(
         .sort((a: string, b: string) => a.localeCompare(b));
 
       res.json({ success: true, data: { territoryOptions, activityTypeOptions } });
-    } catch (error) {
+    } catch (error: any) {
+      logger.error(`Error in /own/history/options endpoint for agent ${(req as AuthRequest).user._id}:`, {
+        error: error?.message,
+        stack: error?.stack,
+        query: req.query,
+      });
       next(error);
     }
   }
