@@ -161,6 +161,7 @@ router.post(
           farmer: task.farmerId,
           activity: activityData,
           status: task.status,
+          outcome: task.outcome || null, // Include stored outcome
           scheduledDate: task.scheduledDate,
           callStartedAt: task.callStartedAt,
           callLog: task.callLog || null, // Include callLog for completed tasks
@@ -203,7 +204,9 @@ router.post(
         if (!(task as any).callStartedAt) {
           (task as any).callStartedAt = new Date();
         }
+        const { getOutcomeFromStatus } = await import('../utils/outcomeHelper.js');
         task.status = 'in_progress';
+        task.outcome = getOutcomeFromStatus('in_progress');
         task.interactionHistory.push({
           timestamp: new Date(),
           status: 'in_progress',
@@ -920,15 +923,6 @@ router.get(
         return dt && !Number.isNaN(dt.getTime()) ? `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}` : '';
       };
 
-      // Helper function to map status to outcome label (matches frontend outcomeLabel)
-      const getOutcomeLabel = (status: string): string => {
-        if (status === 'completed') return 'Completed Conversation';
-        if (status === 'in_progress') return 'In Progress';
-        if (status === 'invalid_number') return 'Unsuccessful';
-        if (status === 'not_reachable') return 'Unsuccessful';
-        return status || 'Unknown';
-      };
-
       const sheetRows = tasks.map((t: any) => {
         const farmer = t.farmerId || {};
         const activity = t.activityId || {};
@@ -942,7 +936,7 @@ router.get(
           Farmer: String(farmer.name || ''),
           Mobile: String(farmer.mobileNumber || ''),
           Language: String(farmer.preferredLanguage || ''),
-          Outcome: getOutcomeLabel(t.status || ''),
+          Outcome: String(t.outcome || ''),
           'Outbound Status': String(t.callLog?.callStatus || ''),
           'Call Started': fmtDate(t.callStartedAt || ''),
           Updated: fmtDate(t.updatedAt || ''),
@@ -2267,6 +2261,10 @@ router.post(
         finalStatus = 'invalid_number';
       }
 
+      // Calculate and set outcome based on final status
+      const { getOutcomeFromStatus } = await import('../utils/outcomeHelper.js');
+      const finalOutcome = getOutcomeFromStatus(finalStatus);
+
       // Add to interaction history (record previous status before update)
       const previousStatus = task.status;
       // Add to interaction history
@@ -2277,6 +2275,7 @@ router.post(
       });
 
       task.status = finalStatus;
+      task.outcome = finalOutcome;
       await task.save();
 
       logger.info(`Task ${taskId} submitted by agent ${authReq.user.email}`);

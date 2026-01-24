@@ -753,7 +753,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           </div>
                         </td>
                         <td className="px-3 py-3 text-sm font-bold text-slate-700" style={{ width: colWidths.outcome, minWidth: colWidths.outcome }}>
-                        {outcomeLabel(t.status)}
+                        {t.outcome || outcomeLabel(t.status)}
                       </td>
                         <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.outbound, minWidth: colWidths.outbound }}>
                         {outboundLabel(outbound)}

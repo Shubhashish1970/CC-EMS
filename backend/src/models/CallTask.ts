@@ -34,10 +34,17 @@ export interface ICallLog {
   sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
 }
 
+export type Outcome = 
+  | 'Completed Conversation'
+  | 'In Progress'
+  | 'Unsuccessful'
+  | 'Unknown';
+
 export interface ICallTask extends Document {
   farmerId: mongoose.Types.ObjectId;
   activityId: mongoose.Types.ObjectId;
   status: TaskStatus;
+  outcome?: Outcome; // Stored outcome label
   retryCount: number;
   assignedAgentId?: mongoose.Types.ObjectId | null;
   scheduledDate: Date;
@@ -152,6 +159,11 @@ const CallTaskSchema = new Schema<ICallTask>(
       type: String,
       enum: ['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'],
       default: 'unassigned',
+    },
+    outcome: {
+      type: String,
+      enum: ['Completed Conversation', 'In Progress', 'Unsuccessful', 'Unknown'],
+      required: false,
     },
     retryCount: {
       type: Number,
