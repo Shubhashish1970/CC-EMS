@@ -993,6 +993,7 @@ router.get(
             return status || 'Unknown';
           };
           
+          let uncountedTasks = 0;
           for (const task of tasks) {
             const effectiveOutcome = getEffectiveOutcome(task);
             const status = String(task.status || '').trim();
@@ -1004,12 +1005,27 @@ router.get(
             
             // Count by effective outcome (case-insensitive matching)
             const normalizedOutcome = effectiveOutcome.toLowerCase();
+            let counted = false;
             if (normalizedOutcome === 'in progress') {
               inProgress++;
+              counted = true;
             } else if (normalizedOutcome === 'completed conversation') {
               completed++;
+              counted = true;
             } else if (normalizedOutcome === 'unsuccessful') {
               unsuccessfulCount++;
+              counted = true;
+            }
+            
+            if (!counted) {
+              uncountedTasks++;
+              logger.warn(`Task not counted in stats (with filters):`, {
+                taskId: task._id,
+                effectiveOutcome,
+                storedOutcome,
+                status,
+                normalizedOutcome
+              });
             }
           }
           
@@ -1017,9 +1033,16 @@ router.get(
             totalTaskIds: taskIds.length,
             totalTasksFetched: tasks.length,
             calculatedCounts: { inProgress, completed, unsuccessfulCount },
+            uncountedTasks,
             outcomeBreakdown,
             statusBreakdown,
-            filters: { search: normalizedSearch, territory: normTerritory, activityType: normType }
+            filters: { search: normalizedSearch, territory: normTerritory, activityType: normType },
+            sampleTaskData: tasks.slice(0, 10).map(t => ({
+              id: t._id,
+              outcome: t.outcome,
+              status: t.status,
+              effectiveOutcome: getEffectiveOutcome(t)
+            }))
           });
         }
       } else {
@@ -1043,6 +1066,7 @@ router.get(
           return status || 'Unknown';
         };
         
+        let uncountedTasks = 0;
         for (const task of tasks) {
           const effectiveOutcome = getEffectiveOutcome(task);
           const status = String(task.status || '').trim();
@@ -1054,26 +1078,44 @@ router.get(
           
           // Count by effective outcome (case-insensitive matching)
           const normalizedOutcome = effectiveOutcome.toLowerCase();
+          let counted = false;
           if (normalizedOutcome === 'in progress') {
             inProgress++;
+            counted = true;
           } else if (normalizedOutcome === 'completed conversation') {
             completed++;
+            counted = true;
           } else if (normalizedOutcome === 'unsuccessful') {
             unsuccessfulCount++;
+            counted = true;
+          }
+          
+          if (!counted) {
+            uncountedTasks++;
+            logger.warn(`Task not counted in stats:`, {
+              taskId: task._id,
+              effectiveOutcome,
+              storedOutcome,
+              status,
+              normalizedOutcome
+            });
           }
         }
         
         logger.info(`Stats calculation (no filters) for agent ${agentId}:`, {
           totalTasksFound: tasks.length,
           calculatedCounts: { inProgress, completed, unsuccessfulCount },
+          uncountedTasks,
           outcomeBreakdown,
           statusBreakdown,
           baseMatchKeys: Object.keys(baseMatch),
           baseMatchHasDateFilter: !!(baseMatch.$or || baseMatch.updatedAt),
-          sampleTaskData: tasks.slice(0, 5).map(t => ({ 
+          baseMatchString: JSON.stringify(baseMatch),
+          sampleTaskData: tasks.slice(0, 10).map(t => ({ 
             id: t._id, 
             outcome: t.outcome, 
             status: t.status,
+            effectiveOutcome: getEffectiveOutcome(t),
             updatedAt: t.updatedAt,
             callStartedAt: t.callStartedAt
           }))
