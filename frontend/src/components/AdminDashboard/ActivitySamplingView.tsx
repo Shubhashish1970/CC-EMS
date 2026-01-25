@@ -1120,6 +1120,11 @@ const ActivitySamplingView: React.FC = () => {
                   ? `⚠ ${statistics.totalTasks - statistics.farmersSampled} extra (${statistics.farmersSampled} sampled)`
                   : `${statistics.farmersSampled} sampled = ${statistics.totalTasks} tasks ✓`}
               </p>
+              {(statistics.callbackTasks || 0) > 0 && (
+                <p className="text-[10px] text-purple-600 font-bold mt-0.5">
+                  incl. {statistics.callbackTasks} callback{statistics.callbackTasks !== 1 ? 's' : ''}
+                </p>
+              )}
             </div>
             <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
               <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Queue</p>
@@ -1133,14 +1138,6 @@ const ActivitySamplingView: React.FC = () => {
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
               <p className="text-xl font-black text-green-800">{statistics.tasksCompleted}</p>
             </div>
-            {/* Callback Tasks - only show if there are callbacks */}
-            {(statistics.callbackTasks || 0) > 0 && (
-              <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                <p className="text-xs font-black text-purple-600 uppercase tracking-widest mb-0.5">Callbacks</p>
-                <p className="text-xl font-black text-purple-800">{statistics.callbackTasks}</p>
-                <p className="text-[10px] text-purple-600 mt-0.5">Retry tasks</p>
-              </div>
-            )}
           </div>
         </div>
       )}
