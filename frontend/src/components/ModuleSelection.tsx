@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Leaf, Phone, ArrowUpRight, ClipboardList, BarChart3, Truck, FileText } from 'lucide-react';
+import { Loader2, Leaf, Phone, ArrowUpRight, ClipboardList, Truck, Headphones } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface Module {
@@ -50,11 +50,11 @@ const ModuleSelection: React.FC = () => {
         available: false,
       },
       {
-        code: 'analytics',
-        name: 'Analytics',
-        fullName: 'Business Intelligence',
-        description: 'Reports & dashboards',
-        icon: <BarChart3 size={24} />,
+        code: 'inbound',
+        name: 'Inbound',
+        fullName: 'Inbound Support',
+        description: 'Customer queries & help',
+        icon: <Headphones size={24} />,
         variant: 'white',
         available: false,
       },
