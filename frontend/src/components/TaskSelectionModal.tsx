@@ -41,13 +41,13 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'in_progress' | 'sampled_in_queue' | 'completed'>('all');
+  const [filter, setFilter] = useState<'in_progress' | 'sampled_in_queue' | 'completed'>('in_progress');
 
   useEffect(() => {
     if (isOpen) {
       fetchAvailableTasks();
       setSearchQuery('');
-      setFilter('all');
+      setFilter('in_progress');
     }
   }, [isOpen]);
 
@@ -97,7 +97,6 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
       task.farmer.location.toLowerCase().includes(query);
     
     const matchesFilter = 
-      filter === 'all' || 
       (filter === 'in_progress' && task.status === 'in_progress') ||
       (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue') || // Queue shows only sampled_in_queue
       (filter === 'completed' && (task.status === 'completed' || task.status === 'not_reachable' || task.status === 'invalid_number'));
@@ -186,16 +185,6 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
 
           {/* Filter Tabs - Light theme - Compact */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
-                filter === 'all'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              All
-            </button>
             <button
               onClick={() => setFilter('in_progress')}
               className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
