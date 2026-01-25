@@ -886,6 +886,9 @@ router.get(
     query('dateTo').optional().isISO8601().toDate(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as AuthRequest;
+    const agentId = authReq.user?._id?.toString() || 'unknown';
+    
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -895,16 +898,14 @@ router.get(
         });
       }
 
-      const authReq = req as AuthRequest;
-      const agentId = authReq.user._id.toString();
       const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
       
       // Log incoming request for debugging
-      logger.info(`Stats endpoint called for agent ${agentId}:`, {
+      console.log(`[STATS] Stats endpoint called for agent ${agentId}:`, JSON.stringify({
         queryParams: { status, territory, activityType, search, dateFrom, dateTo },
         dateFromType: typeof dateFrom,
         dateToType: typeof dateTo,
-      });
+      }));
 
       const baseMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
@@ -920,13 +921,30 @@ router.get(
         let from: Date | null = null;
         let to: Date | null = null;
         
-        if (dateFrom) {
-          from = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
-          from.setHours(0, 0, 0, 0);
-        }
-        if (dateTo) {
-          to = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
-          to.setHours(23, 59, 59, 999);
+        try {
+          if (dateFrom) {
+            from = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
+            if (isNaN(from.getTime())) {
+              console.log(`[STATS] Invalid dateFrom: ${dateFrom}`);
+              from = null;
+            } else {
+              from.setHours(0, 0, 0, 0);
+            }
+          }
+          if (dateTo) {
+            to = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
+            if (isNaN(to.getTime())) {
+              console.log(`[STATS] Invalid dateTo: ${dateTo}`);
+              to = null;
+            } else {
+              to.setHours(23, 59, 59, 999);
+            }
+          }
+          console.log(`[STATS] Parsed dates - from: ${from?.toISOString() || 'null'}, to: ${to?.toISOString() || 'null'}`);
+        } catch (dateError: any) {
+          console.error(`[STATS] Error parsing dates: ${dateError?.message}`);
+          from = null;
+          to = null;
         }
         
         // Use the EXACT same date filter logic as history endpoint
@@ -985,16 +1003,12 @@ router.get(
       }
       
       // Log baseMatch after construction for debugging
-      try {
-        logger.info(`baseMatch constructed for agent ${agentId}:`, {
-          hasStatus: !!baseMatch.status,
-          hasOr: !!baseMatch.$or,
-          orLength: baseMatch.$or ? baseMatch.$or.length : 0,
-          baseMatchKeys: Object.keys(baseMatch),
-        });
-      } catch (logError) {
-        // Ignore logging errors
-      }
+      console.log(`[STATS] baseMatch constructed:`, JSON.stringify({
+        hasStatus: !!baseMatch.status,
+        hasOr: !!baseMatch.$or,
+        orLength: baseMatch.$or ? baseMatch.$or.length : 0,
+        baseMatchKeys: Object.keys(baseMatch),
+      }));
 
       const normalizedSearch = String(search || '').trim();
       const hasActivityFilters = !!String(territory || '').trim() || !!String(activityType || '').trim();
@@ -1131,16 +1145,15 @@ router.get(
       } else {
         // Use the EXACT same query as history endpoint - use find() then count outcomes
         // This ensures we get the exact same records that the history endpoint returns
+        console.log(`[STATS] Starting simple path query for agent ${agentId}`);
         let tasks: any[] = [];
         try {
+          console.log(`[STATS] Executing CallTask.find() query...`);
           tasks = await CallTask.find(baseMatch).lean();
+          console.log(`[STATS] Query returned ${tasks.length} tasks`);
         } catch (queryError: any) {
-          logger.error(`Error querying tasks in stats endpoint:`, {
-            error: queryError?.message || String(queryError),
-            stack: queryError?.stack,
-            baseMatch: JSON.stringify(baseMatch, null, 2),
-            agentId
-          });
+          console.error(`[STATS] Error querying tasks: ${queryError?.message}`);
+          console.error(`[STATS] Error stack: ${queryError?.stack}`);
           throw queryError;
         }
         
