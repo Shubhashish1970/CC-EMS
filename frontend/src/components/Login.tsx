@@ -44,9 +44,9 @@ const Login: React.FC = () => {
           backgroundImage: `url('/images/farmer-hero.png')`,
         }}
       />
-      {/* Gradient Overlay - lighter on right side to show the farmer */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-900/30" />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/40" />
+      {/* Gradient Overlay - lighter to show the farmer more clearly */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/30 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-slate-900/20" />
 
       {/* Top Bar with Sign In Button */}
       <div className="relative z-20">
