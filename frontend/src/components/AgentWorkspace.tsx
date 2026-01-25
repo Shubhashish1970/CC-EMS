@@ -446,14 +446,14 @@ const AgentWorkspace: React.FC = () => {
   // Always show the Agent Workspace interface - no conditional rendering
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-[#f1f5f1] text-slate-900 font-sans antialiased overflow-hidden relative">
+    <div className="flex flex-col lg:flex-row h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden relative">
       
       {/* Loading Overlay - Only shows when loading */}
       {isLoading && (
         <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 shadow-xl">
-            <Loader2 className="animate-spin text-green-700" size={32} />
-            <p className="font-bold text-green-800">Loading tasks...</p>
+            <Loader2 className="animate-spin text-lime-600" size={32} />
+            <p className="font-bold text-slate-800">Loading tasks...</p>
             <Button 
               variant="secondary" 
               onClick={handleStopLoading}
@@ -484,15 +484,15 @@ const AgentWorkspace: React.FC = () => {
         </div>
       )}
       
-      {/* Global Navigation (Desktop) */}
-      <aside className="hidden lg:flex w-20 flex-col items-center py-8 bg-green-950 text-white shadow-2xl z-30">
+      {/* Global Navigation (Desktop) - Dark Slate Theme */}
+      <aside className="hidden lg:flex w-20 flex-col items-center py-8 bg-slate-900 text-white shadow-2xl z-30">
         <nav className="flex flex-col gap-8">
           <button
             onClick={() => setActiveSection('dialer')}
-            className={`p-3 rounded-2xl border shadow-xl transition-all ${
+            className={`p-3 rounded-2xl border transition-all ${
               activeSection === 'dialer'
-                ? 'bg-white/10 text-green-400 border-white/10'
-                : 'bg-transparent text-white/40 border-transparent hover:text-white'
+                ? 'bg-lime-500/20 text-lime-400 border-lime-500/30 shadow-lg'
+                : 'bg-transparent text-slate-400 border-transparent hover:text-white hover:bg-slate-800'
             }`}
             title="Dialer"
           >
@@ -500,14 +500,22 @@ const AgentWorkspace: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveSection('history')}
-            className={`p-3 transition-all ${activeSection === 'history' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+            className={`p-3 rounded-2xl transition-all ${
+              activeSection === 'history' 
+                ? 'text-lime-400 bg-lime-500/20' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
             title="History"
           >
             <History size={24} />
           </button>
           <button
             onClick={() => setActiveSection('analytics')}
-            className={`p-3 transition-all ${activeSection === 'analytics' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+            className={`p-3 rounded-2xl transition-all ${
+              activeSection === 'analytics' 
+                ? 'text-lime-400 bg-lime-500/20' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
             title="Performance"
           >
             <TrendingUp size={24} />
@@ -517,19 +525,19 @@ const AgentWorkspace: React.FC = () => {
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
-        {/* Unified Task Header */}
-        <header className="h-20 bg-white border-b border-green-100 px-4 lg:px-8 flex items-center justify-between shrink-0 shadow-sm z-20">
+        {/* Unified Task Header - Dark Slate Theme */}
+        <header className="h-20 bg-slate-900 px-4 lg:px-8 flex items-center justify-between shrink-0 shadow-lg z-20">
           <div className="flex items-center gap-4 lg:gap-8">
             <div className="flex flex-col">
-              <span className="text-[10px] font-black text-lime-600 uppercase tracking-[0.2em]">Kweka Reach</span>
-              <h1 className="text-base lg:text-xl font-black text-slate-800 tracking-tight">Agent Workspace</h1>
+              <span className="text-[10px] font-black text-lime-400 uppercase tracking-[0.2em]">Kweka Reach</span>
+              <h1 className="text-base lg:text-xl font-black text-white tracking-tight">Agent Workspace</h1>
             </div>
-            <div className="h-10 w-px bg-slate-100 hidden md:block" />
+            <div className="h-10 w-px bg-slate-700 hidden md:block" />
             {taskData && formData.callStatus === 'Connected' && (
               <div className="hidden sm:flex items-center gap-3">
                 <CallTimer duration={callDuration} />
-                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold text-slate-500 uppercase">
-                  <Globe size={14} className="text-indigo-500" />
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-2xl text-[11px] font-bold text-slate-300 uppercase">
+                  <Globe size={14} className="text-lime-400" />
                   {taskData.farmer.preferredLanguage}
                 </div>
               </div>
@@ -547,7 +555,7 @@ const AgentWorkspace: React.FC = () => {
                   }}
                   disabled={isLoading}
                   type="button"
-                  className="px-4 py-2 bg-green-700 text-white rounded-2xl text-xs font-bold hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+                  className="px-4 py-2 bg-lime-500 text-slate-900 rounded-2xl text-xs font-bold hover:bg-lime-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
                 >
                   {isLoading ? (
                     <>
@@ -579,16 +587,16 @@ const AgentWorkspace: React.FC = () => {
             )}
             {/* User Info */}
             {user && (
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300">
                 <User size={16} className="text-slate-400" />
                 <span className="font-medium">{user.name}</span>
-                <span className="text-slate-400">•</span>
-                <span className="text-xs text-slate-500 uppercase">{user.role?.replace('_', ' ')}</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-xs text-slate-400 uppercase">{user.role?.replace('_', ' ')}</span>
               </div>
             )}
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all"
               title="Logout"
             >
               <LogOut size={18} />
@@ -666,24 +674,24 @@ const AgentWorkspace: React.FC = () => {
         )}
 
         {/* Mobile Interaction Navigation */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-200 flex items-center justify-around z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] px-6">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-around z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.2)] px-6">
           <button
             onClick={() => setActiveTab('details')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'details' ? 'text-green-700 bg-green-50' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'details' ? 'text-lime-400 bg-lime-500/20' : 'text-slate-400'}`}
           >
             <User size={22} fill={activeTab === 'details' ? 'currentColor' : 'none'} />
             <span className="text-[10px] font-black uppercase tracking-tighter">Details</span>
           </button>
           <button
             onClick={() => setActiveTab('flow')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'flow' ? 'text-green-700 bg-green-50' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'flow' ? 'text-lime-400 bg-lime-500/20' : 'text-slate-400'}`}
           >
             <CheckCircle size={22} fill={activeTab === 'flow' ? 'currentColor' : 'none'} />
             <span className="text-[10px] font-black uppercase tracking-tighter">Flow</span>
           </button>
           <button
             onClick={() => setActiveTab('ai')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'ai' ? 'text-green-700 bg-green-50' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-2xl transition-all ${activeTab === 'ai' ? 'text-lime-400 bg-lime-500/20' : 'text-slate-400'}`}
           >
             <Zap size={22} fill={activeTab === 'ai' ? 'currentColor' : 'none'} />
             <span className="text-[10px] font-black uppercase tracking-tighter">Notetaker</span>
@@ -694,11 +702,11 @@ const AgentWorkspace: React.FC = () => {
       {/* Floating Dialer Button - Always visible to quickly switch farmers */}
       <button
         onClick={() => setShowTaskSelectionModal(true)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-green-700 hover:bg-green-800 text-white rounded-full shadow-2xl flex items-center justify-center z-40 transition-all hover:scale-110 active:scale-95 border-4 border-white"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-lime-500 hover:bg-lime-400 text-slate-900 rounded-full shadow-2xl flex items-center justify-center z-40 transition-all hover:scale-110 active:scale-95 border-4 border-white"
         title="Switch Farmer / Load Task"
         aria-label="Open contact dialer"
       >
-        <PhoneCall size={28} className="text-white" />
+        <PhoneCall size={28} className="text-slate-900" />
       </button>
 
       {/* Task Selection Modal */}

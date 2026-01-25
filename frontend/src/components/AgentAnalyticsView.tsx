@@ -212,7 +212,7 @@ const AgentAnalyticsView: React.FC = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-[#f1f5f1]">
+    <div className="h-full overflow-y-auto p-6 bg-slate-50">
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
@@ -233,7 +233,7 @@ const AgentAnalyticsView: React.FC = () => {
                       return next;
                     });
                   }}
-                  className="px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between min-w-[280px]"
+                  className="px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between min-w-[280px]"
                 >
                   <span className="truncate">
                     {selectedPreset}
@@ -291,7 +291,7 @@ const AgentAnalyticsView: React.FC = () => {
                                 setSelectedPreset('Custom');
                                 setDraftStart(e.target.value);
                               }}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                             />
                           </div>
                           <div className="flex-1">
@@ -303,7 +303,7 @@ const AgentAnalyticsView: React.FC = () => {
                                 setSelectedPreset('Custom');
                                 setDraftEnd(e.target.value);
                               }}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                             />
                           </div>
                         </div>
@@ -325,7 +325,7 @@ const AgentAnalyticsView: React.FC = () => {
                               setFilters({ dateFrom: draftStart, dateTo: draftEnd });
                               setIsDatePickerOpen(false);
                             }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
                           >
                             Apply
                           </button>

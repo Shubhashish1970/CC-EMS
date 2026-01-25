@@ -414,7 +414,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   }, [rows, tableSort.key, tableSort.dir]);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-[#f1f5f1]">
+    <div className="h-full overflow-y-auto p-6 bg-slate-50">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Section - Matching Activity Sampling */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
@@ -444,7 +444,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   <select
                     value={filters.activityType}
                     onChange={(e) => setFilters((p) => ({ ...p, activityType: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                   >
                     <option value="">All Types</option>
                     {filterOptions.activityTypeOptions.map((t) => (
@@ -458,7 +458,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   <select
                     value={filters.territory}
                     onChange={(e) => setFilters((p) => ({ ...p, territory: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                   >
                     <option value="">All Territories</option>
                     {filterOptions.territoryOptions.map((t) => (
@@ -472,7 +472,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                   <select
                     value={filters.status}
                     onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as any }))}
-                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                   >
                     <option value="">All (except In Queue)</option>
                     <option value="in_progress">In Progress</option>
@@ -490,7 +490,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       value={filters.search}
                       onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
                       placeholder="Farmer, mobile, territory, activity..."
-                      className="w-full pl-10 pr-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full pl-10 pr-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                     />
                   </div>
                 </div>
@@ -509,7 +509,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                           return next;
                         });
                       }}
-                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
+                      className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
                     >
                       <span className="truncate">
                         {selectedPreset}
@@ -566,7 +566,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                     setSelectedPreset('Custom');
                                     setDraftStart(e.target.value);
                                   }}
-                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                                 />
                               </div>
                               <div className="flex-1">
@@ -578,7 +578,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                     setSelectedPreset('Custom');
                                     setDraftEnd(e.target.value);
                                   }}
-                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                                 />
                               </div>
                             </div>
@@ -600,7 +600,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                   setFilters((p) => ({ ...p, dateFrom: draftStart, dateTo: draftEnd }));
                                   setIsDatePickerOpen(false);
                                 }}
-                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
                               >
                                 Apply
                               </button>
@@ -621,7 +621,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
           <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <BarChart3 className="text-green-700" size={18} />
+                <BarChart3 className="text-lime-600" size={18} />
                 <h2 className="text-base font-black text-slate-900">Statistics</h2>
               </div>
               <button
@@ -630,8 +630,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 disabled={isExporting || isLoading}
                 className={`flex items-center justify-center h-10 w-10 rounded-2xl border transition-colors ${
                   isExporting
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
+                    ? 'bg-lime-50 border-lime-200 text-lime-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
                 title="Download Excel (all records matching current filters)"
               >
@@ -672,7 +672,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
         {/* History Table - Matching Activity Sampling */}
         {isLoading ? (
           <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center">
-            <Loader2 className="animate-spin mx-auto mb-4 text-green-700" size={32} />
+            <Loader2 className="animate-spin mx-auto mb-4 text-lime-600" size={32} />
             <p className="text-sm text-slate-600 font-medium">Loading history...</p>
           </div>
         ) : !pagination || (pagination.total || 0) === 0 ? (
@@ -890,7 +890,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"
                   title="Rows per page"
                 >
                   {[10, 20, 50, 100].map((n) => (

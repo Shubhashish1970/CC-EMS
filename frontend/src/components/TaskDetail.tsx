@@ -492,7 +492,7 @@ const StatusChangeModal: React.FC<StatusChangeModalProps> = ({ isOpen, onClose, 
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
             >
               <option value="sampled_in_queue">Sampled - in queue</option>
               <option value="in_progress">In Progress</option>
@@ -510,7 +510,7 @@ const StatusChangeModal: React.FC<StatusChangeModalProps> = ({ isOpen, onClose, 
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
               placeholder="Add notes about this status change..."
             />
           </div>

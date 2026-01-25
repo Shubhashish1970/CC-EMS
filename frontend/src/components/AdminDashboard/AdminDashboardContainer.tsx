@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, UserCog } from 'lucide-react';
+import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, UserCog, Leaf } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ActivitySamplingView from './ActivitySamplingView';
 import AgentQueueView from './AgentQueueView';
@@ -29,32 +29,34 @@ const AdminDashboardContainer: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f1f5f1]">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
+    <div className="min-h-screen bg-slate-50">
+      {/* Header - Dark Slate Theme */}
+      <div className="bg-slate-900 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <BarChart3 className="text-green-700" size={24} />
+              <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
+                <Leaf className="text-slate-900" size={20} />
+              </div>
               <div>
-                <h1 className="text-2xl font-black text-slate-900">Admin Dashboard</h1>
-                <p className="text-sm text-slate-600">Monitor activities and agent queues</p>
+                <span className="text-[10px] font-black text-lime-400 uppercase tracking-[0.2em]">Kweka Reach</span>
+                <h1 className="text-xl font-black text-white">Admin Dashboard</h1>
               </div>
             </div>
             
             {/* User Menu & Logout */}
             <div className="flex items-center gap-4">
               {user && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 text-sm text-slate-300">
                   <UserIcon size={16} className="text-slate-400" />
                   <span className="font-medium">{user.name}</span>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-xs text-slate-500 uppercase">{user.role.replace('_', ' ')}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-xs text-slate-400 uppercase">{user.role.replace('_', ' ')}</span>
                 </div>
               )}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all"
                 title="Logout"
               >
                 <LogOut size={18} />
@@ -64,7 +66,7 @@ const AdminDashboardContainer: React.FC = () => {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-200">
+          <div className="flex items-center gap-1 border-b border-slate-700">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -73,14 +75,14 @@ const AdminDashboardContainer: React.FC = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-3 font-bold text-sm transition-colors relative ${
                     activeTab === tab.id
-                      ? 'text-green-700'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'text-lime-400'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Icon size={18} />
                   {tab.label}
                   {activeTab === tab.id && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-700"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-500"></div>
                   )}
                 </button>
               );

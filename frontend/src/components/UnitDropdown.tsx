@@ -40,7 +40,7 @@ const UnitDropdown: React.FC<UnitDropdownProps> = ({ value, onChange, className 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 px-2 py-1.5 text-xs font-medium border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="w-16 px-2 py-1.5 text-xs font-medium border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-lime-500"
       >
         <span>{selectedUnit.label}</span>
         <ChevronDown 

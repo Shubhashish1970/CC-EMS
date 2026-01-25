@@ -403,7 +403,7 @@ const CallbackRequestView: React.FC = () => {
                             setFilters(f => ({ ...f, dateFrom: draftStart, dateTo: draftEnd }));
                             setIsDatePickerOpen(false);
                           }}
-                          className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
                         >
                           Apply
                         </button>
@@ -487,7 +487,7 @@ const CallbackRequestView: React.FC = () => {
             type="button"
             onClick={handleCreateCallbacks}
             disabled={selectedTaskIds.size === 0 || isCreating}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isCreating ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
             Create {selectedTaskIds.size} Callback{selectedTaskIds.size !== 1 ? 's' : ''}

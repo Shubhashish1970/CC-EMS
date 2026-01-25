@@ -352,7 +352,7 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 text-sm font-bold text-white bg-green-700 hover:bg-green-800 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmitting && <Loader2 size={18} className="animate-spin" />}
               {isEditMode ? 'Update User' : 'Create User'}

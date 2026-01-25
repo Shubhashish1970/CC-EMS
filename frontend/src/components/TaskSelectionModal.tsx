@@ -183,7 +183,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
             />
           </div>
 
@@ -193,7 +193,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               onClick={() => setFilter('in_progress')}
               className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'in_progress'
-                  ? 'bg-green-100 text-green-700'
+                  ? 'bg-slate-900 text-lime-400'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -203,7 +203,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               onClick={() => setFilter('sampled_in_queue')}
               className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'sampled_in_queue'
-                  ? 'bg-green-100 text-green-700'
+                  ? 'bg-slate-900 text-lime-400'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -213,7 +213,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
               onClick={() => setFilter('completed')}
               className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${
                 filter === 'completed'
-                  ? 'bg-green-100 text-green-700'
+                  ? 'bg-slate-900 text-lime-400'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -226,16 +226,16 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
         <div className="flex-1 overflow-y-auto bg-slate-50">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-green-700" size={32} />
+              <Loader2 className="animate-spin text-lime-600" size={32} />
               <span className="ml-3 text-slate-600 font-medium">Loading contacts...</span>
             </div>
           ) : error ? (
             <div className="text-center py-20 px-6">
               <Phone size={48} className="mx-auto text-slate-300 mb-4" />
               <p className="text-red-600 mb-4 font-medium">{error}</p>
-              <button
+                <button
                 onClick={fetchAvailableTasks}
-                className="px-6 py-2 bg-green-700 text-white rounded-2xl font-medium hover:bg-green-800"
+                className="px-6 py-2 bg-slate-900 text-white rounded-2xl font-medium hover:bg-slate-800"
               >
                 Retry
               </button>
@@ -352,11 +352,11 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
 
                       {/* Mobile Number - Prominent */}
                       <div className="flex items-center gap-2 mb-1">
-                        <Phone size={12} className="text-green-600 flex-shrink-0" />
+                        <Phone size={12} className="text-lime-600 flex-shrink-0" />
                         <a
                           href={`tel:${task.farmer.mobileNumber}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm font-bold text-green-700 hover:text-green-800"
+                          className="text-sm font-bold text-slate-700 hover:text-slate-900"
                         >
                           {task.farmer.mobileNumber}
                         </a>
@@ -411,14 +411,14 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                           <div
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
                               isSelected
-                                ? 'bg-green-700 scale-95'
-                                : 'bg-green-600 hover:bg-green-700 active:scale-95'
+                                ? 'bg-slate-900 scale-95'
+                                : 'bg-slate-800 hover:bg-slate-900 active:scale-95'
                             } ${isLoadingTask ? 'opacity-50' : ''}`}
                           >
                             {isSelected && isLoadingTask ? (
-                              <Loader2 size={18} className="animate-spin text-white" />
+                              <Loader2 size={18} className="animate-spin text-lime-400" />
                             ) : (
-                              <Phone size={18} className="text-white" />
+                              <Phone size={18} className="text-lime-400" />
                             )}
                           </div>
                         </>

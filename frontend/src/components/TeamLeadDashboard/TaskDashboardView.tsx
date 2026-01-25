@@ -406,7 +406,7 @@ const TaskDashboardView: React.FC = () => {
             <button
               type="button"
               onClick={confirmAllocate}
-              className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black disabled:opacity-50"
               disabled={isLoading}
             >
               Yes
@@ -458,7 +458,7 @@ const TaskDashboardView: React.FC = () => {
                     return next;
                   });
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
               >
                 <span className="truncate">
                   {selectedPreset}
@@ -512,7 +512,7 @@ const TaskDashboardView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftStart(e.target.value);
                             }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                           />
                         </div>
                         <div className="flex-1">
@@ -524,7 +524,7 @@ const TaskDashboardView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftEnd(e.target.value);
                             }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                           />
                         </div>
                       </div>
@@ -546,7 +546,7 @@ const TaskDashboardView: React.FC = () => {
                             setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' }));
                             setIsDatePickerOpen(false);
                           }}
-                          className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                          className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
                         >
                           Apply
                         </button>
@@ -661,7 +661,7 @@ const TaskDashboardView: React.FC = () => {
                     ? totalUnassigned === 0
                     : Number(unassignedTotalByLanguage.get(allocLanguage) || 0) === 0)
                 }
-                className="w-full px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-black disabled:opacity-50"
+                className="w-full px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black disabled:opacity-50"
               >
                 Auto-Allocate
               </button>

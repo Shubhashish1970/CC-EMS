@@ -719,7 +719,7 @@ const TaskList: React.FC = () => {
                   <select
                     value={filters.status}
                     onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                   >
                     <option value="">All Statuses</option>
                     <option value="sampled_in_queue">Sampled - in queue</option>
@@ -738,7 +738,7 @@ const TaskList: React.FC = () => {
                     <select
                       value={filters.agentId}
                       onChange={(e) => setFilters({ ...filters, agentId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                     >
                       <option value="">All Agents</option>
                       {agents.map((agent) => (
@@ -758,7 +758,7 @@ const TaskList: React.FC = () => {
                     <select
                       value={filters.territory}
                       onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                     >
                       <option value="">All Territories</option>
                       {filterOptions.territoryOptions.map((t) => (
@@ -778,7 +778,7 @@ const TaskList: React.FC = () => {
                     <select
                       value={filters.zone}
                       onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                     >
                       <option value="">All Zones</option>
                       {filterOptions.zoneOptions.map((z) => (
@@ -800,7 +800,7 @@ const TaskList: React.FC = () => {
                     <select
                       value={filters.bu}
                       onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                     >
                       <option value="">All BUs</option>
                       {filterOptions.buOptions.map((b) => (
@@ -891,7 +891,7 @@ const TaskList: React.FC = () => {
                               setFilters((prev) => ({ ...prev, dateFrom: draftStart, dateTo: draftEnd }));
                               setIsDatePickerOpen(false);
                             }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800"
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
                           >
                             Apply
                           </button>
@@ -912,7 +912,7 @@ const TaskList: React.FC = () => {
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     placeholder="Search by farmer name, mobile, agent, or location..."
-                    className="w-full pl-12 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full pl-12 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1048,7 +1048,7 @@ const TaskList: React.FC = () => {
                           type="checkbox"
                           checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
                           onChange={toggleSelectAll}
-                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-lime-500"
                           title="Select all on this page"
                         />
                         <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, 'select')} />
@@ -1112,7 +1112,7 @@ const TaskList: React.FC = () => {
                                 type="checkbox"
                                 checked={selectedTasks.has(task._id)}
                                 onChange={() => toggleTaskSelection(task._id)}
-                                className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-green-500"
+                                className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-lime-500"
                               />
                             </td>
                             <td className="px-3 py-3 text-sm" style={{ width: tableColumnWidths.farmer, minWidth: tableColumnWidths.farmer }}>
@@ -1210,7 +1210,7 @@ const TaskList: React.FC = () => {
                           setCurrentPage(1);
                           setPageSize(Number(e.target.value));
                         }}
-                        className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"
                         title="Rows per page"
                       >
                         {[10, 20, 50, 100].map((n) => (
@@ -1302,7 +1302,7 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
             >
               <option value="sampled_in_queue">Sampled - in queue</option>
               <option value="in_progress">In Progress</option>
@@ -1320,7 +1320,7 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
               placeholder="Add notes about this status change..."
             />
           </div>

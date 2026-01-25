@@ -43,7 +43,7 @@ const AgentLanguageMatrix: React.FC = () => {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <Loader2 className="animate-spin text-green-700 mx-auto mb-4" size={32} />
+          <Loader2 className="animate-spin text-lime-600 mx-auto mb-4" size={32} />
           <p className="text-slate-600 font-medium">Loading language matrix...</p>
         </div>
       </div>
