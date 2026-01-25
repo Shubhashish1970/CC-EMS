@@ -1015,188 +1015,55 @@ router.get(
         if (taskIds.length > 0) {
           const tasks = await CallTask.find({ _id: { $in: taskIds } }).lean();
           
-          const outcomeBreakdown: Record<string, number> = {};
-          const statusBreakdown: Record<string, number> = {};
-          
           // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
           const getEffectiveOutcome = (task: any): string => {
             if (task.outcome) return String(task.outcome).trim();
             const status = String(task.status || '').trim();
-            // Match frontend outcomeLabel logic
             if (status === 'completed') return 'Completed Conversation';
             if (status === 'in_progress') return 'In Progress';
             if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
             return status || 'Unknown';
           };
           
-          let uncountedTasks = 0;
           for (const task of tasks) {
             const effectiveOutcome = getEffectiveOutcome(task);
-            const status = String(task.status || '').trim();
-            const storedOutcome = task.outcome ? String(task.outcome).trim() : 'NULL';
-            
-            // Track what we're seeing
-            outcomeBreakdown[effectiveOutcome] = (outcomeBreakdown[effectiveOutcome] || 0) + 1;
-            statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
-            
-            // Count by effective outcome (case-insensitive matching)
             const normalizedOutcome = effectiveOutcome.toLowerCase();
-            let counted = false;
+            
             if (normalizedOutcome === 'in progress') {
               inProgress++;
-              counted = true;
             } else if (normalizedOutcome === 'completed conversation') {
               completed++;
-              counted = true;
             } else if (normalizedOutcome === 'unsuccessful') {
               unsuccessfulCount++;
-              counted = true;
-            }
-            
-            if (!counted) {
-              uncountedTasks++;
-              logger.warn(`Task not counted in stats (with filters):`, {
-                taskId: task._id?.toString() || 'unknown',
-                effectiveOutcome,
-                storedOutcome,
-                status,
-                normalizedOutcome
-              });
             }
           }
-          
-          logger.info(`Stats calculation (with filters) for agent ${agentId}:`, {
-            totalTaskIds: taskIds.length,
-            totalTasksFetched: tasks.length,
-            calculatedCounts: { inProgress, completed, unsuccessfulCount },
-            uncountedTasks,
-            outcomeBreakdown,
-            statusBreakdown,
-            filters: { search: normalizedSearch, territory: normTerritory, activityType: normType },
-            sampleTaskData: tasks.slice(0, 10).map(t => ({
-              id: t._id,
-              outcome: t.outcome,
-              status: t.status,
-              effectiveOutcome: getEffectiveOutcome(t)
-            }))
-          });
         }
       } else {
         // Use the EXACT same query as history endpoint - use find() then count outcomes
-        // This ensures we get the exact same records that the history endpoint returns
         const tasks = await CallTask.find(baseMatch).lean();
-        
-        // Count outcomes from the actual task documents (same as what history endpoint sees)
-        // Use the same logic as frontend: outcome || outcomeLabel(status)
-        const outcomeBreakdown: Record<string, number> = {};
-        const statusBreakdown: Record<string, number> = {};
         
         // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
         const getEffectiveOutcome = (task: any): string => {
           if (task.outcome) return String(task.outcome).trim();
           const status = String(task.status || '').trim();
-          // Match frontend outcomeLabel logic
           if (status === 'completed') return 'Completed Conversation';
           if (status === 'in_progress') return 'In Progress';
           if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
           return status || 'Unknown';
         };
         
-        let uncountedTasks = 0;
-        logger.info(`Starting stats calculation for ${tasks.length} tasks (no filters path)`);
-        
-        let taskIndex = 0;
         for (const task of tasks) {
-          taskIndex++;
           const effectiveOutcome = getEffectiveOutcome(task);
-          const status = String(task.status || '').trim();
-          const storedOutcome = task.outcome ? String(task.outcome).trim() : 'NULL';
-          
-          // Track what we're seeing
-          outcomeBreakdown[effectiveOutcome] = (outcomeBreakdown[effectiveOutcome] || 0) + 1;
-          statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
-          
-          // Count by effective outcome (case-insensitive matching)
           const normalizedOutcome = effectiveOutcome.toLowerCase();
-          let counted = false;
-          
-          // Debug: Log first few tasks to see what we're getting
-          if (taskIndex <= 3) {
-            logger.info(`Sample task ${taskIndex}:`, {
-              taskId: task._id?.toString(),
-              storedOutcome,
-              status,
-              effectiveOutcome,
-              normalizedOutcome,
-              willMatch: normalizedOutcome === 'unsuccessful' || normalizedOutcome === 'completed conversation' || normalizedOutcome === 'in progress'
-            });
-          }
           
           if (normalizedOutcome === 'in progress') {
             inProgress++;
-            counted = true;
           } else if (normalizedOutcome === 'completed conversation') {
             completed++;
-            counted = true;
           } else if (normalizedOutcome === 'unsuccessful') {
             unsuccessfulCount++;
-            counted = true;
-          }
-          
-          if (!counted) {
-            uncountedTasks++;
-            if (uncountedTasks <= 5) {  // Only log first 5 to avoid spam
-              logger.warn(`Task not counted in stats:`, {
-                taskId: task._id?.toString() || 'unknown',
-                effectiveOutcome,
-                storedOutcome,
-                status,
-                normalizedOutcome
-              });
-            }
           }
         }
-        
-        logger.info(`After counting loop: inProgress=${inProgress}, completed=${completed}, unsuccessfulCount=${unsuccessfulCount}, uncountedTasks=${uncountedTasks}`);
-        
-        // Helper to safely stringify baseMatch (handle Date objects and ObjectIds)
-        const safeStringify = (obj: any): string => {
-          try {
-            return JSON.stringify(obj, (key, value) => {
-              if (value instanceof Date) {
-                return value.toISOString();
-              }
-              if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'ObjectId') {
-                return value.toString();
-              }
-              if (value && typeof value === 'object' && value._bsontype === 'ObjectId') {
-                return value.toString();
-              }
-              return value;
-            });
-          } catch (e) {
-            return `[Stringify Error: ${String(e)}]`;
-          }
-        };
-        
-        logger.info(`Stats calculation (no filters) for agent ${agentId}:`, {
-          totalTasksFound: tasks.length,
-          calculatedCounts: { inProgress, completed, unsuccessfulCount },
-          uncountedTasks,
-          outcomeBreakdown,
-          statusBreakdown,
-          baseMatchKeys: Object.keys(baseMatch),
-          baseMatchHasDateFilter: !!(baseMatch.$or || baseMatch.updatedAt),
-          baseMatchString: safeStringify(baseMatch),
-          sampleTaskData: tasks.slice(0, 10).map(t => ({ 
-            id: t._id?.toString(), 
-            outcome: t.outcome, 
-            status: t.status,
-            effectiveOutcome: getEffectiveOutcome(t),
-            updatedAt: t.updatedAt?.toISOString(),
-            callStartedAt: t.callStartedAt?.toISOString()
-          }))
-        });
       }
       
       // Get inQueue count separately (sampled_in_queue) for the agent
@@ -1328,14 +1195,6 @@ router.get(
       
       const total = inProgress + completed + unsuccessful + inQueueCount;
 
-      // Log the final response being sent
-      logger.info(`Stats endpoint response for agent ${agentId}:`, {
-        calculatedCounts: { inProgress, completed, unsuccessful, invalidCount, inQueueCount, total },
-        queryParams: { status, territory, activityType, search, dateFrom, dateTo },
-        hasDateFilter: !!(dateFrom || dateTo),
-        hasSearchFilters: !!(normalizedSearch || hasActivityFilters),
-      });
-
       res.json({
         success: true,
         data: {
@@ -1347,24 +1206,7 @@ router.get(
           invalid: invalidCount,
         },
       });
-    } catch (error: any) {
-      const errorDetails = {
-        message: error?.message || String(error),
-        name: error?.name || 'UnknownError',
-        stack: error?.stack || 'No stack trace',
-        query: req.query,
-        agentId: (req as AuthRequest).user?._id?.toString() || 'unknown',
-      };
-      // Use both logger and console.error to ensure we capture the error
-      // Serialize errorDetails to avoid [object Object] in logs
-      const errorString = JSON.stringify(errorDetails, null, 2);
-      console.error(`[STATS ERROR] Error in /own/history/stats endpoint:\n${errorString}`);
-      logger.error(`Error in /own/history/stats endpoint: ${errorDetails.message}`, {
-        errorName: errorDetails.name,
-        errorStack: errorDetails.stack,
-        query: errorDetails.query,
-        agentId: errorDetails.agentId,
-      });
+    } catch (error) {
       next(error);
     }
   }
