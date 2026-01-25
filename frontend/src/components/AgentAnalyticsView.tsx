@@ -85,16 +85,7 @@ const getPresetRange = (preset: DateRangePreset): { start: string; end: string }
   }
 };
 
-// Auto-select bucket based on date range
-const getAutoBucket = (dateFrom: string, dateTo: string): Bucket => {
-  if (!dateFrom || !dateTo) return 'daily';
-  const from = new Date(dateFrom);
-  const to = new Date(dateTo);
-  const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  if (days <= 14) return 'daily';
-  if (days <= 60) return 'weekly';
-  return 'monthly';
-};
+// Always use daily bucket for consistent date-wise trend
 
 const fmtDuration = (secs: number) => {
   const s = Number(secs || 0);
@@ -130,8 +121,8 @@ const AgentAnalyticsView: React.FC = () => {
   const [draftEnd, setDraftEnd] = useState('');
   const datePickerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-calculate bucket based on date range
-  const bucket = useMemo(() => getAutoBucket(filters.dateFrom, filters.dateTo), [filters.dateFrom, filters.dateTo]);
+  // Always use daily bucket for date-wise trend
+  const bucket: Bucket = 'daily';
 
   useEffect(() => {
     if (filters.dateFrom || filters.dateTo) return;
@@ -415,7 +406,7 @@ const AgentAnalyticsView: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-black text-slate-900">Call Trend</h3>
-                <p className="text-[10px] text-slate-500">Grouped by {bucket}</p>
+                <p className="text-[10px] text-slate-500">Daily breakdown</p>
               </div>
             </div>
             
