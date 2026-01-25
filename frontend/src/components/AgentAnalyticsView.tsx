@@ -344,17 +344,49 @@ const AgentAnalyticsView: React.FC = () => {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Tasks Due */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 rounded-lg bg-slate-100">
+                <AlertCircle size={14} className="text-slate-600" />
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tasks Due</span>
+            </div>
+            <div className="text-3xl font-black text-slate-900">{totals.totalTasksDue || 0}</div>
+            <div className="text-xs text-slate-500 mt-1">In date range</div>
+          </div>
+
           {/* Total Calls */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 rounded-lg bg-blue-50">
                 <Phone size={14} className="text-blue-600" />
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Calls</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calls Made</span>
             </div>
             <div className="text-3xl font-black text-slate-900">{totals.attempted || 0}</div>
             <div className="text-xs text-slate-500 mt-1">{totals.callsPerDay || 0}/day avg</div>
+          </div>
+
+          {/* Call Efficiency */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`p-1.5 rounded-lg ${(totals.efficiency || 0) >= 80 ? 'bg-green-50' : (totals.efficiency || 0) >= 50 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                {(totals.efficiency || 0) >= 80 ? (
+                  <TrendingUp size={14} className="text-green-600" />
+                ) : (totals.efficiency || 0) >= 50 ? (
+                  <TrendingUp size={14} className="text-amber-600" />
+                ) : (
+                  <TrendingDown size={14} className="text-red-600" />
+                )}
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency</span>
+            </div>
+            <div className={`text-3xl font-black ${(totals.efficiency || 0) >= 80 ? 'text-green-600' : (totals.efficiency || 0) >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+              {totals.efficiency || 0}%
+            </div>
+            <div className="text-xs text-slate-500 mt-1">Calls / Tasks due</div>
           </div>
 
           {/* Success Rate */}
@@ -391,7 +423,7 @@ const AgentAnalyticsView: React.FC = () => {
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 rounded-lg bg-slate-100">
-                <AlertCircle size={14} className="text-slate-600" />
+                <CheckCircle size={14} className="text-slate-600" />
               </div>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Outcomes</span>
             </div>

@@ -1423,13 +1423,27 @@ router.get(
       const daysInRange = from && to ? Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24))) : 1;
       const callsPerDay = totals.attempted > 0 ? (totals.attempted / daysInRange).toFixed(1) : '0';
 
+      // Count total tasks due within date range (based on scheduledDate)
+      const tasksDueMatch: any = {
+        assignedAgentId: new mongoose.Types.ObjectId(agentId),
+      };
+      if (from || to) {
+        tasksDueMatch.scheduledDate = {};
+        if (from) tasksDueMatch.scheduledDate.$gte = from;
+        if (to) tasksDueMatch.scheduledDate.$lte = to;
+      }
+      const totalTasksDue = await CallTask.countDocuments(tasksDueMatch);
+      
+      // Calculate efficiency (attempted / due)
+      const efficiency = totalTasksDue > 0 ? Math.round((totals.attempted / totalTasksDue) * 100) : 0;
+
       res.json({
         success: true,
         data: {
           bucket: bucketKey,
           dateFrom: from ? from.toISOString() : null,
           dateTo: to ? to.toISOString() : null,
-          totals: { ...totals, avgConnectedDurationSeconds, successRate, callsPerDay, daysInRange },
+          totals: { ...totals, avgConnectedDurationSeconds, successRate, callsPerDay, daysInRange, totalTasksDue, efficiency },
           trend,
         },
       });
