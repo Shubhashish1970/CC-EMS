@@ -670,6 +670,7 @@ export const getActivitiesSamplingStats = async (filters?: {
   tasksNotReachable: number;
   tasksInvalidNumber: number;
   tasksUnassigned: number;
+  callbackTasks: number;
 }> => {
   const {
     activityType,
@@ -783,12 +784,20 @@ export const getActivitiesSamplingStats = async (filters?: {
     },
     { $unwind: '$activity' },
     { $match: taskMatch },
-    { $group: { _id: '$status', count: { $sum: 1 } } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        callbackCount: { $sum: { $cond: [{ $eq: ['$isCallback', true] }, 1, 0] } },
+      },
+    },
   ]);
 
   const byStatus: Record<string, number> = {};
+  let totalCallbacks = 0;
   for (const r of taskAgg) {
     byStatus[String(r._id)] = Number(r.count || 0);
+    totalCallbacks += Number(r.callbackCount || 0);
   }
 
   const totalTasks = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
@@ -808,6 +817,7 @@ export const getActivitiesSamplingStats = async (filters?: {
     tasksNotReachable: Number(byStatus.not_reachable || 0),
     tasksInvalidNumber: Number(byStatus.invalid_number || 0),
     tasksUnassigned: Number(byStatus.unassigned || 0),
+    callbackTasks: totalCallbacks,
   };
 };
 
