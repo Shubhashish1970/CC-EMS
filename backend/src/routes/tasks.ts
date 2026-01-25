@@ -3261,13 +3261,20 @@ router.get(
         match.isCallback = true;
       }
 
-      // Count total
-      const total = await CallTask.countDocuments(match);
-      const pages = Math.ceil(total / Number(limit));
-
-      // Fetch tasks with farmer and activity data
+      // Fetch tasks with farmer and activity data, excluding those that already have callbacks
       const tasks = await CallTask.aggregate([
         { $match: match },
+        // Lookup to check if a callback already exists for this task
+        {
+          $lookup: {
+            from: 'calltasks',
+            localField: '_id',
+            foreignField: 'parentTaskId',
+            as: 'existingCallbacks',
+          },
+        },
+        // Filter out tasks that already have a callback created
+        { $match: { existingCallbacks: { $size: 0 } } },
         { $sort: { updatedAt: -1 } },
         { $skip: (Number(page) - 1) * Number(limit) },
         { $limit: Number(limit) },
@@ -3321,6 +3328,23 @@ router.get(
           },
         },
       ]);
+
+      // Get total count (need separate aggregation for accurate count)
+      const countResult = await CallTask.aggregate([
+        { $match: match },
+        {
+          $lookup: {
+            from: 'calltasks',
+            localField: '_id',
+            foreignField: 'parentTaskId',
+            as: 'existingCallbacks',
+          },
+        },
+        { $match: { existingCallbacks: { $size: 0 } } },
+        { $count: 'total' },
+      ]);
+      const total = countResult[0]?.total || 0;
+      const pages = Math.ceil(total / Number(limit));
 
       res.json({
         success: true,

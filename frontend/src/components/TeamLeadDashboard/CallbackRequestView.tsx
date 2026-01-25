@@ -189,17 +189,20 @@ const CallbackRequestView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
+  // Filter tasks that can be selected (not at max callbacks)
+  const selectableTasks = tasks.filter(t => (t.callbackNumber || 0) < 2);
+
   const handleSelectAll = () => {
-    if (selectedTaskIds.size === tasks.length) {
+    if (selectedTaskIds.size === selectableTasks.length && selectableTasks.length > 0) {
       setSelectedTaskIds(new Set());
     } else {
-      setSelectedTaskIds(new Set(tasks.filter(t => t.callbackNumber < 2).map(t => t._id)));
+      setSelectedTaskIds(new Set(selectableTasks.map(t => t._id)));
     }
   };
 
   const handleSelectTask = (taskId: string) => {
     const task = tasks.find(t => t._id === taskId);
-    if (task && task.callbackNumber >= 2) return; // Can't select max retry tasks
+    if (task && (task.callbackNumber || 0) >= 2) return; // Can't select max retry tasks
 
     const newSet = new Set(selectedTaskIds);
     if (newSet.has(taskId)) {
@@ -236,7 +239,6 @@ const CallbackRequestView: React.FC = () => {
     setDraftEnd(filters.dateTo);
   };
 
-  const selectableTasks = tasks.filter(t => t.callbackNumber < 2);
   const allSelected = selectableTasks.length > 0 && selectedTaskIds.size === selectableTasks.length;
 
   return (
