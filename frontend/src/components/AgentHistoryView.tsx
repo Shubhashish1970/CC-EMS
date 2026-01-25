@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, User as UserIcon, ChevronUp } from 'lucide-react';
+import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, ChevronUp } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -41,6 +41,17 @@ const toLocalISO = (d: Date): string => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// Get initials from name for avatar display
+const getInitials = (name: string): string => {
+  if (!name) return '?';
+  return name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 };
 
 const formatPretty = (iso: string) => {
@@ -757,8 +768,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                 }}
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                <UserIcon className="text-slate-400" size={18} />
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-sm border-2 border-white">
+                                <span className="text-white font-bold text-sm">{getInitials(farmer.name || '')}</span>
                               </div>
                             )}
                             <div className="min-w-0">
