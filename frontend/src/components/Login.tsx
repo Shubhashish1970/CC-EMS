@@ -62,14 +62,121 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* Sign In Button - Trigger */}
-          <button
-            onClick={() => setShowLoginPanel(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-lime-400 hover:bg-lime-500 text-slate-900 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transition-all"
-          >
-            <LogIn size={18} />
-            Sign In
-          </button>
+          {/* Sign In Button & Dropdown Container */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLoginPanel(!showLoginPanel)}
+              className="flex items-center gap-2 px-6 py-3 bg-lime-400 hover:bg-lime-500 text-slate-900 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transition-all"
+            >
+              <LogIn size={18} />
+              Sign In
+            </button>
+
+            {/* Login Panel - Drops down below button */}
+            <div 
+              className={`absolute right-0 top-full mt-3 w-[380px] transition-all duration-300 ease-out ${
+                showLoginPanel 
+                  ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                  : 'opacity-0 -translate-y-4 pointer-events-none'
+              }`}
+            >
+              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+                {/* Header */}
+                <div className="bg-slate-900 px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-lime-400 rounded-lg flex items-center justify-center">
+                      <Leaf size={18} className="text-slate-900" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-sm">Welcome back</h3>
+                      <p className="text-[11px] text-slate-400">Sign in to continue</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowLoginPanel(false)}
+                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Form */}
+                <div className="p-5">
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+                      {error}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label htmlFor="email" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                        Email Address
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
+                        placeholder="Enter your email"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="password" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="w-full px-3.5 py-3 pr-11 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
+                          placeholder="Enter your password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-slate-500 hover:text-lime-600 font-medium transition-colors"
+                      >
+                        Forgot Password?
+                      </Link>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          Signing In...
+                        </>
+                      ) : (
+                        'Sign In'
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -160,125 +267,13 @@ const Login: React.FC = () => {
         </div>
       </div>
 
-      {/* Login Panel - Slides down from top */}
-      <div 
-        className={`fixed inset-0 z-50 transition-all duration-500 ease-out ${
-          showLoginPanel 
-            ? 'opacity-100 pointer-events-auto' 
-            : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        {/* Backdrop */}
+      {/* Click outside to close login panel */}
+      {showLoginPanel && (
         <div 
-          className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"
+          className="fixed inset-0 z-10"
           onClick={() => setShowLoginPanel(false)}
         />
-
-        {/* Login Card - Animated from top */}
-        <div 
-          className={`absolute left-1/2 -translate-x-1/2 w-full max-w-md px-4 transition-all duration-500 ease-out ${
-            showLoginPanel 
-              ? 'top-8 lg:top-16 opacity-100' 
-              : '-top-full opacity-0'
-          }`}
-        >
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="bg-slate-900 px-6 py-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-lime-400 rounded-xl flex items-center justify-center">
-                  <Leaf size={20} className="text-slate-900" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold">Welcome back</h3>
-                  <p className="text-xs text-slate-400">Sign in to continue</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowLoginPanel(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="p-6">
-              {error && (
-                <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-medium">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label htmlFor="email" className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
-                      placeholder="Enter your password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <Link
-                    to="/forgot-password"
-                    className="text-sm text-slate-600 hover:text-lime-600 font-medium transition-colors"
-                  >
-                    Forgot Password?
-                  </Link>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      Signing In...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
