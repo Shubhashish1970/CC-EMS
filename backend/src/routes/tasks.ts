@@ -646,43 +646,6 @@ router.get(
   }
 );
 
-// @route   GET /api/tasks/own/history/:id
-// @desc    Agent History detail for a specific task
-// @access  Private (CC Agent)
-router.get(
-  '/own/history/:id',
-  requirePermission('tasks.view.own'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const authReq = req as AuthRequest;
-      const agentId = authReq.user._id.toString();
-      const taskId = req.params.id;
-
-      const task = await CallTask.findById(taskId)
-        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
-        .populate('activityId', 'activityId type date officerName tmName location territory territoryName state zoneName buName crops products')
-        .populate('assignedAgentId', 'name email employeeId')
-        .lean();
-
-      if (!task) {
-        const error: AppError = new Error('Task not found');
-        error.statusCode = 404;
-        throw error;
-      }
-
-      if (!task.assignedAgentId || (task.assignedAgentId as any)?._id?.toString?.() !== agentId) {
-        const error: AppError = new Error('Access denied');
-        error.statusCode = 403;
-        throw error;
-      }
-
-      res.json({ success: true, data: { task } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
 // @route   GET /api/tasks/own/history/options
 // @desc    Distinct filter option lists for Agent History (territory/activityType), scoped by filters (each ignores its own selection)
 // @access  Private (CC Agent)
@@ -877,10 +840,6 @@ router.get(
 router.get(
   '/own/history/stats',
   requirePermission('tasks.view.own'),
-  (req: Request, res: Response, next: NextFunction) => {
-    console.log('[STATS-MW] After requirePermission');
-    next();
-  },
   [
     query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
     query('territory').optional().isString(),
@@ -889,16 +848,10 @@ router.get(
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
   ],
-  (req: Request, res: Response, next: NextFunction) => {
-    console.log('[STATS-MW] After validators, query:', JSON.stringify(req.query));
-    next();
-  },
   async (req: Request, res: Response, next: NextFunction) => {
-    console.log('[STATS] Handler entered');
     try {
       const authReq = req as AuthRequest;
       const agentId = authReq.user?._id?.toString() || 'unknown';
-      console.log(`[STATS] Agent ID: ${agentId}`);
       
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -907,10 +860,8 @@ router.get(
           error: { message: 'Validation failed', errors: errors.array() },
         });
       }
-      console.log('[STATS] Validation passed');
 
       const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
-      console.log(`[STATS] Query params extracted - dateFrom: ${dateFrom}, dateTo: ${dateTo}`);
 
       const baseMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
@@ -926,30 +877,21 @@ router.get(
         let from: Date | null = null;
         let to: Date | null = null;
         
-        try {
-          if (dateFrom) {
-            from = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
-            if (isNaN(from.getTime())) {
-              console.log(`[STATS] Invalid dateFrom: ${dateFrom}`);
-              from = null;
-            } else {
-              from.setHours(0, 0, 0, 0);
-            }
+        if (dateFrom) {
+          from = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
+          if (!isNaN(from.getTime())) {
+            from.setHours(0, 0, 0, 0);
+          } else {
+            from = null;
           }
-          if (dateTo) {
-            to = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
-            if (isNaN(to.getTime())) {
-              console.log(`[STATS] Invalid dateTo: ${dateTo}`);
-              to = null;
-            } else {
-              to.setHours(23, 59, 59, 999);
-            }
+        }
+        if (dateTo) {
+          to = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
+          if (!isNaN(to.getTime())) {
+            to.setHours(23, 59, 59, 999);
+          } else {
+            to = null;
           }
-          console.log(`[STATS] Parsed dates - from: ${from?.toISOString() || 'null'}, to: ${to?.toISOString() || 'null'}`);
-        } catch (dateError: any) {
-          console.error(`[STATS] Error parsing dates: ${dateError?.message}`);
-          from = null;
-          to = null;
         }
         
         // Use the EXACT same date filter logic as history endpoint
@@ -1006,14 +948,6 @@ router.get(
           baseMatch.$or = dateConditions;
         }
       }
-      
-      // Log baseMatch after construction for debugging
-      console.log(`[STATS] baseMatch constructed:`, JSON.stringify({
-        hasStatus: !!baseMatch.status,
-        hasOr: !!baseMatch.$or,
-        orLength: baseMatch.$or ? baseMatch.$or.length : 0,
-        baseMatchKeys: Object.keys(baseMatch),
-      }));
 
       const normalizedSearch = String(search || '').trim();
       const hasActivityFilters = !!String(territory || '').trim() || !!String(activityType || '').trim();
@@ -1150,17 +1084,7 @@ router.get(
       } else {
         // Use the EXACT same query as history endpoint - use find() then count outcomes
         // This ensures we get the exact same records that the history endpoint returns
-        console.log(`[STATS] Starting simple path query for agent ${agentId}`);
-        let tasks: any[] = [];
-        try {
-          console.log(`[STATS] Executing CallTask.find() query...`);
-          tasks = await CallTask.find(baseMatch).lean();
-          console.log(`[STATS] Query returned ${tasks.length} tasks`);
-        } catch (queryError: any) {
-          console.error(`[STATS] Error querying tasks: ${queryError?.message}`);
-          console.error(`[STATS] Error stack: ${queryError?.stack}`);
-          throw queryError;
-        }
+        const tasks = await CallTask.find(baseMatch).lean();
         
         // Count outcomes from the actual task documents (same as what history endpoint sees)
         // Use the same logic as frontend: outcome || outcomeLabel(status)
@@ -1446,6 +1370,43 @@ router.get(
   }
 );
 
+// @route   GET /api/tasks/own/history/:id
+// @desc    Agent History detail for a specific task
+// @access  Private (CC Agent)
+// NOTE: This route MUST come AFTER /own/history/options and /own/history/stats to avoid "options"/"stats" being treated as an ID
+router.get(
+  '/own/history/:id',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user._id.toString();
+      const taskId = req.params.id;
+
+      const task = await CallTask.findById(taskId)
+        .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
+        .populate('activityId', 'activityId type date officerName tmName location territory territoryName state zoneName buName crops products')
+        .populate('assignedAgentId', 'name email employeeId')
+        .lean();
+
+      if (!task) {
+        const error: AppError = new Error('Task not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!task.assignedAgentId || (task.assignedAgentId as any)?._id?.toString?.() !== agentId) {
+        const error: AppError = new Error('Access denied');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      res.json({ success: true, data: { task } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // @route   GET /api/tasks/own/analytics
 // @desc    Agent performance analytics (attempts + outcomes) with time-bucket toggle
