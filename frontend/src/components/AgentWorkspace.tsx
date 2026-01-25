@@ -513,12 +513,6 @@ const AgentWorkspace: React.FC = () => {
             <TrendingUp size={24} />
           </button>
         </nav>
-        <button 
-          onClick={logout}
-          className="mt-auto p-3 text-white/40 hover:text-red-400 transition-all"
-        >
-          <LogOut size={24} />
-        </button>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -570,23 +564,36 @@ const AgentWorkspace: React.FC = () => {
               </div>
             )}
           </div>
-              <div className="flex items-center gap-3">
-                {activeSection === 'dialer' && taskData && (
-                  <Button 
-                    variant="primary" 
-                    size="sm" 
-                    onClick={handleFinishCall}
-                    disabled={isSubmitting || !formData.callStatus}
-                    title={!formData.callStatus ? 'Please select call status' : formData.callStatus === 'Connected' ? 'Finish call and submit' : 'Save call attempt'}
-                  >
-                    <PhoneOff size={16} />
-                    {formData.callStatus === 'Connected' ? 'Finish Call' : 'Save Call'}
-                  </Button>
-                )}
-            <Button variant="danger" size="sm" onClick={logout}>
-              <LogOut size={16} />
-              Logout
-            </Button>
+          <div className="flex items-center gap-4">
+            {activeSection === 'dialer' && taskData && (
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={handleFinishCall}
+                disabled={isSubmitting || !formData.callStatus}
+                title={!formData.callStatus ? 'Please select call status' : formData.callStatus === 'Connected' ? 'Finish call and submit' : 'Save call attempt'}
+              >
+                <PhoneOff size={16} />
+                {formData.callStatus === 'Connected' ? 'Finish Call' : 'Save Call'}
+              </Button>
+            )}
+            {/* User Info */}
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+                <User size={16} className="text-slate-400" />
+                <span className="font-medium">{user.name}</span>
+                <span className="text-slate-400">•</span>
+                <span className="text-xs text-slate-500 uppercase">{user.role?.replace('_', ' ')}</span>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
+              title="Logout"
+            >
+              <LogOut size={18} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </header>
 
