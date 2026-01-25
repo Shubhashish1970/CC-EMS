@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tasksAPI } from '../services/api';
 import {
-  Phone, User, CheckCircle, Zap, LogOut, Globe, Loader2, Database,
+  Phone, User, CheckCircle, Zap, LogOut, Globe, Loader2,
   TrendingUp, MapPin, History, X, PhoneOff, PhoneCall
 } from 'lucide-react';
 import BinaryToggle from './BinaryToggle';
@@ -20,7 +20,7 @@ import AgentAnalyticsView from './AgentAnalyticsView';
 
 // Business Constants
 const IndianCrops = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane'];
-const NACLProducts = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster'];
+const AgriProducts = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster'];
 const NonPurchaseReasons = ['Price', 'Availability', 'Brand preference', 'No requirement', 'Not convinced', 'Other'];
 
 interface CallLog {
@@ -521,7 +521,7 @@ const AgentWorkspace: React.FC = () => {
         <header className="h-20 bg-white border-b border-green-100 px-4 lg:px-8 flex items-center justify-between shrink-0 shadow-sm z-20">
           <div className="flex items-center gap-4 lg:gap-8">
             <div className="flex flex-col">
-              <span className="text-[10px] font-black text-green-700 uppercase tracking-[0.2em]">NACL EMS System</span>
+              <span className="text-[10px] font-black text-lime-600 uppercase tracking-[0.2em]">Kweka Reach</span>
               <h1 className="text-base lg:text-xl font-black text-slate-800 tracking-tight">Agent Workspace</h1>
             </div>
             <div className="h-10 w-px bg-slate-100 hidden md:block" />
@@ -622,7 +622,7 @@ const AgentWorkspace: React.FC = () => {
                 isSubmitting={isSubmitting}
                 isActive={activeTab === 'flow'}
                 IndianCrops={taskData?.activity?.crops || IndianCrops}
-                NACLProducts={taskData?.activity?.products || NACLProducts}
+                AgriProducts={taskData?.activity?.products || AgriProducts}
                 NonPurchaseReasons={NonPurchaseReasons}
                 isAIPanelExpanded={isAIPanelExpanded}
                 onOutboundStatusSelected={handleOutboundStatusSelected}

@@ -28,7 +28,7 @@ interface CallInteractionFormProps {
   isSubmitting: boolean;
   isActive: boolean;
   IndianCrops: string[]; // Activity crops (for highlighting)
-  NACLProducts: string[]; // Activity products (for highlighting)
+  AgriProducts: string[]; // Activity products (for highlighting)
   NonPurchaseReasons: string[];
   isAIPanelExpanded?: boolean;
   onOutboundStatusSelected?: (status: string) => void;
@@ -43,7 +43,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
   isSubmitting,
   isActive,
   IndianCrops, // Activity crops
-  NACLProducts, // Activity products
+  AgriProducts, // Activity products
   NonPurchaseReasons,
   isAIPanelExpanded = false,
   onOutboundStatusSelected,
@@ -81,14 +81,14 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
         console.error('Error fetching master data:', error);
         // Fallback to activity data if master data fails
         setMasterCrops(IndianCrops);
-        setMasterProducts(NACLProducts);
+        setMasterProducts(AgriProducts);
       } finally {
         setLoadingMasterData(false);
       }
     };
 
     fetchMasterData();
-  }, [IndianCrops, NACLProducts]);
+  }, [IndianCrops, AgriProducts]);
 
   // Auto-scroll to sections when they appear (scrolls within the container)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -367,12 +367,12 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                   activityItems={IndianCrops}
                                 />
                                 <MultiTagSelect
-                                  label="NACL Products Recalled"
+                                  label="Products Recalled"
                                   items={masterProducts}
                                   selected={formData.productsDiscussed}
                                   onToggle={(i: string) => toggleList('productsDiscussed', i)}
                                   color="indigo"
-                                  activityItems={NACLProducts}
+                                  activityItems={AgriProducts}
                                 />
                               </>
                             )}

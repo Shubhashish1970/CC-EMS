@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { Loader2, Database, ArrowLeft, Mail } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Leaf } from 'lucide-react';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -30,19 +30,19 @@ const ForgotPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f1f5f1] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-700 rounded-2xl mb-4 shadow-lg">
-            <Database size={32} className="text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-lime-400 rounded-2xl mb-4 shadow-lg">
+            <Leaf size={32} className="text-slate-900" />
           </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">NACL EMS System</h1>
-          <p className="text-sm text-slate-500 mt-2">Call Centre Management</p>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Kweka Reach</h1>
+          <p className="text-sm text-slate-500 mt-2">Farmer Engagement Platform</p>
         </div>
 
         {/* Forgot Password Form */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl p-8">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8">
           <div className="flex items-center gap-3 mb-6">
             <Link
               to="/login"
@@ -62,7 +62,7 @@ const ForgotPassword: React.FC = () => {
 
           {success ? (
             <div className="space-y-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm">
+              <div className="p-4 bg-lime-50 border border-lime-200 rounded-2xl text-lime-800 text-sm">
                 <div className="flex items-start gap-3">
                   <Mail size={20} className="mt-0.5 flex-shrink-0" />
                   <div>
@@ -70,7 +70,7 @@ const ForgotPassword: React.FC = () => {
                     <p>
                       If an account with <strong>{email}</strong> exists, we've sent you a password reset link.
                     </p>
-                    <p className="mt-2 text-xs text-green-600">
+                    <p className="mt-2 text-xs text-lime-600">
                       The link will expire in 1 hour. If you don't see the email, check your spam folder.
                     </p>
                   </div>
@@ -98,7 +98,7 @@ const ForgotPassword: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-100 focus:border-green-500 outline-none transition-all text-sm font-medium"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
                   placeholder="Enter your email"
                 />
               </div>
@@ -106,7 +106,7 @@ const ForgotPassword: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-green-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -124,7 +124,7 @@ const ForgotPassword: React.FC = () => {
               <div className="text-center">
                 <Link
                   to="/login"
-                  className="text-sm text-slate-600 hover:text-green-700 font-medium transition-colors"
+                  className="text-sm text-slate-600 hover:text-lime-600 font-medium transition-colors"
                 >
                   Back to Login
                 </Link>
@@ -135,7 +135,7 @@ const ForgotPassword: React.FC = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-6">
-          © 2024 NACL. All rights reserved.
+          © {new Date().getFullYear()} Kweka Reach. All rights reserved.
         </p>
       </div>
     </div>

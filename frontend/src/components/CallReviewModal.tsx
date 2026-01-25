@@ -181,7 +181,7 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                       )}
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-slate-200">
-                      <label className="text-xs font-bold text-slate-600 mb-2 block">NACL Products Recalled</label>
+                      <label className="text-xs font-bold text-slate-600 mb-2 block">Products Recalled</label>
                       {formData.productsDiscussed.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {formData.productsDiscussed.map((product, idx) => (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { Loader2, Database, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff, CheckCircle, Leaf } from 'lucide-react';
 
 const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -103,11 +103,11 @@ const ResetPassword: React.FC = () => {
 
   if (verifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f1f5f1] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl p-8">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8">
             <div className="flex items-center justify-center gap-3">
-              <Loader2 className="animate-spin text-green-700" size={24} />
+              <Loader2 className="animate-spin text-lime-600" size={24} />
               <p className="text-slate-600 font-medium">Verifying reset link...</p>
             </div>
           </div>
@@ -118,22 +118,22 @@ const ResetPassword: React.FC = () => {
 
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f1f5f1] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-700 rounded-2xl mb-4 shadow-lg">
-              <Database size={32} className="text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-lime-400 rounded-2xl mb-4 shadow-lg">
+              <Leaf size={32} className="text-slate-900" />
             </div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">NACL EMS System</h1>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Kweka Reach</h1>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl p-8">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8">
             <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm mb-4">
               {error}
             </div>
             <Link
               to="/forgot-password"
-              className="block w-full text-center py-3 px-4 bg-green-700 hover:bg-green-800 text-white rounded-2xl font-medium text-sm transition-colors"
+              className="block w-full text-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-medium text-sm transition-colors"
             >
               Request New Reset Link
             </Link>
@@ -145,29 +145,29 @@ const ResetPassword: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f1f5f1] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-700 rounded-2xl mb-4 shadow-lg">
-              <Database size={32} className="text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-lime-400 rounded-2xl mb-4 shadow-lg">
+              <Leaf size={32} className="text-slate-900" />
             </div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">NACL EMS System</h1>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Kweka Reach</h1>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl p-8">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm mb-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8">
+            <div className="p-4 bg-lime-50 border border-lime-200 rounded-2xl text-lime-800 text-sm mb-4">
               <div className="flex items-start gap-3">
                 <CheckCircle size={20} className="mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-semibold mb-1">Password Reset Successful!</p>
                   <p>Your password has been reset successfully. You can now log in with your new password.</p>
-                  <p className="mt-2 text-xs text-green-600">Redirecting to login page...</p>
+                  <p className="mt-2 text-xs text-lime-600">Redirecting to login page...</p>
                 </div>
               </div>
             </div>
             <Link
               to="/login"
-              className="block w-full text-center py-3 px-4 bg-green-700 hover:bg-green-800 text-white rounded-2xl font-medium text-sm transition-colors"
+              className="block w-full text-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-medium text-sm transition-colors"
             >
               Go to Login
             </Link>
@@ -178,19 +178,19 @@ const ResetPassword: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f1f5f1] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-700 rounded-2xl mb-4 shadow-lg">
-            <Database size={32} className="text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-lime-400 rounded-2xl mb-4 shadow-lg">
+            <Leaf size={32} className="text-slate-900" />
           </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">NACL EMS System</h1>
-          <p className="text-sm text-slate-500 mt-2">Call Centre Management</p>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Kweka Reach</h1>
+          <p className="text-sm text-slate-500 mt-2">Farmer Engagement Platform</p>
         </div>
 
         {/* Reset Password Form */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl p-8">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8">
           <div className="flex items-center gap-3 mb-6">
             <Link
               to="/login"
@@ -223,7 +223,7 @@ const ResetPassword: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-100 focus:border-green-500 outline-none transition-all text-sm font-medium"
+                  className="w-full px-4 py-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
                   placeholder="Enter new password"
                 />
                 <button
@@ -248,7 +248,7 @@ const ResetPassword: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-100 focus:border-green-500 outline-none transition-all text-sm font-medium"
+                  className="w-full px-4 py-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
                   placeholder="Confirm new password"
                 />
                 <button
@@ -265,7 +265,7 @@ const ResetPassword: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-green-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -280,7 +280,7 @@ const ResetPassword: React.FC = () => {
             <div className="text-center">
               <Link
                 to="/login"
-                className="text-sm text-slate-600 hover:text-green-700 font-medium transition-colors"
+                className="text-sm text-slate-600 hover:text-lime-600 font-medium transition-colors"
               >
                 Back to Login
               </Link>
@@ -290,7 +290,7 @@ const ResetPassword: React.FC = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-6">
-          © 2024 NACL. All rights reserved.
+          © {new Date().getFullYear()} Kweka Reach. All rights reserved.
         </p>
       </div>
     </div>
