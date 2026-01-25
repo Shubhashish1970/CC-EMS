@@ -3224,7 +3224,12 @@ router.get(
       const match: any = {
         assignedAgentId: { $in: teamAgentIds },
         status: { $in: ['completed', 'not_reachable', 'invalid_number'] }, // Only completed/unsuccessful
-        callbackNumber: { $lt: 2 }, // Max 2 callbacks (0=original, 1=first callback, 2=second = max)
+        // Max 2 callbacks: handle tasks without callbackNumber field (treat as 0)
+        $or: [
+          { callbackNumber: { $exists: false } },
+          { callbackNumber: null },
+          { callbackNumber: { $lt: 2 } },
+        ],
       };
 
       // Agent filter
@@ -3397,7 +3402,12 @@ router.post(
           $match: {
             _id: { $in: taskIds.map((id: string) => new mongoose.Types.ObjectId(id)) },
             status: { $in: ['completed', 'not_reachable', 'invalid_number'] },
-            callbackNumber: { $lt: 2 }, // Max 2 callbacks
+            // Max 2 callbacks: handle tasks without callbackNumber field (treat as 0)
+            $or: [
+              { callbackNumber: { $exists: false } },
+              { callbackNumber: null },
+              { callbackNumber: { $lt: 2 } },
+            ],
           },
         },
         {
