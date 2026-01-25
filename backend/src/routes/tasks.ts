@@ -877,6 +877,10 @@ router.get(
 router.get(
   '/own/history/stats',
   requirePermission('tasks.view.own'),
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('[STATS-MW] After requirePermission');
+    next();
+  },
   [
     query('status').optional().isIn(['in_progress', 'completed', 'not_reachable', 'invalid_number']),
     query('territory').optional().isString(),
@@ -885,6 +889,10 @@ router.get(
     query('dateFrom').optional().isISO8601().toDate(),
     query('dateTo').optional().isISO8601().toDate(),
   ],
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('[STATS-MW] After validators, query:', JSON.stringify(req.query));
+    next();
+  },
   async (req: Request, res: Response, next: NextFunction) => {
     console.log('[STATS] Handler entered');
     try {
