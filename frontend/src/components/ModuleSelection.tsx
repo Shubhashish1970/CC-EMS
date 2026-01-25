@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PhoneCall, Loader2, ArrowRight, Activity, Leaf, Users, BarChart3, LogOut, Phone, TrendingUp, CheckCircle } from 'lucide-react';
+import { PhoneCall, Loader2, ArrowRight, Leaf, Phone, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface Module {
@@ -14,7 +14,7 @@ interface Module {
 }
 
 const ModuleSelection: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [modules, setModules] = useState<Module[]>([]);
@@ -46,15 +46,6 @@ const ModuleSelection: React.FC = () => {
 
   const handleModuleSelect = (moduleCode: string) => {
     navigate(`/workspace/${moduleCode}`, { replace: true });
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login', { replace: true });
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
   };
 
   if (isLoading) {
@@ -130,25 +121,16 @@ const ModuleSelection: React.FC = () => {
           </div>
 
           {/* Bottom - User Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-lime-500/20 rounded-full flex items-center justify-center">
-                <span className="text-lime-400 font-bold text-sm">
-                  {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
-                </span>
-              </div>
-              <div>
-                <p className="text-white font-semibold">{user?.name || 'User'}</p>
-                <p className="text-xs text-slate-400 uppercase">{user?.role?.replace('_', ' ') || 'Agent'}</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-lime-500/20 rounded-full flex items-center justify-center">
+              <span className="text-lime-400 font-bold text-sm">
+                {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+              </span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
+            <div>
+              <p className="text-white font-semibold">{user?.name || 'User'}</p>
+              <p className="text-xs text-slate-400 uppercase">{user?.role?.replace('_', ' ') || 'Agent'}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -157,22 +139,14 @@ const ModuleSelection: React.FC = () => {
       <div className="w-full lg:w-1/2 bg-slate-50 flex flex-col">
         {/* Mobile Header */}
         <div className="lg:hidden bg-slate-900 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
-                <Leaf className="text-slate-900" size={20} />
-              </div>
-              <div>
-                <h1 className="text-lg font-black text-white">Kweka Reach</h1>
-                <p className="text-[10px] text-lime-400 uppercase tracking-wider">Farmer Engagement</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
+              <Leaf className="text-slate-900" size={20} />
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
-            >
-              <LogOut size={20} />
-            </button>
+            <div>
+              <h1 className="text-lg font-black text-white">Kweka Reach</h1>
+              <p className="text-[10px] text-lime-400 uppercase tracking-wider">Farmer Engagement</p>
+            </div>
           </div>
         </div>
 
