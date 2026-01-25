@@ -94,7 +94,7 @@ const fmtDuration = (secs: number) => {
   return `${m}m ${r}s`;
 };
 
-// Format period for display
+// Format period for chart display (short)
 const formatPeriod = (period: string, bucket: Bucket) => {
   if (bucket === 'daily') {
     try {
@@ -107,11 +107,25 @@ const formatPeriod = (period: string, bucket: Bucket) => {
   return period;
 };
 
+// Format period for table display (dd-mmm-yy)
+const formatPeriodTable = (period: string) => {
+  try {
+    const d = new Date(period);
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const year = String(d.getFullYear()).slice(-2);
+    return `${day}-${month}-${year}`;
+  } catch {
+    return period;
+  }
+};
+
 const AgentAnalyticsView: React.FC = () => {
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<any>(null);
-  const [showDetailTable, setShowDetailTable] = useState(false);
+  const [showDetailTable, setShowDetailTable] = useState(true);
 
   const [filters, setFilters] = useState<{ dateFrom: string; dateTo: string }>({ dateFrom: '', dateTo: '' });
 
@@ -592,7 +606,7 @@ const AgentAnalyticsView: React.FC = () => {
                     const successPct = r.attempted > 0 ? Math.round((r.successful / r.attempted) * 100) : 0;
                     return (
                       <tr key={r.period} className="hover:bg-slate-50">
-                        <td className="py-2 pr-4 font-medium text-slate-900">{r.period}</td>
+                        <td className="py-2 pr-4 font-medium text-slate-900">{formatPeriodTable(r.period)}</td>
                         <td className="py-2 pr-4 text-right font-bold text-slate-700">{r.attempted}</td>
                         <td className="py-2 pr-4 text-right font-bold text-green-600">{r.successful}</td>
                         <td className="py-2 pr-4 text-right font-bold text-red-600">{r.unsuccessful}</td>
