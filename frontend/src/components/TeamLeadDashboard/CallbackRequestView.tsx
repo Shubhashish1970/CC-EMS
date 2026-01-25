@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import Button from '../shared/Button';
 import { tasksAPI } from '../../services/api';
@@ -47,6 +47,8 @@ interface Agent {
   name: string;
   email: string;
 }
+
+const PAGE_SIZE = 30;
 
 // Format date to YYYY-MM-DD in local timezone
 const toLocalISO = (d: Date): string => {
@@ -115,11 +117,12 @@ const formatDate = (dateStr: string) => {
 const CallbackRequestView: React.FC = () => {
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [tasks, setTasks] = useState<CallbackTask[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0, hasMore: false });
 
   // Filters
   const [filters, setFilters] = useState({
@@ -136,6 +139,10 @@ const CallbackRequestView: React.FC = () => {
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
   const datePickerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Infinite scroll refs
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize date range
   useEffect(() => {
@@ -156,8 +163,14 @@ const CallbackRequestView: React.FC = () => {
     return () => document.removeEventListener('mousedown', onClick);
   }, [isDatePickerOpen]);
 
-  const loadTasks = async (page = 1) => {
-    setIsLoading(true);
+  // Load tasks (initial or refresh)
+  const loadTasks = useCallback(async (reset = true) => {
+    if (reset) {
+      setIsLoading(true);
+      setTasks([]);
+      setSelectedTaskIds(new Set());
+    }
+    
     try {
       const res: any = await tasksAPI.getCallbackCandidates({
         dateFrom: filters.dateFrom || undefined,
@@ -165,29 +178,89 @@ const CallbackRequestView: React.FC = () => {
         outcome: filters.outcome !== 'all' ? filters.outcome : undefined,
         callType: filters.callType !== 'all' ? filters.callType : undefined,
         agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
-        page,
-        limit: pagination.limit,
+        page: 1,
+        limit: PAGE_SIZE,
       });
 
       if (res.success) {
         setTasks(res.data.tasks || []);
         setAgents(res.data.agents || []);
-        setPagination(res.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
-        setSelectedTaskIds(new Set()); // Clear selection on new data
+        const pag = res.data.pagination || { page: 1, total: 0, pages: 0 };
+        setPagination({
+          page: pag.page,
+          total: pag.total,
+          pages: pag.pages,
+          hasMore: pag.page < pag.pages,
+        });
       }
     } catch (e: any) {
       toast.showError(e?.message || 'Failed to load tasks');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filters, toast]);
 
+  // Load more tasks (infinite scroll)
+  const loadMoreTasks = useCallback(async () => {
+    if (isLoadingMore || !pagination.hasMore) return;
+    
+    setIsLoadingMore(true);
+    const nextPage = pagination.page + 1;
+    
+    try {
+      const res: any = await tasksAPI.getCallbackCandidates({
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        outcome: filters.outcome !== 'all' ? filters.outcome : undefined,
+        callType: filters.callType !== 'all' ? filters.callType : undefined,
+        agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
+        page: nextPage,
+        limit: PAGE_SIZE,
+      });
+
+      if (res.success) {
+        const newTasks = res.data.tasks || [];
+        setTasks(prev => [...prev, ...newTasks]);
+        const pag = res.data.pagination || { page: nextPage, total: 0, pages: 0 };
+        setPagination({
+          page: pag.page,
+          total: pag.total,
+          pages: pag.pages,
+          hasMore: pag.page < pag.pages,
+        });
+      }
+    } catch (e: any) {
+      toast.showError(e?.message || 'Failed to load more tasks');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [filters, pagination, isLoadingMore, toast]);
+
+  // Initial load when filters change
   useEffect(() => {
     if (filters.dateFrom && filters.dateTo) {
-      loadTasks(1);
+      loadTasks(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && pagination.hasMore && !isLoadingMore && !isLoading) {
+          loadMoreTasks();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [pagination.hasMore, isLoadingMore, isLoading, loadMoreTasks]);
 
   // Filter tasks that can be selected (not at max callbacks)
   const selectableTasks = tasks.filter(t => (t.callbackNumber || 0) < 2);
@@ -202,7 +275,7 @@ const CallbackRequestView: React.FC = () => {
 
   const handleSelectTask = (taskId: string) => {
     const task = tasks.find(t => t._id === taskId);
-    if (task && (task.callbackNumber || 0) >= 2) return; // Can't select max retry tasks
+    if (task && (task.callbackNumber || 0) >= 2) return;
 
     const newSet = new Set(selectedTaskIds);
     if (newSet.has(taskId)) {
@@ -225,7 +298,7 @@ const CallbackRequestView: React.FC = () => {
       
       if (res.success) {
         toast.showSuccess(`Created ${res.data.summary.created} callback(s)${res.data.summary.skipped > 0 ? `, ${res.data.summary.skipped} skipped` : ''}`);
-        loadTasks(pagination.page); // Reload to reflect changes
+        loadTasks(true); // Reload to reflect changes
       }
     } catch (e: any) {
       toast.showError(e?.message || 'Failed to create callbacks');
@@ -250,7 +323,7 @@ const CallbackRequestView: React.FC = () => {
             <h2 className="text-lg font-black text-slate-900">Request Callbacks</h2>
             <p className="text-xs text-slate-500">Select completed/unsuccessful calls to schedule callbacks</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => loadTasks(pagination.page)} disabled={isLoading}>
+          <Button variant="secondary" size="sm" onClick={() => loadTasks(true)} disabled={isLoading}>
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </Button>
@@ -390,7 +463,7 @@ const CallbackRequestView: React.FC = () => {
       {/* Tasks Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Action Bar */}
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -403,6 +476,11 @@ const CallbackRequestView: React.FC = () => {
             </button>
             <span className="text-sm text-slate-500">
               {selectedTaskIds.size} of {selectableTasks.length} selected
+              {pagination.total > 0 && (
+                <span className="text-slate-400 ml-1">
+                  ({tasks.length} of {pagination.total} loaded)
+                </span>
+              )}
             </span>
           </div>
           <button
@@ -416,11 +494,11 @@ const CallbackRequestView: React.FC = () => {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Table with scroll container */}
+        <div ref={tableContainerRef} className="overflow-x-auto max-h-[60vh] overflow-y-auto">
           <table className="w-full">
-            <thead>
-              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50">
+            <thead className="sticky top-0 bg-slate-50 z-10">
+              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                 <th className="px-4 py-3 text-left w-10"></th>
                 <th className="px-4 py-3 text-left">Farmer</th>
                 <th className="px-4 py-3 text-left">Outcome</th>
@@ -446,102 +524,106 @@ const CallbackRequestView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                tasks.map((task) => {
-                  const isMaxRetry = task.callbackNumber >= 2;
-                  const isSelected = selectedTaskIds.has(task._id);
+                <>
+                  {tasks.map((task) => {
+                    const isMaxRetry = (task.callbackNumber || 0) >= 2;
+                    const isSelected = selectedTaskIds.has(task._id);
 
-                  return (
-                    <tr
-                      key={task._id}
-                      className={`hover:bg-slate-50 ${isMaxRetry ? 'opacity-50' : ''} ${isSelected ? 'bg-green-50' : ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTask(task._id)}
-                          disabled={isMaxRetry}
-                          className="disabled:cursor-not-allowed"
-                          title={isMaxRetry ? 'Max callbacks reached (2)' : ''}
-                        >
-                          {isSelected ? (
-                            <CheckSquare size={18} className="text-green-600" />
+                    return (
+                      <tr
+                        key={task._id}
+                        className={`hover:bg-slate-50 ${isMaxRetry ? 'opacity-50' : ''} ${isSelected ? 'bg-green-50' : ''}`}
+                      >
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectTask(task._id)}
+                            disabled={isMaxRetry}
+                            className="disabled:cursor-not-allowed"
+                            title={isMaxRetry ? 'Max callbacks reached (2)' : ''}
+                          >
+                            {isSelected ? (
+                              <CheckSquare size={18} className="text-green-600" />
+                            ) : (
+                              <Square size={18} className={isMaxRetry ? 'text-slate-300' : 'text-slate-400'} />
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{task.farmer?.name || 'Unknown'}</p>
+                            <p className="text-xs text-slate-500">{task.farmer?.mobileNumber}</p>
+                            <p className="text-[10px] text-slate-400">{task.farmer?.location}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
+                            task.outcome === 'Completed Conversation' 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {task.outcome === 'Completed Conversation' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                            {task.outcome === 'Completed Conversation' ? 'Completed' : 'Unsuccessful'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          {task.callLog?.callStatus || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {task.isCallback ? (
+                            <span className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
+                              Callback #{task.callbackNumber}
+                            </span>
                           ) : (
-                            <Square size={18} className={isMaxRetry ? 'text-slate-300' : 'text-slate-400'} />
+                            <span className="px-2 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
+                              Original
+                            </span>
                           )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{task.farmer?.name || 'Unknown'}</p>
-                          <p className="text-xs text-slate-500">{task.farmer?.mobileNumber}</p>
-                          <p className="text-[10px] text-slate-400">{task.farmer?.location}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
-                          task.outcome === 'Completed Conversation' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {task.outcome === 'Completed Conversation' ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                          {task.outcome === 'Completed Conversation' ? 'Completed' : 'Unsuccessful'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {task.callLog?.callStatus || '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {task.isCallback ? (
-                          <span className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
-                            Callback #{task.callbackNumber}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
-                            Original
-                          </span>
-                        )}
-                        {isMaxRetry && (
-                          <span className="ml-1 text-[10px] text-red-500">(Max)</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        {task.agent?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-500">
-                        {formatDate(task.updatedAt)}
-                      </td>
-                    </tr>
-                  );
-                })
+                          {isMaxRetry && (
+                            <span className="ml-1 text-[10px] text-red-500">(Max)</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          {task.agent?.name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500">
+                          {formatDate(task.updatedAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
               )}
             </tbody>
           </table>
+          
+          {/* Load more trigger */}
+          {!isLoading && tasks.length > 0 && (
+            <div ref={loadMoreRef} className="py-4 text-center">
+              {isLoadingMore ? (
+                <div className="flex items-center justify-center gap-2 text-slate-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm">Loading more...</span>
+                </div>
+              ) : pagination.hasMore ? (
+                <button
+                  type="button"
+                  onClick={loadMoreTasks}
+                  className="text-sm text-green-700 hover:text-green-800 font-medium"
+                >
+                  Load more tasks
+                </button>
+              ) : tasks.length > PAGE_SIZE ? (
+                <p className="text-sm text-slate-400">All {pagination.total} tasks loaded</p>
+              ) : null}
+            </div>
+          )}
         </div>
 
-        {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between bg-slate-50">
-            <p className="text-sm text-slate-600">
-              Page {pagination.page} of {pagination.pages} • {pagination.total} total tasks
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => loadTasks(pagination.page - 1)}
-                disabled={pagination.page === 1 || isLoading}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => loadTasks(pagination.page + 1)}
-                disabled={pagination.page >= pagination.pages || isLoading}
-              >
-                Next
-              </Button>
-            </div>
+        {/* Footer with stats */}
+        {!isLoading && tasks.length > 0 && (
+          <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-xs text-slate-500">
+            Showing {tasks.length} of {pagination.total} tasks • {selectableTasks.length} eligible for callback
           </div>
         )}
       </div>
