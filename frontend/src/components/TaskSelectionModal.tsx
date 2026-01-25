@@ -26,6 +26,10 @@ interface Task {
   scheduledDate: string;
   createdAt: string;
   updatedAt?: string;
+  // Callback fields
+  isCallback?: boolean;
+  callbackNumber?: number;
+  parentTaskId?: string;
 }
 
 interface TaskSelectionModalProps {
@@ -324,6 +328,12 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                         <h3 className="text-base font-black text-slate-900 truncate">
                           {task.farmer.name}
                         </h3>
+                        {/* Callback Badge */}
+                        {task.isCallback && (
+                          <span className="flex-shrink-0 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-bold border border-purple-200">
+                            Callback #{task.callbackNumber || 1}
+                          </span>
+                        )}
                         {isInProgress && (
                           <span className="flex-shrink-0 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200">
                             In Progress

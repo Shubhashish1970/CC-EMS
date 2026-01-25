@@ -55,6 +55,10 @@ export interface ICallTask extends Document {
     status: TaskStatus;
     notes?: string;
   }>;
+  // Callback/Retry fields
+  parentTaskId?: mongoose.Types.ObjectId | null; // Link to original task for callbacks
+  isCallback: boolean; // true for callback tasks
+  callbackNumber: number; // 0 for original, 1 for 1st callback, 2 for 2nd callback
   createdAt: Date;
   updatedAt: Date;
 }
@@ -191,6 +195,20 @@ const CallTaskSchema = new Schema<ICallTask>(
       type: [InteractionHistorySchema],
       default: [],
     },
+    // Callback/Retry fields
+    parentTaskId: {
+      type: Schema.Types.ObjectId,
+      ref: 'CallTask',
+      default: null,
+    },
+    isCallback: {
+      type: Boolean,
+      default: false,
+    },
+    callbackNumber: {
+      type: Number,
+      default: 0, // 0 = original, 1 = 1st callback, 2 = 2nd callback (max)
+    },
   },
   {
     timestamps: true,
@@ -203,10 +221,12 @@ CallTaskSchema.index({ farmerId: 1, createdAt: -1 }); // For farmer history
 CallTaskSchema.index({ scheduledDate: 1 }); // For chronological ordering
 CallTaskSchema.index({ activityId: 1 }); // For activity-based queries
 CallTaskSchema.index({ assignedAgentId: 1, status: 1, scheduledDate: 1 }); // Compound: agent queue with status and date
-CallTaskSchema.index({ activityId: 1, farmerId: 1 }, { unique: true }); // UNIQUE: Prevent duplicate tasks for same farmer+activity
+CallTaskSchema.index({ activityId: 1, farmerId: 1, callbackNumber: 1 }, { unique: true }); // UNIQUE: Prevent duplicate tasks for same farmer+activity+callbackNumber
 CallTaskSchema.index({ createdAt: -1 }); // For recent tasks
 CallTaskSchema.index({ status: 1, scheduledDate: 1 }); // Compound: status + scheduled date for filtering
 CallTaskSchema.index({ status: 1, scheduledDate: 1, createdAt: -1 }); // For unassigned management
+CallTaskSchema.index({ parentTaskId: 1 }); // For callback chain queries
+CallTaskSchema.index({ isCallback: 1, status: 1 }); // For callback filtering
 
 export const CallTask = mongoose.model<ICallTask>('CallTask', CallTaskSchema);
 

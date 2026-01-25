@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sliders, List, LogOut, User as UserIcon } from 'lucide-react';
+import { Sliders, List, LogOut, User as UserIcon, PhoneForwarded } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SamplingControlView from './SamplingControlView';
 import TaskDashboardView from './TaskDashboardView';
+import CallbackRequestView from './CallbackRequestView';
 
 const TeamLeadDashboardContainer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sampling' | 'tasks'>('sampling');
+  const [activeTab, setActiveTab] = useState<'sampling' | 'tasks' | 'callbacks'>('sampling');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +23,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
   const tabs = [
     { id: 'sampling' as const, label: 'Sampling Control', icon: Sliders },
     { id: 'tasks' as const, label: 'Task Allocation', icon: List },
+    { id: 'callbacks' as const, label: 'Request Callbacks', icon: PhoneForwarded },
   ];
 
   return (
@@ -78,6 +80,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
       <div className="max-w-7xl mx-auto p-6">
         {activeTab === 'sampling' && <SamplingControlView />}
         {activeTab === 'tasks' && <TaskDashboardView />}
+        {activeTab === 'callbacks' && <CallbackRequestView />}
       </div>
     </div>
   );

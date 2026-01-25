@@ -81,6 +81,10 @@ router.get(
           scheduledDate: task.scheduledDate,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
+          // Callback fields
+          isCallback: task.isCallback || false,
+          callbackNumber: task.callbackNumber || 0,
+          parentTaskId: task.parentTaskId?.toString() || null,
         };
       });
 
@@ -3156,6 +3160,429 @@ router.put(
         success: true,
         message: 'Task status updated successfully',
         data: { task },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============================================================================
+// CALLBACK REQUEST ENDPOINTS (Team Lead)
+// ============================================================================
+
+// @route   GET /api/tasks/callback/candidates
+// @desc    List tasks eligible for callback (completed/unsuccessful tasks under team)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/callback/candidates',
+  requirePermission('tasks.view.team'),
+  [
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('outcome').optional().isIn(['Unsuccessful', 'Completed Conversation', 'all']),
+    query('callType').optional().isIn(['original', 'callback', 'all']),
+    query('agentId').optional().isMongoId(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const { dateFrom, dateTo, outcome, callType, agentId, page = 1, limit = 50 } = req.query;
+
+      // Get team agents
+      const teamAgents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+      }).select('_id name email').lean();
+
+      const teamAgentIds = teamAgents.map(a => a._id);
+
+      if (!teamAgentIds.length) {
+        return res.json({
+          success: true,
+          data: {
+            tasks: [],
+            agents: [],
+            pagination: { page: 1, limit: Number(limit), total: 0, pages: 0 },
+          },
+        });
+      }
+
+      // Build match query
+      const match: any = {
+        assignedAgentId: { $in: teamAgentIds },
+        status: { $in: ['completed', 'not_reachable', 'invalid_number'] }, // Only completed/unsuccessful
+        callbackNumber: { $lt: 2 }, // Max 2 callbacks (0=original, 1=first callback, 2=second = max)
+      };
+
+      // Agent filter
+      if (agentId) {
+        match.assignedAgentId = new mongoose.Types.ObjectId(agentId as string);
+      }
+
+      // Date filter (using updatedAt for when call was completed)
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom as string) : null;
+        const to = dateTo ? new Date(dateTo as string) : null;
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+        
+        match.updatedAt = {};
+        if (from) match.updatedAt.$gte = from;
+        if (to) match.updatedAt.$lte = to;
+      }
+
+      // Outcome filter
+      if (outcome && outcome !== 'all') {
+        match.outcome = outcome;
+      }
+
+      // Call type filter
+      if (callType === 'original') {
+        match.isCallback = { $ne: true };
+      } else if (callType === 'callback') {
+        match.isCallback = true;
+      }
+
+      // Count total
+      const total = await CallTask.countDocuments(match);
+      const pages = Math.ceil(total / Number(limit));
+
+      // Fetch tasks with farmer and activity data
+      const tasks = await CallTask.aggregate([
+        { $match: match },
+        { $sort: { updatedAt: -1 } },
+        { $skip: (Number(page) - 1) * Number(limit) },
+        { $limit: Number(limit) },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'activities',
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'assignedAgentId',
+            foreignField: '_id',
+            as: 'agent',
+          },
+        },
+        { $unwind: { path: '$agent', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 1,
+            status: 1,
+            outcome: 1,
+            callbackNumber: 1,
+            isCallback: 1,
+            updatedAt: 1,
+            callLog: 1,
+            'farmer._id': 1,
+            'farmer.name': 1,
+            'farmer.mobileNumber': 1,
+            'farmer.preferredLanguage': 1,
+            'farmer.location': 1,
+            'activity._id': 1,
+            'activity.type': 1,
+            'activity.territoryName': 1,
+            'agent._id': 1,
+            'agent.name': 1,
+            'agent.email': 1,
+          },
+        },
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          tasks,
+          agents: teamAgents,
+          pagination: {
+            page: Number(page),
+            limit: Number(limit),
+            total,
+            pages,
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/tasks/callback/create
+// @desc    Create callback tasks from selected task IDs (bulk)
+// @access  Private (Team Lead, MIS Admin)
+router.post(
+  '/callback/create',
+  requirePermission('tasks.reassign'),
+  [
+    body('taskIds').isArray({ min: 1 }).withMessage('At least one task ID is required'),
+    body('taskIds.*').isMongoId().withMessage('Invalid task ID format'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const { taskIds } = req.body;
+
+      // Get team agents for allocation
+      const teamAgents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+      }).select('_id name email languageCapabilities').lean();
+
+      if (!teamAgents.length) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No active agents available for callback allocation' },
+        });
+      }
+
+      // Build agents by language map
+      const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
+      const agentsByLanguage = new Map<string, any[]>();
+      const agentRoundRobin = new Map<string, number>(); // Track round-robin index per language
+
+      for (const a of teamAgents as any[]) {
+        const caps: string[] = Array.isArray(a.languageCapabilities) ? a.languageCapabilities : [];
+        for (const cap of caps) {
+          const key = normalize(cap);
+          if (!key) continue;
+          const list = agentsByLanguage.get(key) || [];
+          list.push(a);
+          agentsByLanguage.set(key, list);
+          if (!agentRoundRobin.has(key)) agentRoundRobin.set(key, 0);
+        }
+      }
+
+      // Fetch original tasks with farmer data
+      const originalTasks = await CallTask.aggregate([
+        {
+          $match: {
+            _id: { $in: taskIds.map((id: string) => new mongoose.Types.ObjectId(id)) },
+            status: { $in: ['completed', 'not_reachable', 'invalid_number'] },
+            callbackNumber: { $lt: 2 }, // Max 2 callbacks
+          },
+        },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: '$farmer' },
+      ]);
+
+      if (!originalTasks.length) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No valid tasks found for callback creation (may have reached max callbacks)' },
+        });
+      }
+
+      const created: any[] = [];
+      const skipped: any[] = [];
+
+      for (const task of originalTasks) {
+        const farmerLang = normalize(task.farmer?.preferredLanguage);
+        const candidateAgents = agentsByLanguage.get(farmerLang) || [];
+
+        if (!candidateAgents.length) {
+          skipped.push({
+            taskId: task._id.toString(),
+            reason: `No agent available for language: ${task.farmer?.preferredLanguage || 'Unknown'}`,
+          });
+          continue;
+        }
+
+        // Round-robin selection
+        const rrIndex = agentRoundRobin.get(farmerLang) || 0;
+        const selectedAgent = candidateAgents[rrIndex % candidateAgents.length];
+        agentRoundRobin.set(farmerLang, rrIndex + 1);
+
+        // Create callback task
+        const newCallbackNumber = (task.callbackNumber || 0) + 1;
+        
+        try {
+          const callbackTask = await CallTask.create({
+            farmerId: task.farmerId,
+            activityId: task.activityId,
+            status: 'sampled_in_queue',
+            retryCount: (task.retryCount || 0) + 1,
+            assignedAgentId: selectedAgent._id,
+            scheduledDate: new Date(),
+            parentTaskId: task._id,
+            isCallback: true,
+            callbackNumber: newCallbackNumber,
+            interactionHistory: [
+              {
+                timestamp: new Date(),
+                status: 'sampled_in_queue',
+                notes: `Callback #${newCallbackNumber} created by Team Lead from task ${task._id}`,
+              },
+            ],
+          });
+
+          created.push({
+            originalTaskId: task._id.toString(),
+            callbackTaskId: callbackTask._id.toString(),
+            assignedTo: { id: selectedAgent._id, name: selectedAgent.name, email: selectedAgent.email },
+            farmerName: task.farmer?.name,
+            callbackNumber: newCallbackNumber,
+          });
+        } catch (err: any) {
+          // Handle duplicate key error (callback already exists)
+          if (err.code === 11000) {
+            skipped.push({
+              taskId: task._id.toString(),
+              reason: 'Callback already exists for this task',
+            });
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Created ${created.length} callback task(s), skipped ${skipped.length}`,
+        data: {
+          created,
+          skipped,
+          summary: {
+            requested: taskIds.length,
+            created: created.length,
+            skipped: skipped.length,
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/:taskId/callback-history
+// @desc    Get callback chain history for a task (original + all callbacks)
+// @access  Private
+router.get(
+  '/:taskId/callback-history',
+  requirePermission('tasks.view.own'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { taskId } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(taskId)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Invalid task ID' },
+        });
+      }
+
+      // Get the current task
+      const currentTask = await CallTask.findById(taskId)
+        .populate('farmerId', 'name mobileNumber preferredLanguage location')
+        .populate('assignedAgentId', 'name email')
+        .lean();
+
+      if (!currentTask) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Task not found' },
+        });
+      }
+
+      // Find the root task (original)
+      let rootTaskId = currentTask._id;
+      if (currentTask.parentTaskId) {
+        // Traverse up to find the root
+        let parentId = currentTask.parentTaskId;
+        while (parentId) {
+          const parent = await CallTask.findById(parentId).select('parentTaskId').lean();
+          if (!parent || !parent.parentTaskId) {
+            rootTaskId = parentId;
+            break;
+          }
+          parentId = parent.parentTaskId;
+        }
+      }
+
+      // Get all tasks in the chain (original + callbacks)
+      const chain = await CallTask.find({
+        $or: [
+          { _id: rootTaskId },
+          { parentTaskId: rootTaskId },
+          // For deeper chains, find by activityId+farmerId
+          { 
+            activityId: currentTask.activityId, 
+            farmerId: currentTask.farmerId,
+          },
+        ],
+      })
+        .populate('assignedAgentId', 'name email')
+        .sort({ callbackNumber: 1, createdAt: 1 })
+        .lean();
+
+      // Deduplicate and sort
+      const uniqueChain = Array.from(
+        new Map(chain.map((t: any) => [t._id.toString(), t])).values()
+      ).sort((a: any, b: any) => (a.callbackNumber || 0) - (b.callbackNumber || 0));
+
+      res.json({
+        success: true,
+        data: {
+          currentTaskId: taskId,
+          chain: uniqueChain.map((t: any) => ({
+            _id: t._id,
+            callbackNumber: t.callbackNumber || 0,
+            isCallback: t.isCallback || false,
+            status: t.status,
+            outcome: t.outcome,
+            callLog: t.callLog,
+            assignedAgent: t.assignedAgentId,
+            callStartedAt: t.callStartedAt,
+            updatedAt: t.updatedAt,
+            createdAt: t.createdAt,
+          })),
+        },
       });
     } catch (error) {
       next(error);

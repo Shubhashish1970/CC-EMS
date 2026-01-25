@@ -355,6 +355,41 @@ export const tasksAPI = {
     const query = params.toString();
     return apiRequest(`/tasks/unassigned${query ? `?${query}` : ''}`);
   },
+
+  // Callback Request APIs (Team Lead)
+  getCallbackCandidates: async (filters?: { 
+    dateFrom?: string; 
+    dateTo?: string; 
+    outcome?: string; 
+    callType?: string; 
+    agentId?: string;
+    page?: number; 
+    limit?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.outcome) params.append('outcome', filters.outcome);
+    if (filters?.callType) params.append('callType', filters.callType);
+    if (filters?.agentId) params.append('agentId', filters.agentId);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
+
+    const query = params.toString();
+    return apiRequest(`/tasks/callback/candidates${query ? `?${query}` : ''}`);
+  },
+
+  createCallbacks: async (taskIds: string[]) => {
+    return apiRequest('/tasks/callback/create', {
+      method: 'POST',
+      body: JSON.stringify({ taskIds }),
+    });
+  },
+
+  getCallbackHistory: async (taskId: string) => {
+    return apiRequest(`/tasks/${taskId}/callback-history`);
+  },
+
   getDashboard: async (filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     const params = new URLSearchParams();
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
