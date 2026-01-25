@@ -886,10 +886,12 @@ router.get(
     query('dateTo').optional().isISO8601().toDate(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
-    const authReq = req as AuthRequest;
-    const agentId = authReq.user?._id?.toString() || 'unknown';
-    
+    console.log('[STATS] Handler entered');
     try {
+      const authReq = req as AuthRequest;
+      const agentId = authReq.user?._id?.toString() || 'unknown';
+      console.log(`[STATS] Agent ID: ${agentId}`);
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
@@ -897,15 +899,10 @@ router.get(
           error: { message: 'Validation failed', errors: errors.array() },
         });
       }
+      console.log('[STATS] Validation passed');
 
       const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
-      
-      // Log incoming request for debugging
-      console.log(`[STATS] Stats endpoint called for agent ${agentId}:`, JSON.stringify({
-        queryParams: { status, territory, activityType, search, dateFrom, dateTo },
-        dateFromType: typeof dateFrom,
-        dateToType: typeof dateTo,
-      }));
+      console.log(`[STATS] Query params extracted - dateFrom: ${dateFrom}, dateTo: ${dateTo}`);
 
       const baseMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
