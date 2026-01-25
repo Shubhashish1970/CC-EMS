@@ -1297,12 +1297,13 @@ router.get(
           ? { $dateToString: { format: '%G-W%V', date: '$callStartedAt' } }
           : { $dateToString: { format: '%Y-%m-%d', date: '$callStartedAt' } };
 
+      // Use aggregation with outcome field for consistency with stats endpoint
       const agg = await CallTask.aggregate([
         { $match: match },
         { $addFields: { __outbound: { $ifNull: ['$callLog.callStatus', ''] } } },
         {
           $group: {
-            _id: { period: dateExpr, status: '$status', outbound: '$__outbound' },
+            _id: { period: dateExpr, status: '$status', outbound: '$__outbound', outcome: '$outcome' },
             count: { $sum: 1 },
             connectedDuration: {
               $sum: {
@@ -1328,17 +1329,32 @@ router.get(
         incomingNA: 0,
         invalid: 0,
         noAnswer: 0,
+        connected: 0,
         connectedDurationSeconds: 0,
         connectedCount: 0,
       };
 
       const normOutbound = (s: string) => String(s || '').trim();
+      
+      // Helper to get outcome (matches stats endpoint logic: outcome || outcomeLabel(status))
+      const getEffectiveOutcome = (outcome: string | undefined, status: string): string => {
+        if (outcome) return String(outcome).trim();
+        if (status === 'completed') return 'Completed Conversation';
+        if (status === 'in_progress') return 'In Progress';
+        if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
+        return status || 'Unknown';
+      };
 
       for (const row of agg) {
         const period = row._id?.period || 'Unknown';
         const status = row._id?.status || 'unknown';
         const outbound = normOutbound(row._id?.outbound);
+        const storedOutcome = row._id?.outcome;
         const count = Number(row.count || 0);
+        
+        // Get effective outcome using same logic as stats endpoint
+        const effectiveOutcome = getEffectiveOutcome(storedOutcome, status);
+        const normalizedOutcome = effectiveOutcome.toLowerCase();
 
         if (!byPeriod[period]) {
           byPeriod[period] = {
@@ -1351,26 +1367,30 @@ router.get(
             incomingNA: 0,
             invalid: 0,
             noAnswer: 0,
+            connected: 0,
           };
         }
 
         byPeriod[period].attempted += count;
         totals.attempted += count;
 
-        if (status === 'in_progress') {
+        // Use outcome-based classification (consistent with stats endpoint)
+        if (normalizedOutcome === 'in progress') {
           byPeriod[period].inProgress += count;
           totals.inProgress += count;
-        }
-        if (status === 'completed') {
+        } else if (normalizedOutcome === 'completed conversation') {
           byPeriod[period].successful += count;
           totals.successful += count;
-        }
-        if (status === 'not_reachable' || status === 'invalid_number') {
+        } else if (normalizedOutcome === 'unsuccessful') {
           byPeriod[period].unsuccessful += count;
           totals.unsuccessful += count;
         }
 
-        if (outbound === 'Disconnected') {
+        // Outbound status breakdown
+        if (outbound === 'Connected') {
+          byPeriod[period].connected += count;
+          totals.connected += count;
+        } else if (outbound === 'Disconnected') {
           byPeriod[period].disconnected += count;
           totals.disconnected += count;
         } else if (outbound === 'Incoming N/A' || outbound === 'Not Reachable') {
@@ -1391,6 +1411,13 @@ router.get(
       const trend = Object.values(byPeriod).sort((a: any, b: any) => String(a.period).localeCompare(String(b.period)));
       const avgConnectedDurationSeconds =
         totals.connectedCount > 0 ? Math.round(totals.connectedDurationSeconds / totals.connectedCount) : 0;
+      
+      // Calculate success rate
+      const successRate = totals.attempted > 0 ? Math.round((totals.successful / totals.attempted) * 100) : 0;
+
+      // Calculate days in range for calls/day metric
+      const daysInRange = from && to ? Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24))) : 1;
+      const callsPerDay = totals.attempted > 0 ? (totals.attempted / daysInRange).toFixed(1) : '0';
 
       res.json({
         success: true,
@@ -1398,7 +1425,7 @@ router.get(
           bucket: bucketKey,
           dateFrom: from ? from.toISOString() : null,
           dateTo: to ? to.toISOString() : null,
-          totals: { ...totals, avgConnectedDurationSeconds },
+          totals: { ...totals, avgConnectedDurationSeconds, successRate, callsPerDay, daysInRange },
           trend,
         },
       });
