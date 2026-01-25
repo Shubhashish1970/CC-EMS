@@ -410,7 +410,7 @@ const AgentAnalyticsView: React.FC = () => {
 
         {/* Trend Chart + Outcome Breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Trend Bar Chart */}
+          {/* Trend Line Chart */}
           <div className="lg:col-span-2 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -420,57 +420,125 @@ const AgentAnalyticsView: React.FC = () => {
             </div>
             
             {trend.length > 0 ? (
-              <div className="space-y-2">
-                {trend.map((row: any) => {
-                  const successPct = row.attempted > 0 ? (row.successful / row.attempted) * 100 : 0;
-                  const unsuccessPct = row.attempted > 0 ? (row.unsuccessful / row.attempted) * 100 : 0;
-                  const inProgressPct = row.attempted > 0 ? (row.inProgress / row.attempted) * 100 : 0;
-                  const barWidth = (row.attempted / maxAttempted) * 100;
+              <div>
+                {/* Line Chart */}
+                <div className="relative h-48">
+                  {/* Y-axis labels */}
+                  <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-[10px] text-slate-400 font-medium">
+                    <span>{maxAttempted}</span>
+                    <span>{Math.round(maxAttempted / 2)}</span>
+                    <span>0</span>
+                  </div>
                   
-                  return (
-                    <div key={row.period} className="flex items-center gap-3">
-                      <div className="w-16 text-xs font-medium text-slate-600 text-right shrink-0">
-                        {formatPeriod(row.period, bucket)}
-                      </div>
-                      <div className="flex-1 h-7 bg-slate-100 rounded-lg overflow-hidden relative" style={{ width: `${barWidth}%`, minWidth: '40px' }}>
-                        <div className="h-full flex">
-                          {successPct > 0 && (
-                            <div className="bg-green-500 h-full" style={{ width: `${successPct}%` }} title={`Completed: ${row.successful}`} />
-                          )}
-                          {unsuccessPct > 0 && (
-                            <div className="bg-red-400 h-full" style={{ width: `${unsuccessPct}%` }} title={`Unsuccessful: ${row.unsuccessful}`} />
-                          )}
-                          {inProgressPct > 0 && (
-                            <div className="bg-amber-400 h-full" style={{ width: `${inProgressPct}%` }} title={`In Progress: ${row.inProgress}`} />
-                          )}
-                        </div>
-                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">
-                          {row.attempted}
+                  {/* Chart area */}
+                  <div className="ml-10 h-full">
+                    <svg className="w-full h-full" viewBox={`0 0 ${Math.max(trend.length * 80, 300)} 160`} preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      <line x1="0" y1="0" x2="100%" y2="0" stroke="#e2e8f0" strokeWidth="1" />
+                      <line x1="0" y1="80" x2="100%" y2="80" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                      <line x1="0" y1="160" x2="100%" y2="160" stroke="#e2e8f0" strokeWidth="1" />
+                      
+                      {/* Total Attempted Line */}
+                      <polyline
+                        fill="none"
+                        stroke="#64748b"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        points={trend.map((row: any, i: number) => {
+                          const x = trend.length === 1 ? 150 : (i / (trend.length - 1)) * (Math.max(trend.length * 80, 300) - 40) + 20;
+                          const y = 160 - (row.attempted / maxAttempted) * 150;
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+                      
+                      {/* Completed Line */}
+                      <polyline
+                        fill="none"
+                        stroke="#22c55e"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        points={trend.map((row: any, i: number) => {
+                          const x = trend.length === 1 ? 150 : (i / (trend.length - 1)) * (Math.max(trend.length * 80, 300) - 40) + 20;
+                          const y = 160 - (row.successful / maxAttempted) * 150;
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+                      
+                      {/* Unsuccessful Line */}
+                      <polyline
+                        fill="none"
+                        stroke="#f87171"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        points={trend.map((row: any, i: number) => {
+                          const x = trend.length === 1 ? 150 : (i / (trend.length - 1)) * (Math.max(trend.length * 80, 300) - 40) + 20;
+                          const y = 160 - (row.unsuccessful / maxAttempted) * 150;
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+                      
+                      {/* Data points with values */}
+                      {trend.map((row: any, i: number) => {
+                        const x = trend.length === 1 ? 150 : (i / (trend.length - 1)) * (Math.max(trend.length * 80, 300) - 40) + 20;
+                        const yAttempted = 160 - (row.attempted / maxAttempted) * 150;
+                        const ySuccess = 160 - (row.successful / maxAttempted) * 150;
+                        const yUnsuccess = 160 - (row.unsuccessful / maxAttempted) * 150;
+                        
+                        return (
+                          <g key={row.period}>
+                            {/* Attempted dot */}
+                            <circle cx={x} cy={yAttempted} r="4" fill="#64748b" />
+                            <text x={x} y={yAttempted - 8} textAnchor="middle" className="text-[9px] fill-slate-500 font-medium">{row.attempted}</text>
+                            
+                            {/* Success dot */}
+                            <circle cx={x} cy={ySuccess} r="4" fill="#22c55e" />
+                            {row.successful > 0 && (
+                              <text x={x} y={ySuccess - 8} textAnchor="middle" className="text-[9px] fill-green-600 font-bold">{row.successful}</text>
+                            )}
+                            
+                            {/* Unsuccessful dot */}
+                            <circle cx={x} cy={yUnsuccess} r="4" fill="#f87171" />
+                            {row.unsuccessful > 0 && (
+                              <text x={x} y={yUnsuccess + 14} textAnchor="middle" className="text-[9px] fill-red-500 font-bold">{row.unsuccessful}</text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                    
+                    {/* X-axis labels */}
+                    <div className="flex justify-between mt-1 px-2">
+                      {trend.map((row: any) => (
+                        <span key={row.period} className="text-[10px] text-slate-500 font-medium">
+                          {formatPeriod(row.period, bucket)}
                         </span>
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="h-32 flex items-center justify-center text-slate-400 text-sm">
+              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
                 No data for selected range
               </div>
             )}
             
             {/* Legend */}
-            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-6 mt-4 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-green-500" />
+                <div className="w-4 h-0.5 bg-slate-500 rounded" />
+                <span className="text-[10px] text-slate-600">Total</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-0.5 bg-green-500 rounded" />
                 <span className="text-[10px] text-slate-600">Completed</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-red-400" />
+                <div className="w-4 h-0.5 bg-red-400 rounded" />
                 <span className="text-[10px] text-slate-600">Unsuccessful</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded bg-amber-400" />
-                <span className="text-[10px] text-slate-600">In Progress</span>
               </div>
             </div>
           </div>
