@@ -23,8 +23,7 @@ type HistoryColumnKey =
   | 'outbound'
   | 'activityType'
   | 'territory'
-  | 'updated'
-  | 'action';
+  | 'updated';
 
 const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
   expand: 56,
@@ -34,7 +33,6 @@ const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
   activityType: 160,
   territory: 220,
   updated: 140,
-  action: 120,
 };
 
 // Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
@@ -685,28 +683,27 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       ['activityType', 'Activity'],
                       ['territory', 'Territory'],
                       ['updated', 'Updated'],
-                      ['action', 'Action'],
                     ] as Array<[HistoryColumnKey, string]>
                   ).map(([key, label]) => (
                     <th
                       key={key}
                       className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
                       style={{ width: colWidths[key], minWidth: colWidths[key] }}
-                      onClick={key === 'action' || key === 'expand' ? undefined : () => {
+                      onClick={key === 'expand' ? undefined : () => {
                             setTableSort((p) => {
                           if (p.key === key) return { key, dir: p.dir === 'asc' ? 'desc' : 'asc' };
                           return { key, dir: 'asc' };
                             });
                           }}
-                      title={key === 'action' || key === 'expand' ? undefined : 'Click to sort'}
+                      title={key === 'expand' ? undefined : 'Click to sort'}
                     >
                       <div className="flex items-center gap-2">
                         <span className="truncate">{label}</span>
-                        {key !== 'action' && key !== 'expand' && tableSort.key === key && (
+                        {key !== 'expand' && tableSort.key === key && (
                           tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                         )}
                       </div>
-                        {key !== 'action' && key !== 'expand' && (
+                        {key !== 'expand' && (
                           <div
                           className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
                           onMouseDown={(e) => {
@@ -784,19 +781,6 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       </td>
                         <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.updated, minWidth: colWidths.updated }}>
                         {updated}
-                      </td>
-                        <td className="px-3 py-3 text-sm text-right" style={{ width: colWidths.action, minWidth: colWidths.action }}>
-                        {t.status === 'in_progress' ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenTask?.(String(t._id))}
-                            className="px-3 py-1.5 rounded-xl text-xs font-black text-white bg-green-700 hover:bg-green-800"
-                          >
-                            Open
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-400">Read-only</span>
-                        )}
                       </td>
                       </tr>
 
