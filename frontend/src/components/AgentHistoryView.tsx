@@ -800,92 +800,60 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                               )}
 
                               {detail && (
-                                <div className="space-y-2">
-                                  {/* Farmer Section */}
-                                  <div>
-                                    <h4 className="text-xs font-black text-slate-700 mb-1">Farmer</h4>
-                                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                      <div>
-                                        <p className="text-xs font-medium text-slate-900">{detail.farmerId?.name || 'Unknown'}</p>
-                                        <p className="text-[10px] text-slate-600">{detail.farmerId?.mobileNumber || ''}</p>
-                                      </div>
-                                      <div className="mt-1.5 pt-1.5 border-t border-slate-200 text-[10px] text-slate-600">
-                                        <div>{detail.farmerId?.location || ''}</div>
-                                        <div>Language: <span className="font-bold">{detail.farmerId?.preferredLanguage || 'Unknown'}</span></div>
-                                      </div>
+                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                  {/* Main Grid - 4 columns for wide layout */}
+                                  <div className="grid grid-cols-4 gap-4">
+                                    {/* Farmer Info */}
+                                    <div>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Farmer</h4>
+                                      <p className="text-xs font-semibold text-slate-900">{detail.farmerId?.name || 'Unknown'}</p>
+                                      <p className="text-[10px] text-slate-600">{detail.farmerId?.mobileNumber || ''}</p>
+                                      <p className="text-[10px] text-slate-500 mt-0.5">{detail.farmerId?.location || ''}</p>
+                                      <p className="text-[10px] text-slate-600">Lang: <span className="font-semibold">{detail.farmerId?.preferredLanguage || '-'}</span></p>
+                                    </div>
+
+                                    {/* Activity Info */}
+                                    <div>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Activity</h4>
+                                      <p className="text-xs font-semibold text-slate-900">{detail.activityId?.type || '-'}</p>
+                                      <p className="text-[10px] text-slate-600">Officer: <span className="font-semibold">{detail.activityId?.officerName || '-'}</span></p>
+                                      <p className="text-[10px] text-slate-600">Territory: <span className="font-semibold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></p>
+                                      <p className="text-[10px] text-slate-600">State: <span className="font-semibold">{detail.activityId?.state || '-'}</span></p>
+                                    </div>
+
+                                    {/* Call Info */}
+                                    <div>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Call Info</h4>
+                                      <p className="text-[10px] text-slate-600">Status: <span className="text-xs font-semibold text-slate-900">{detail.callLog?.callStatus || '-'}</span></p>
+                                      <p className="text-[10px] text-slate-600">Started: <span className="font-semibold">{formatDateTime(detail.callStartedAt) || '-'}</span></p>
+                                      <p className="text-[10px] text-slate-600">Duration: <span className="font-semibold">{Number(detail.callLog?.callDurationSeconds || 0)}s</span></p>
+                                    </div>
+
+                                    {/* Feedback */}
+                                    <div>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Feedback</h4>
+                                      <p className="text-[10px] text-slate-600">Sentiment: <span className="font-semibold">{detail.callLog?.sentiment || 'N/A'}</span></p>
+                                      <p className="text-[10px] text-slate-600 line-clamp-2">Comments: <span className="font-medium">{detail.callLog?.farmerComments || '-'}</span></p>
                                     </div>
                                   </div>
 
-                                  {/* Activity Section */}
-                                  <div>
-                                    <h4 className="text-xs font-black text-slate-700 mb-1">Activity</h4>
-                                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                      <div>
-                                        <p className="text-xs font-medium text-slate-900">{detail.activityId?.type || '-'}</p>
-                                      </div>
-                                      <div className="mt-1.5 pt-1.5 border-t border-slate-200 text-[10px] text-slate-600">
-                                        <div>Officer: <span className="font-bold">{detail.activityId?.officerName || '-'}</span></div>
-                                        <div>Territory: <span className="font-bold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></div>
-                                        <div>State: <span className="font-bold">{detail.activityId?.state || '-'}</span></div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Call Information */}
-                                  <div>
-                                    <h4 className="text-xs font-black text-slate-700 mb-1">Call Information</h4>
-                                    <div className="flex items-center gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-slate-500">Outbound:</span>
-                                        <span className="text-xs font-bold text-slate-900">{detail.callLog?.callStatus || '-'}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-slate-500">Started:</span>
-                                        <span className="text-xs font-bold text-slate-900">{formatDateTime(detail.callStartedAt) || '-'}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-slate-500">Duration:</span>
-                                        <span className="text-xs font-bold text-slate-900">{Number(detail.callLog?.callDurationSeconds || 0)}s</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Activity Details - Crops & Products */}
+                                  {/* Crops & Products - inline if present */}
                                   {((detail.callLog?.cropsDiscussed && detail.callLog.cropsDiscussed.length > 0) || 
                                     (detail.callLog?.productsDiscussed && detail.callLog.productsDiscussed.length > 0)) && (
-                                    <div>
-                                      <h4 className="text-xs font-black text-slate-700 mb-1">Activity Details</h4>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {detail.callLog?.cropsDiscussed?.map((crop, idx) => (
-                                          <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
-                                            {crop}
-                                          </span>
-                                        ))}
-                                        {detail.callLog?.productsDiscussed?.map((product, idx) => (
-                                          <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
-                                            {product}
-                                          </span>
-                                        ))}
-                                      </div>
+                                    <div className="mt-2 pt-2 border-t border-slate-200 flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Details:</span>
+                                      {detail.callLog?.cropsDiscussed?.map((crop, idx) => (
+                                        <span key={idx} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium">
+                                          {crop}
+                                        </span>
+                                      ))}
+                                      {detail.callLog?.productsDiscussed?.map((product, idx) => (
+                                        <span key={idx} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                                          {product}
+                                        </span>
+                                      ))}
                                     </div>
                                   )}
-
-                                  {/* Farmer Comments & Sentiment */}
-                                  <div>
-                                    <h4 className="text-xs font-black text-slate-700 mb-1">Farmer Feedback</h4>
-                                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                      <div className="flex items-center gap-4 text-[10px]">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-slate-500">Comments:</span>
-                                          <span className="text-slate-700 flex-1">{detail.callLog?.farmerComments || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-slate-500">Sentiment:</span>
-                                          <span className="text-slate-700 font-bold">{detail.callLog?.sentiment || 'N/A'}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
                                 </div>
                               )}
                             </div>
