@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import Button from '../shared/Button';
+import StyledSelect from '../shared/StyledSelect';
 
 type DateRangePreset =
   | 'Custom'
@@ -560,34 +561,28 @@ const TaskDashboardView: React.FC = () => {
 
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">BU</label>
-            <select
+            <StyledSelect
               value={filters.bu}
-              onChange={(e) => setFilters((p) => ({ ...p, bu: e.target.value }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
-            >
-              <option value="">All</option>
-              {(data?.filterOptions?.buOptions || []).map((b: string) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setFilters((p) => ({ ...p, bu: value }))}
+              options={[
+                { value: '', label: 'All' },
+                ...(data?.filterOptions?.buOptions || []).map((b: string) => ({ value: b, label: b })),
+              ]}
+              placeholder="All"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
-            <select
+            <StyledSelect
               value={filters.state}
-              onChange={(e) => setFilters((p) => ({ ...p, state: e.target.value }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
-            >
-              <option value="">All</option>
-              {(data?.filterOptions?.stateOptions || []).map((s: string) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setFilters((p) => ({ ...p, state: value }))}
+              options={[
+                { value: '', label: 'All' },
+                ...(data?.filterOptions?.stateOptions || []).map((s: string) => ({ value: s, label: s })),
+              ]}
+              placeholder="All"
+            />
           </div>
         </div>
 
@@ -621,21 +616,21 @@ const TaskDashboardView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:max-w-3xl">
             <div>
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Language</label>
-              <select
+              <StyledSelect
                 value={allocLanguage}
-                onChange={(e) => setAllocLanguage(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
-              >
-                <option value="">Select language</option>
-                <option value="ALL">All Languages ({totalUnassigned})</option>
-                {unassignedRows
-                  .filter((r: any) => Number(r.unassigned || 0) > 0)
-                  .map((r: any) => (
-                    <option key={r.language} value={r.language}>
-                      {r.language} ({r.unassigned})
-                    </option>
-                  ))}
-              </select>
+                onChange={(value) => setAllocLanguage(value)}
+                options={[
+                  { value: '', label: 'Select language' },
+                  { value: 'ALL', label: `All Languages (${totalUnassigned})` },
+                  ...unassignedRows
+                    .filter((r: any) => Number(r.unassigned || 0) > 0)
+                    .map((r: any) => ({
+                      value: r.language,
+                      label: `${r.language} (${r.unassigned})`,
+                    })),
+                ]}
+                placeholder="Select language"
+              />
             </div>
             <div>
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">

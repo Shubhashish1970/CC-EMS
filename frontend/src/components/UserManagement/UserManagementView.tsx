@@ -6,6 +6,7 @@ import UserList from './UserList';
 import UserForm, { UserRole } from './UserForm';
 import AgentLanguageMatrix from './AgentLanguageMatrix';
 import ConfirmationModal from '../shared/ConfirmationModal';
+import StyledSelect from '../shared/StyledSelect';
 
 interface User {
   _id: string;
@@ -266,36 +267,38 @@ const UserManagementView: React.FC = () => {
 
               {/* Role Filter */}
               <div>
-                <select
+                <StyledSelect
                   value={filters.role}
-                  onChange={(e) => setFilters({ ...filters, role: e.target.value as UserRole | '' })}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-green-700 focus:outline-none bg-white"
-                >
-                  <option value="">All Roles</option>
-                  <option value="cc_agent">CC Agent</option>
-                  <option value="team_lead">Team Lead</option>
-                  <option value="mis_admin">MIS Admin</option>
-                  <option value="core_sales_head">Core Sales Head</option>
-                  <option value="marketing_head">Marketing Head</option>
-                </select>
+                  onChange={(value) => setFilters({ ...filters, role: value as UserRole | '' })}
+                  options={[
+                    { value: '', label: 'All Roles' },
+                    { value: 'cc_agent', label: 'CC Agent' },
+                    { value: 'team_lead', label: 'Team Lead' },
+                    { value: 'mis_admin', label: 'MIS Admin' },
+                    { value: 'core_sales_head', label: 'Core Sales Head' },
+                    { value: 'marketing_head', label: 'Marketing Head' },
+                  ]}
+                  placeholder="All Roles"
+                />
               </div>
 
               {/* Status Filter */}
               <div>
-                <select
+                <StyledSelect
                   value={filters.isActive === undefined ? '' : filters.isActive ? 'true' : 'false'}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setFilters({
                       ...filters,
-                      isActive: e.target.value === '' ? undefined : e.target.value === 'true',
+                      isActive: value === '' ? undefined : value === 'true',
                     })
                   }
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-green-700 focus:outline-none bg-white"
-                >
-                  <option value="">All Status</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
+                  options={[
+                    { value: '', label: 'All Status' },
+                    { value: 'true', label: 'Active' },
+                    { value: 'false', label: 'Inactive' },
+                  ]}
+                  placeholder="All Status"
+                />
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { X, Loader2, Check } from 'lucide-react';
 import { usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import LanguageSelector from './LanguageSelector';
+import StyledSelect from '../shared/StyledSelect';
 
 export type UserRole = 'cc_agent' | 'team_lead' | 'mis_admin' | 'core_sales_head' | 'marketing_head';
 
@@ -352,20 +353,19 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
               <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                 Team Lead <span className="text-red-500">*</span>
               </label>
-              <select
+              <StyledSelect
                 value={formData.teamLeadId}
-                onChange={(e) => setFormData({ ...formData, teamLeadId: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-green-700 focus:outline-none bg-white"
+                onChange={(value) => setFormData({ ...formData, teamLeadId: value })}
+                options={[
+                  { value: '', label: 'Select Team Lead' },
+                  ...teamLeads.map((lead) => ({
+                    value: lead._id,
+                    label: `${lead.name} (${lead.email})`,
+                  })),
+                ]}
                 disabled={isSubmitting}
-                required
-              >
-                <option value="">Select Team Lead</option>
-                {teamLeads.map((lead) => (
-                  <option key={lead._id} value={lead._id}>
-                    {lead.name} ({lead.email})
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Team Lead"
+              />
               {!teamLeads.length && (
                 <p className="text-xs text-amber-700 mt-1">
                   No active Team Leads found. Create a Team Lead first.

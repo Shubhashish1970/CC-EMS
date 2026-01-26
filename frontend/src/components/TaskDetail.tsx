@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
 import { ArrowLeft, User as UserIcon, Phone, MapPin, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import Button from './shared/Button';
+import StyledSelect from './shared/StyledSelect';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel } from '../utils/taskStatusLabels';
 
@@ -492,17 +493,18 @@ const StatusChangeModal: React.FC<StatusChangeModalProps> = ({ isOpen, onClose, 
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
               New Status
             </label>
-            <select
+            <StyledSelect
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
-            >
-              <option value="sampled_in_queue">Sampled - in queue</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="not_reachable">Not Reachable</option>
-              <option value="invalid_number">Invalid Number</option>
-            </select>
+              onChange={(value) => setStatus(value)}
+              options={[
+                { value: 'sampled_in_queue', label: 'Sampled - in queue' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'not_reachable', label: 'Not Reachable' },
+                { value: 'invalid_number', label: 'Invalid Number' },
+              ]}
+              placeholder="Select status"
+            />
           </div>
 
           <div>

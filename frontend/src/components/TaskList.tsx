@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { tasksAPI, usersAPI } from '../services/api';
 import { Loader2, Search, Filter, RefreshCw, User as UserIcon, MapPin, Calendar, Phone, CheckCircle, Clock, XCircle, AlertCircle, Download, ArrowUpDown, CheckSquare, Square, BarChart3, AlertTriangle, ChevronDown, ChevronUp, ArrowDownToLine } from 'lucide-react';
 import Button from './shared/Button';
+import StyledSelect from './shared/StyledSelect';
 import TaskDetail from './TaskDetail';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
@@ -719,18 +720,19 @@ const TaskList: React.FC = () => {
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                     Status
                   </label>
-                  <select
+                  <StyledSelect
                     value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="sampled_in_queue">Sampled - in queue</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="not_reachable">Not Reachable</option>
-                    <option value="invalid_number">Invalid Number</option>
-                  </select>
+                    onChange={(value) => setFilters({ ...filters, status: value })}
+                    options={[
+                      { value: '', label: 'All Statuses' },
+                      { value: 'sampled_in_queue', label: 'Sampled - in queue' },
+                      { value: 'in_progress', label: 'In Progress' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'not_reachable', label: 'Not Reachable' },
+                      { value: 'invalid_number', label: 'Invalid Number' },
+                    ]}
+                    placeholder="All Statuses"
+                  />
                 </div>
 
                 {user?.role !== 'team_lead' && (
@@ -738,18 +740,18 @@ const TaskList: React.FC = () => {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                       Agent
                     </label>
-                    <select
+                    <StyledSelect
                       value={filters.agentId}
-                      onChange={(e) => setFilters({ ...filters, agentId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                    >
-                      <option value="">All Agents</option>
-                      {agents.map((agent) => (
-                        <option key={agent._id} value={agent._id}>
-                          {agent.name} ({agent.email})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setFilters({ ...filters, agentId: value })}
+                      options={[
+                        { value: '', label: 'All Agents' },
+                        ...agents.map((agent) => ({
+                          value: agent._id,
+                          label: `${agent.name} (${agent.email})`,
+                        })),
+                      ]}
+                      placeholder="All Agents"
+                    />
                   </div>
                 )}
 
@@ -758,18 +760,15 @@ const TaskList: React.FC = () => {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                       Territory
                     </label>
-                    <select
+                    <StyledSelect
                       value={filters.territory}
-                      onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                    >
-                      <option value="">All Territories</option>
-                      {filterOptions.territoryOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setFilters({ ...filters, territory: value })}
+                      options={[
+                        { value: '', label: 'All Territories' },
+                        ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t })),
+                      ]}
+                      placeholder="All Territories"
+                    />
                   </div>
                 )}
 
@@ -778,18 +777,15 @@ const TaskList: React.FC = () => {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                       Zone
                     </label>
-                    <select
+                    <StyledSelect
                       value={filters.zone}
-                      onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                    >
-                      <option value="">All Zones</option>
-                      {filterOptions.zoneOptions.map((z) => (
-                        <option key={z} value={z}>
-                          {z}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setFilters({ ...filters, zone: value })}
+                      options={[
+                        { value: '', label: 'All Zones' },
+                        ...filterOptions.zoneOptions.map((z) => ({ value: z, label: z })),
+                      ]}
+                      placeholder="All Zones"
+                    />
                   </div>
                 )}
               </div>
@@ -800,18 +796,15 @@ const TaskList: React.FC = () => {
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                       BU
                     </label>
-                    <select
+                    <StyledSelect
                       value={filters.bu}
-                      onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                    >
-                      <option value="">All BUs</option>
-                      {filterOptions.buOptions.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setFilters({ ...filters, bu: value })}
+                      options={[
+                        { value: '', label: 'All BUs' },
+                        ...filterOptions.buOptions.map((b) => ({ value: b, label: b })),
+                      ]}
+                      placeholder="All BUs"
+                    />
                   </div>
                 )}
 
@@ -840,21 +833,21 @@ const TaskList: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
-                            <select
+                            <StyledSelect
                               value={selectedPreset}
-                              onChange={(e) => {
-                                const p = e.target.value as DateRangePreset;
+                              onChange={(value) => {
+                                const p = value as DateRangePreset;
                                 setSelectedPreset(p);
                                 const r = getPresetRange(p);
                                 setDraftStart(r.start);
                                 setDraftEnd(r.end);
                               }}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-                            >
-                              {(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => (
-                                <option key={p} value={p}>{p}</option>
-                              ))}
-                            </select>
+                              options={(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => ({
+                                value: p,
+                                label: p,
+                              }))}
+                              placeholder="Select preset"
+                            />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1207,21 +1200,18 @@ const TaskList: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                      <select
-                        value={pageSize}
-                        onChange={(e) => {
+                      <StyledSelect
+                        value={String(pageSize)}
+                        onChange={(value) => {
                           setCurrentPage(1);
-                          setPageSize(Number(e.target.value));
+                          setPageSize(Number(value));
                         }}
-                        className="text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"
-                        title="Rows per page"
-                      >
-                        {[10, 20, 50, 100].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
+                        options={[10, 20, 50, 100].map((n) => ({
+                          value: String(n),
+                          label: String(n),
+                        }))}
+                        className="w-20"
+                      />
                     </div>
                     <Button
                       variant="secondary"
@@ -1302,17 +1292,18 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
               New Status
             </label>
-            <select
+            <StyledSelect
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
-            >
-              <option value="sampled_in_queue">Sampled - in queue</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="not_reachable">Not Reachable</option>
-              <option value="invalid_number">Invalid Number</option>
-            </select>
+              onChange={(value) => setStatus(value)}
+              options={[
+                { value: 'sampled_in_queue', label: 'Sampled - in queue' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'not_reachable', label: 'Not Reachable' },
+                { value: 'invalid_number', label: 'Invalid Number' },
+              ]}
+              placeholder="Select status"
+            />
           </div>
 
           <div>

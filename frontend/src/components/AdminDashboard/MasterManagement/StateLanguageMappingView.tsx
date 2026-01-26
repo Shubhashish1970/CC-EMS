@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Globe, Check } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
+import StyledSelect from '../../shared/StyledSelect';
 
 interface StateLanguageMapping {
   _id: string;
@@ -424,10 +425,9 @@ const StateLanguageMappingView: React.FC = () => {
                 <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   Primary Language <span className="text-red-500">*</span>
                 </label>
-                <select
+                <StyledSelect
                   value={formData.primaryLanguage}
-                  onChange={(e) => {
-                    const newPrimary = e.target.value;
+                  onChange={(newPrimary) => {
                     setFormData({ 
                       ...formData, 
                       primaryLanguage: newPrimary,
@@ -435,13 +435,10 @@ const StateLanguageMappingView: React.FC = () => {
                       secondaryLanguages: formData.secondaryLanguages.filter(l => l !== newPrimary)
                     });
                   }}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none bg-white"
+                  options={availableLanguages.map((lang) => ({ value: lang, label: lang }))}
                   disabled={isSubmitting}
-                >
-                  {availableLanguages.map((lang) => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
+                  placeholder="Select primary language"
+                />
               </div>
 
               <div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import Button from '../shared/Button';
+import StyledSelect from '../shared/StyledSelect';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -418,44 +419,45 @@ const CallbackRequestView: React.FC = () => {
           {/* Outcome Filter */}
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outcome</label>
-            <select
+            <StyledSelect
               value={filters.outcome}
-              onChange={(e) => setFilters(f => ({ ...f, outcome: e.target.value }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-            >
-              <option value="all">All Outcomes</option>
-              <option value="Unsuccessful">Unsuccessful</option>
-              <option value="Completed Conversation">Completed</option>
-            </select>
+              onChange={(value) => setFilters(f => ({ ...f, outcome: value }))}
+              options={[
+                { value: 'all', label: 'All Outcomes' },
+                { value: 'Unsuccessful', label: 'Unsuccessful' },
+                { value: 'Completed Conversation', label: 'Completed' },
+              ]}
+              placeholder="All Outcomes"
+            />
           </div>
 
           {/* Call Type Filter */}
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Call Type</label>
-            <select
+            <StyledSelect
               value={filters.callType}
-              onChange={(e) => setFilters(f => ({ ...f, callType: e.target.value }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-            >
-              <option value="all">All Types</option>
-              <option value="original">Original</option>
-              <option value="callback">Callback</option>
-            </select>
+              onChange={(value) => setFilters(f => ({ ...f, callType: value }))}
+              options={[
+                { value: 'all', label: 'All Types' },
+                { value: 'original', label: 'Original' },
+                { value: 'callback', label: 'Callback' },
+              ]}
+              placeholder="All Types"
+            />
           </div>
 
           {/* Agent Filter */}
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Agent</label>
-            <select
+            <StyledSelect
               value={filters.agentId}
-              onChange={(e) => setFilters(f => ({ ...f, agentId: e.target.value }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
-            >
-              <option value="all">All Agents</option>
-              {agents.map(agent => (
-                <option key={agent._id} value={agent._id}>{agent.name}</option>
-              ))}
-            </select>
+              onChange={(value) => setFilters(f => ({ ...f, agentId: value }))}
+              options={[
+                { value: 'all', label: 'All Agents' },
+                ...agents.map(agent => ({ value: agent._id, label: agent.name })),
+              ]}
+              placeholder="All Agents"
+            />
           </div>
         </div>
       </div>

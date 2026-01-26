@@ -3,6 +3,7 @@ import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square
 import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
+import StyledSelect from '../shared/StyledSelect';
 
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
 
@@ -793,16 +794,17 @@ const SamplingControlView: React.FC = () => {
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
-            <select
+            <StyledSelect
               value={activityFilters.lifecycleStatus}
-              onChange={(e) => setActivityFilters((p) => ({ ...p, lifecycleStatus: e.target.value as LifecycleStatus }))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="not_eligible">Not Eligible</option>
-              <option value="sampled">Sampled</option>
-            </select>
+              onChange={(value) => setActivityFilters((p) => ({ ...p, lifecycleStatus: value as LifecycleStatus }))}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'not_eligible', label: 'Not Eligible' },
+                { value: 'sampled', label: 'Sampled' },
+              ]}
+              placeholder="Select lifecycle"
+            />
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
