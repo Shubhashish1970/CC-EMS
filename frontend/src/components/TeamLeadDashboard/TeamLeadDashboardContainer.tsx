@@ -8,7 +8,7 @@ import CallbackRequestView from './CallbackRequestView';
 
 const TeamLeadDashboardContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sampling' | 'tasks' | 'callbacks'>('sampling');
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -48,7 +48,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
                   <UserIcon size={16} className="text-slate-400" />
                   <span className="font-medium">{user.name}</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-400 uppercase">{user.role.replace('_', ' ')}</span>
+                  <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role).replace('_', ' ')}</span>
                 </div>
               )}
               <button

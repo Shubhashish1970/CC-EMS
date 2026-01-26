@@ -67,7 +67,7 @@ interface TaskData {
 }
 
 const AgentWorkspace: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole } = useAuth();
   const { showError, showWarning } = useToast();
   const [callDuration, setCallDuration] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -591,7 +591,7 @@ const AgentWorkspace: React.FC = () => {
                 <User size={16} className="text-slate-400" />
                 <span className="font-medium">{user.name}</span>
                 <span className="text-slate-500">•</span>
-                <span className="text-xs text-slate-400 uppercase">{user.role?.replace('_', ' ')}</span>
+                <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role)?.replace('_', ' ')}</span>
               </div>
             )}
             <button

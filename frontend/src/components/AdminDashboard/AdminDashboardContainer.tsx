@@ -9,7 +9,7 @@ import UserManagementView from '../UserManagement/UserManagementView';
 
 const AdminDashboardContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'activities' | 'queues' | 'tasks' | 'users'>('activities');
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -51,7 +51,7 @@ const AdminDashboardContainer: React.FC = () => {
                   <UserIcon size={16} className="text-slate-400" />
                   <span className="font-medium">{user.name}</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-400 uppercase">{user.role.replace('_', ' ')}</span>
+                  <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role).replace('_', ' ')}</span>
                 </div>
               )}
               <button

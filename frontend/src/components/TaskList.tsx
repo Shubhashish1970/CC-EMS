@@ -84,8 +84,11 @@ const DEFAULT_TASK_TABLE_WIDTHS: Record<TaskTableColumnKey, number> = {
 };
 
 const TaskList: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeRole } = useAuth();
   const toast = useToast();
+  
+  // Use activeRole for permission checks, fallback to user.role
+  const currentRole = activeRole || user?.role;
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -277,7 +280,7 @@ const TaskList: React.FC = () => {
       setError(null);
       try {
         let response;
-        if (user.role === 'team_lead') {
+        if (currentRole === 'team_lead') {
           response = await tasksAPI.getTeamTasks({
             status: filters.status || undefined,
             dateFrom: filters.dateFrom || undefined,
@@ -327,7 +330,7 @@ const TaskList: React.FC = () => {
         setError(null);
         try {
           let response;
-          if (user.role === 'team_lead') {
+          if (currentRole === 'team_lead') {
             response = await tasksAPI.getTeamTasks({
               status: filters.status || undefined,
               dateFrom: filters.dateFrom || undefined,
@@ -401,7 +404,7 @@ const TaskList: React.FC = () => {
 
   const fetchStats = async () => {
     if (!user) return;
-    if (user.role === 'team_lead') return;
+    if (currentRole === 'team_lead') return;
     setIsStatsLoading(true);
     try {
       const res: any = await tasksAPI.getPendingTasksStats({
@@ -433,7 +436,7 @@ const TaskList: React.FC = () => {
   });
 
   const fetchFilterOptions = async () => {
-    if (!user || user.role === 'team_lead') return;
+    if (!user || currentRole === 'team_lead') return;
     try {
       const res: any = await tasksAPI.getPendingTasksFilterOptions({
         agentId: filters.agentId || undefined,
@@ -462,7 +465,7 @@ const TaskList: React.FC = () => {
   }, [user, filters.agentId, filters.territory, filters.zone, filters.bu, filters.search, filters.dateFrom, filters.dateTo]);
 
   const handleDownloadExcel = async () => {
-    if (!user || user.role === 'team_lead') return;
+    if (!user || currentRole === 'team_lead') return;
     setIsExporting(true);
     try {
       await tasksAPI.downloadPendingTasksExport({

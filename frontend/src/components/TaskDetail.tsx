@@ -67,7 +67,10 @@ interface TaskDetailProps {
 }
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) => {
-  const { user } = useAuth();
+  const { user, activeRole } = useAuth();
+  
+  // Use activeRole for permission checks, fallback to user.role
+  const currentRole = activeRole || user?.role;
   const { showSuccess, showError } = useToast();
   const [fullTask, setFullTask] = useState<Task | null>(task);
   const [isLoading, setIsLoading] = useState(false);
@@ -132,8 +135,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
     });
   };
 
-  const canReassign = user && (user.role === 'team_lead' || user.role === 'mis_admin');
-  const canChangeStatus = user && (user.role === 'team_lead' || user.role === 'mis_admin');
+  const canReassign = user && (currentRole === 'team_lead' || currentRole === 'mis_admin');
+  const canChangeStatus = user && (currentRole === 'team_lead' || currentRole === 'mis_admin');
 
   const handleStatusUpdate = async (newStatus: string, notes?: string) => {
     setIsUpdatingStatus(true);
