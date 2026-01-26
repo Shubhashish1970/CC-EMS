@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Users as UsersIcon, Loader2 } from 'lucide-react';
-import { usersAPI } from '../../services/api';
+import { usersAPI, getAuthHeaders } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { AVAILABLE_LANGUAGES } from './LanguageSelector';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Fallback languages in case API fails
+const FALLBACK_LANGUAGES = ['Hindi', 'Telugu', 'Marathi', 'Kannada', 'Tamil', 'Bengali', 'Oriya', 'English', 'Malayalam'];
 
 interface Agent {
   _id: string;
@@ -15,11 +19,35 @@ interface Agent {
 const AgentLanguageMatrix: React.FC = () => {
   const { showError } = useToast();
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>(FALLBACK_LANGUAGES);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    fetchLanguages();
     fetchAgents();
   }, []);
+
+  const fetchLanguages = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/master-data/languages`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          const activeLanguages = data.data
+            .filter((lang: any) => lang.isActive)
+            .sort((a: any, b: any) => a.displayOrder - b.displayOrder)
+            .map((lang: any) => lang.name);
+          if (activeLanguages.length > 0) {
+            setAvailableLanguages(activeLanguages);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch languages, using fallback:', error);
+    }
+  };
 
   const fetchAgents = async () => {
     setIsLoading(true);
@@ -61,7 +89,7 @@ const AgentLanguageMatrix: React.FC = () => {
   }
 
   // Calculate language coverage
-  const languageCoverage = AVAILABLE_LANGUAGES.map((lang) => {
+  const languageCoverage = availableLanguages.map((lang) => {
     const agentsWithLang = agents.filter((agent) => agent.languageCapabilities.includes(lang));
     return {
       language: lang,
@@ -83,7 +111,7 @@ const AgentLanguageMatrix: React.FC = () => {
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-2xl font-black text-green-700">
-            {AVAILABLE_LANGUAGES.length - languagesWithoutAgents.length}
+            {availableLanguages.length - languagesWithoutAgents.length}
           </div>
           <div className="text-sm text-slate-600 font-medium mt-1">Languages Covered</div>
         </div>
@@ -133,7 +161,7 @@ const AgentLanguageMatrix: React.FC = () => {
                 <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider sticky left-0 bg-slate-50 z-10">
                   Agent
                 </th>
-                {AVAILABLE_LANGUAGES.map((lang) => (
+                {availableLanguages.map((lang) => (
                   <th
                     key={lang}
                     className="px-4 py-4 text-center text-xs font-black text-slate-700 uppercase tracking-wider min-w-[100px]"
@@ -155,7 +183,7 @@ const AgentLanguageMatrix: React.FC = () => {
                       <div className="text-xs text-slate-500 mt-0.5">{agent.email}</div>
                     </div>
                   </td>
-                  {AVAILABLE_LANGUAGES.map((lang) => {
+                  {availableLanguages.map((lang) => {
                     const hasLanguage = agent.languageCapabilities.includes(lang);
                     return (
                       <td key={lang} className="px-4 py-4 text-center">

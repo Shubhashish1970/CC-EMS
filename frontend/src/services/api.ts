@@ -13,7 +13,7 @@ const getActiveRole = (): string | null => {
 };
 
 // Get auth headers
-const getAuthHeaders = (): HeadersInit => {
+export const getAuthHeaders = (): HeadersInit => {
   const token = getAuthToken();
   const activeRole = getActiveRole();
   return {
