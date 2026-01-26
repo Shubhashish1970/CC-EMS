@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult, query } from 'express-validator';
-import { MasterCrop, MasterProduct, NonPurchaseReason, Sentiment } from '../models/MasterData.js';
+import { MasterCrop, MasterProduct, NonPurchaseReason, Sentiment, MasterLanguage } from '../models/MasterData.js';
 import { StateLanguageMapping } from '../models/StateLanguageMapping.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/rbac.js';
@@ -876,6 +876,184 @@ router.put(
         success: true,
         message: 'State-language mapping updated successfully',
         data: { mapping },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==================== LANGUAGES ====================
+
+// @route   GET /api/master-data/languages
+// @desc    Get all active languages (for dropdown)
+// @access  Private (all authenticated users)
+router.get('/languages', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { activeOnly = 'true' } = req.query;
+    const query: any = {};
+    
+    if (activeOnly === 'true') {
+      query.isActive = true;
+    }
+
+    const languages = await MasterLanguage.find(query)
+      .sort({ displayOrder: 1, name: 1 })
+      .select('name code displayOrder isActive');
+
+    res.json({
+      success: true,
+      data: { languages },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   GET /api/master-data/languages/all
+// @desc    Get all languages (including inactive) - Admin only
+// @access  Private (MIS Admin)
+router.get(
+  '/languages/all',
+  requirePermission('master_data.view'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const languages = await MasterLanguage.find().sort({ displayOrder: 1, name: 1 });
+
+      res.json({
+        success: true,
+        data: { languages },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/master-data/languages
+// @desc    Create new language - Admin only
+// @access  Private (MIS Admin)
+router.post(
+  '/languages',
+  requirePermission('master_data.create'),
+  [
+    body('name').trim().notEmpty().withMessage('Language name is required'),
+    body('code').trim().notEmpty().withMessage('Language code is required'),
+    body('displayOrder').optional().isInt({ min: 0 }),
+    body('isActive').optional().isBoolean(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { name, code, displayOrder = 0, isActive = true } = req.body;
+
+      // Check if language already exists by name or code
+      const existingByName = await MasterLanguage.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      if (existingByName) {
+        const error: AppError = new Error('Language with this name already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const existingByCode = await MasterLanguage.findOne({ code: code.toUpperCase() });
+      if (existingByCode) {
+        const error: AppError = new Error('Language with this code already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const language = new MasterLanguage({
+        name,
+        code: code.toUpperCase(),
+        displayOrder,
+        isActive,
+      });
+
+      await language.save();
+
+      logger.info(`Language created: ${language.name} (${language.code}) by ${(req as AuthRequest).user.email}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Language created successfully',
+        data: { language },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   PUT /api/master-data/languages/:id
+// @desc    Update language - Admin only
+// @access  Private (MIS Admin)
+router.put(
+  '/languages/:id',
+  requirePermission('master_data.update'),
+  [
+    body('name').optional().trim().notEmpty(),
+    body('code').optional().trim().notEmpty(),
+    body('displayOrder').optional().isInt({ min: 0 }),
+    body('isActive').optional().isBoolean(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { id } = req.params;
+      const { name, code, displayOrder, isActive } = req.body;
+
+      const language = await MasterLanguage.findById(id);
+      if (!language) {
+        const error: AppError = new Error('Language not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (name && name.toLowerCase() !== language.name.toLowerCase()) {
+        const existing = await MasterLanguage.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+        if (existing) {
+          const error: AppError = new Error('Language name already exists');
+          error.statusCode = 409;
+          throw error;
+        }
+        language.name = name;
+      }
+
+      if (code && code.toUpperCase() !== language.code) {
+        const existing = await MasterLanguage.findOne({ code: code.toUpperCase() });
+        if (existing) {
+          const error: AppError = new Error('Language code already exists');
+          error.statusCode = 409;
+          throw error;
+        }
+        language.code = code.toUpperCase();
+      }
+
+      if (displayOrder !== undefined) language.displayOrder = displayOrder;
+      if (isActive !== undefined) language.isActive = isActive;
+
+      await language.save();
+
+      logger.info(`Language updated: ${language.name} by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: 'Language updated successfully',
+        data: { language },
       });
     } catch (error) {
       next(error);

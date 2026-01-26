@@ -32,6 +32,15 @@ export interface ISentiment extends Document {
   updatedAt: Date;
 }
 
+export interface IMasterLanguage extends Document {
+  name: string;        // e.g., "Hindi", "Telugu"
+  code: string;        // e.g., "HI", "TE" (ISO 639-1 style)
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 const MasterCropSchema = new Schema<IMasterCrop>(
   {
     name: {
@@ -116,6 +125,33 @@ const SentimentSchema = new Schema<ISentiment>(
   }
 );
 
+const MasterLanguageSchema = new Schema<IMasterLanguage>(
+  {
+    name: {
+      type: String,
+      required: [true, 'Language name is required'],
+      trim: true,
+    },
+    code: {
+      type: String,
+      required: [true, 'Language code is required'],
+      trim: true,
+      uppercase: true,
+    },
+    displayOrder: {
+      type: Number,
+      default: 0,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
 // Indexes
 MasterCropSchema.index({ name: 1 }, { unique: true });
 MasterCropSchema.index({ isActive: 1 });
@@ -125,9 +161,13 @@ NonPurchaseReasonSchema.index({ name: 1 }, { unique: true });
 NonPurchaseReasonSchema.index({ isActive: 1, displayOrder: 1 });
 SentimentSchema.index({ name: 1 }, { unique: true });
 SentimentSchema.index({ isActive: 1, displayOrder: 1 });
+MasterLanguageSchema.index({ name: 1 }, { unique: true });
+MasterLanguageSchema.index({ code: 1 }, { unique: true });
+MasterLanguageSchema.index({ isActive: 1, displayOrder: 1 });
 
 export const MasterCrop = mongoose.model<IMasterCrop>('MasterCrop', MasterCropSchema);
 export const MasterProduct = mongoose.model<IMasterProduct>('MasterProduct', MasterProductSchema);
 export const NonPurchaseReason = mongoose.model<INonPurchaseReason>('NonPurchaseReason', NonPurchaseReasonSchema);
 export const Sentiment = mongoose.model<ISentiment>('Sentiment', SentimentSchema);
+export const MasterLanguage = mongoose.model<IMasterLanguage>('MasterLanguage', MasterLanguageSchema);
 

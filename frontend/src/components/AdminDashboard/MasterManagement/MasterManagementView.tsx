@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Users, Leaf, Package, MessageSquareX, MapPin, ThumbsUp } from 'lucide-react';
+import { Users, Leaf, Package, MessageSquareX, MapPin, ThumbsUp, Globe } from 'lucide-react';
 import UserManagementView from '../../UserManagement/UserManagementView';
 import CropsMasterView from './CropsMasterView';
 import ProductsMasterView from './ProductsMasterView';
 import NonPurchaseReasonsMasterView from './NonPurchaseReasonsMasterView';
 import StateLanguageMappingView from './StateLanguageMappingView';
 import SentimentsMasterView from './SentimentsMasterView';
+import LanguagesMasterView from './LanguagesMasterView';
 
-type MasterTab = 'users' | 'crops' | 'products' | 'nonPurchaseReasons' | 'stateLanguage' | 'sentiments';
+type MasterTab = 'users' | 'crops' | 'products' | 'nonPurchaseReasons' | 'languages' | 'stateLanguage' | 'sentiments';
 
 const MasterManagementView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<MasterTab>('users');
@@ -17,6 +18,7 @@ const MasterManagementView: React.FC = () => {
     { id: 'crops', label: 'Crops', icon: Leaf },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'nonPurchaseReasons', label: 'Non-Purchase Reasons', icon: MessageSquareX },
+    { id: 'languages', label: 'Languages', icon: Globe },
     { id: 'stateLanguage', label: 'State-Language', icon: MapPin },
     { id: 'sentiments', label: 'Sentiments', icon: ThumbsUp },
   ];
@@ -53,6 +55,7 @@ const MasterManagementView: React.FC = () => {
         {activeSubTab === 'crops' && <CropsMasterView />}
         {activeSubTab === 'products' && <ProductsMasterView />}
         {activeSubTab === 'nonPurchaseReasons' && <NonPurchaseReasonsMasterView />}
+        {activeSubTab === 'languages' && <LanguagesMasterView />}
         {activeSubTab === 'stateLanguage' && <StateLanguageMappingView />}
         {activeSubTab === 'sentiments' && <SentimentsMasterView />}
       </div>

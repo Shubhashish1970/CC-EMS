@@ -1,7 +1,8 @@
-import React from 'react';
-import { Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 
-export const AVAILABLE_LANGUAGES = [
+// Fallback languages in case API fails
+export const FALLBACK_LANGUAGES = [
   'Hindi',
   'Telugu',
   'Marathi',
@@ -13,7 +14,9 @@ export const AVAILABLE_LANGUAGES = [
   'Malayalam',
 ] as const;
 
-export type Language = typeof AVAILABLE_LANGUAGES[number];
+export type Language = string;
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface LanguageSelectorProps {
   selectedLanguages: string[];
@@ -28,6 +31,33 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   required = false,
   disabled = false,
 }) => {
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([...FALLBACK_LANGUAGES]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE}/master-data/languages`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        const data = await response.json();
+        if (data.success && data.data.languages.length > 0) {
+          setAvailableLanguages(data.data.languages.map((l: any) => l.name));
+        }
+      } catch (error) {
+        console.warn('Failed to fetch languages from API, using fallback');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLanguages();
+  }, []);
+
   const handleToggle = (language: string) => {
     if (disabled) return;
     
@@ -38,6 +68,21 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
+          Language Capabilities
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <div className="flex items-center gap-2 text-slate-500">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Loading languages...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide">
@@ -45,7 +90,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {AVAILABLE_LANGUAGES.map((language) => {
+        {availableLanguages.map((language) => {
           const isSelected = selectedLanguages.includes(language);
           return (
             <button

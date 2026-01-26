@@ -25,7 +25,8 @@ const getAuthHeaders = () => {
   };
 };
 
-const AVAILABLE_LANGUAGES = [
+// Fallback languages in case API fails
+const FALLBACK_LANGUAGES = [
   'Hindi',
   'Telugu',
   'Marathi',
@@ -40,6 +41,7 @@ const AVAILABLE_LANGUAGES = [
 const StateLanguageMappingView: React.FC = () => {
   const { showSuccess, showError } = useToast();
   const [mappings, setMappings] = useState<StateLanguageMapping[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>(FALLBACK_LANGUAGES);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showInactive, setShowInactive] = useState(false);
@@ -52,6 +54,20 @@ const StateLanguageMappingView: React.FC = () => {
     isActive: true 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchLanguages = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/master-data/languages`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (data.success && data.data.languages.length > 0) {
+        setAvailableLanguages(data.data.languages.map((l: any) => l.name));
+      }
+    } catch (error) {
+      console.warn('Failed to fetch languages from API, using fallback');
+    }
+  };
 
   const fetchMappings = async () => {
     setIsLoading(true);
@@ -73,6 +89,7 @@ const StateLanguageMappingView: React.FC = () => {
   };
 
   useEffect(() => {
+    fetchLanguages();
     fetchMappings();
   }, []);
 
@@ -421,7 +438,7 @@ const StateLanguageMappingView: React.FC = () => {
                   className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none bg-white"
                   disabled={isSubmitting}
                 >
-                  {AVAILABLE_LANGUAGES.map((lang) => (
+                  {availableLanguages.map((lang) => (
                     <option key={lang} value={lang}>{lang}</option>
                   ))}
                 </select>
@@ -432,7 +449,7 @@ const StateLanguageMappingView: React.FC = () => {
                   Secondary Languages
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {AVAILABLE_LANGUAGES.filter(l => l !== formData.primaryLanguage).map((lang) => {
+                  {availableLanguages.filter(l => l !== formData.primaryLanguage).map((lang) => {
                     const isSelected = formData.secondaryLanguages.includes(lang);
                     return (
                       <button

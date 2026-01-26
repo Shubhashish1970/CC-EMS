@@ -1,0 +1,391 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Globe } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
+
+interface Language {
+  _id: string;
+  name: string;
+  code: string;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
+const LanguagesMasterView: React.FC = () => {
+  const { showSuccess, showError } = useToast();
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
+  const [formData, setFormData] = useState({ name: '', code: '', displayOrder: 0, isActive: true });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchLanguages = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/master-data/languages/all`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setLanguages(data.data.languages);
+      } else {
+        showError('Failed to fetch languages');
+      }
+    } catch (error) {
+      showError('Failed to fetch languages');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLanguages();
+  }, []);
+
+  const handleOpenModal = (language?: Language) => {
+    if (language) {
+      setEditingLanguage(language);
+      setFormData({
+        name: language.name,
+        code: language.code,
+        displayOrder: language.displayOrder,
+        isActive: language.isActive,
+      });
+    } else {
+      setEditingLanguage(null);
+      setFormData({ name: '', code: '', displayOrder: languages.length, isActive: true });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingLanguage(null);
+    setFormData({ name: '', code: '', displayOrder: 0, isActive: true });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const url = editingLanguage
+        ? `${API_BASE}/master-data/languages/${editingLanguage._id}`
+        : `${API_BASE}/master-data/languages`;
+      const method = editingLanguage ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(editingLanguage ? 'Language updated successfully' : 'Language created successfully');
+        handleCloseModal();
+        fetchLanguages();
+      } else {
+        showError(data.error?.message || 'Failed to save language');
+      }
+    } catch (error) {
+      showError('Failed to save language');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (language: Language) => {
+    try {
+      const response = await fetch(`${API_BASE}/master-data/languages/${language._id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isActive: !language.isActive }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(`Language ${language.isActive ? 'deactivated' : 'activated'} successfully`);
+        fetchLanguages();
+      } else {
+        showError(data.error?.message || 'Failed to update language');
+      }
+    } catch (error) {
+      showError('Failed to update language');
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const template = 'Name,Code,Display Order,Active\nHindi,HI,1,Active\nTelugu,TE,2,Active\nMarathi,MR,3,Active';
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'languages_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExport = () => {
+    const csvContent = [
+      ['Name', 'Code', 'Display Order', 'Active'].join(','),
+      ...languages.map(l => [l.name, l.code, l.displayOrder, l.isActive ? 'Active' : 'Inactive'].join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `languages_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const filteredLanguages = languages.filter((language) => {
+    const matchesSearch =
+      language.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      language.code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesActive = showInactive || language.isActive;
+    return matchesSearch && matchesActive;
+  });
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Languages Master</h2>
+          <p className="text-sm text-slate-500">Manage languages for agent capabilities and farmer preferences</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <Download size={16} />
+            Template
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <Upload size={16} />
+            Export
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 px-4 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-colors"
+          >
+            <Plus size={18} />
+            Add Language
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search languages..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+          />
+          Show inactive
+        </label>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={32} className="animate-spin text-lime-600" />
+        </div>
+      ) : filteredLanguages.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">
+          {searchTerm ? 'No languages match your search' : 'No languages found'}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Language
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Code
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Order
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredLanguages.map((language) => (
+                <tr key={language._id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Globe size={16} className="text-lime-600" />
+                      <span className="font-medium text-slate-800">{language.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-mono rounded">
+                      {language.code}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{language.displayOrder}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleToggleActive(language)}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                        language.isActive
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                      }`}
+                    >
+                      {language.isActive ? (
+                        <>
+                          <CheckCircle size={12} /> Active
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={12} /> Inactive
+                        </>
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleOpenModal(language)}
+                      className="p-2 text-slate-500 hover:text-lime-600 hover:bg-lime-50 rounded-lg transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800">
+                {editingLanguage ? 'Edit Language' : 'Add New Language'}
+              </h3>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Language Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Hindi, Telugu"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Language Code <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g., HI, TE, MR"
+                  maxLength={5}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 uppercase"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1">2-5 character code (auto-capitalized)</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Display Order</label>
+                <input
+                  type="number"
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+                />
+                <label htmlFor="isActive" className="text-sm text-slate-700">
+                  Active
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-4 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  {editingLanguage ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default LanguagesMasterView;
