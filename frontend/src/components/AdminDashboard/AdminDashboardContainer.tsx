@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, UserCog, Leaf } from 'lucide-react';
+import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, Database, Leaf } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ActivitySamplingView from './ActivitySamplingView';
 import AgentQueueView from './AgentQueueView';
 import TaskList from '../TaskList';
-import UserManagementView from '../UserManagement/UserManagementView';
+import MasterManagementView from './MasterManagement/MasterManagementView';
 
 const AdminDashboardContainer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'activities' | 'queues' | 'tasks' | 'users'>('activities');
+  const [activeTab, setActiveTab] = useState<'activities' | 'queues' | 'tasks' | 'masters'>('activities');
   const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
 
@@ -25,7 +25,7 @@ const AdminDashboardContainer: React.FC = () => {
     { id: 'activities' as const, label: 'Activity Monitoring', icon: ActivityIcon },
     { id: 'queues' as const, label: 'Agent Queues', icon: Users },
     { id: 'tasks' as const, label: 'Task Management', icon: List },
-    { id: 'users' as const, label: 'User Management', icon: UserCog },
+    { id: 'masters' as const, label: 'Master Management', icon: Database },
   ];
 
   return (
@@ -96,7 +96,7 @@ const AdminDashboardContainer: React.FC = () => {
         {activeTab === 'activities' && <ActivitySamplingView />}
         {activeTab === 'queues' && <AgentQueueView />}
         {activeTab === 'tasks' && <TaskList />}
-        {activeTab === 'users' && <UserManagementView />}
+        {activeTab === 'masters' && <MasterManagementView />}
       </div>
     </div>
   );

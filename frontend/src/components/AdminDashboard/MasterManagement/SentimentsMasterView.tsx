@@ -1,0 +1,514 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Smile, Frown, Meh, HelpCircle } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
+
+interface Sentiment {
+  _id: string;
+  name: string;
+  colorClass: string;
+  icon: string;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+const COLOR_OPTIONS = [
+  { value: 'bg-green-100 text-green-800', label: 'Green', preview: 'bg-green-500' },
+  { value: 'bg-red-100 text-red-800', label: 'Red', preview: 'bg-red-500' },
+  { value: 'bg-yellow-100 text-yellow-800', label: 'Yellow', preview: 'bg-yellow-500' },
+  { value: 'bg-blue-100 text-blue-800', label: 'Blue', preview: 'bg-blue-500' },
+  { value: 'bg-slate-100 text-slate-800', label: 'Gray', preview: 'bg-slate-500' },
+];
+
+const ICON_OPTIONS = [
+  { value: 'smile', label: 'Smile', icon: Smile },
+  { value: 'frown', label: 'Frown', icon: Frown },
+  { value: 'meh', label: 'Neutral', icon: Meh },
+  { value: 'help', label: 'Unknown', icon: HelpCircle },
+];
+
+const getIconComponent = (iconName: string) => {
+  switch (iconName) {
+    case 'smile': return Smile;
+    case 'frown': return Frown;
+    case 'meh': return Meh;
+    case 'help': return HelpCircle;
+    default: return Meh;
+  }
+};
+
+const SentimentsMasterView: React.FC = () => {
+  const { showSuccess, showError } = useToast();
+  const [sentiments, setSentiments] = useState<Sentiment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSentiment, setEditingSentiment] = useState<Sentiment | null>(null);
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    colorClass: 'bg-slate-100 text-slate-800', 
+    icon: 'meh',
+    displayOrder: 0, 
+    isActive: true 
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchSentiments = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/master-data/sentiments/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSentiments(data.data.sentiments);
+      } else {
+        showError('Failed to fetch sentiments');
+      }
+    } catch (error) {
+      showError('Failed to fetch sentiments');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSentiments();
+  }, []);
+
+  const handleOpenModal = (sentiment?: Sentiment) => {
+    if (sentiment) {
+      setEditingSentiment(sentiment);
+      setFormData({ 
+        name: sentiment.name, 
+        colorClass: sentiment.colorClass,
+        icon: sentiment.icon,
+        displayOrder: sentiment.displayOrder, 
+        isActive: sentiment.isActive 
+      });
+    } else {
+      setEditingSentiment(null);
+      const maxOrder = sentiments.length > 0 ? Math.max(...sentiments.map(s => s.displayOrder)) + 1 : 0;
+      setFormData({ 
+        name: '', 
+        colorClass: 'bg-slate-100 text-slate-800', 
+        icon: 'meh',
+        displayOrder: maxOrder, 
+        isActive: true 
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingSentiment(null);
+    setFormData({ name: '', colorClass: 'bg-slate-100 text-slate-800', icon: 'meh', displayOrder: 0, isActive: true });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      showError('Sentiment name is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = editingSentiment
+        ? `${API_BASE}/api/master-data/sentiments/${editingSentiment._id}`
+        : `${API_BASE}/api/master-data/sentiments`;
+      const method = editingSentiment ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(editingSentiment ? 'Sentiment updated successfully' : 'Sentiment created successfully');
+        handleCloseModal();
+        fetchSentiments();
+      } else {
+        showError(data.error?.message || 'Operation failed');
+      }
+    } catch (error) {
+      showError('Operation failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (sentiment: Sentiment) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/master-data/sentiments/${sentiment._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive: !sentiment.isActive }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(`Sentiment ${sentiment.isActive ? 'deactivated' : 'activated'} successfully`);
+        fetchSentiments();
+      } else {
+        showError(data.error?.message || 'Operation failed');
+      }
+    } catch (error) {
+      showError('Operation failed');
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['Name', 'Color (Green/Red/Yellow/Blue/Gray)', 'Icon (smile/frown/meh/help)', 'Display Order', 'Status (Active/Inactive)'];
+    const sampleData = [
+      ['Positive', 'Green', 'smile', '1', 'Active'],
+      ['Negative', 'Red', 'frown', '2', 'Active'],
+      ['Neutral', 'Gray', 'meh', '3', 'Active'],
+    ];
+    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sentiments_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadData = () => {
+    const headers = ['Name', 'Color Class', 'Icon', 'Display Order', 'Status', 'Created At'];
+    const csvData = sentiments.map(s => [
+      `"${s.name}"`,
+      `"${s.colorClass}"`,
+      s.icon,
+      s.displayOrder,
+      s.isActive ? 'Active' : 'Inactive',
+      new Date(s.createdAt).toLocaleDateString(),
+    ]);
+    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sentiments_export.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const filteredSentiments = sentiments.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = showInactive || s.isActive;
+    return matchesSearch && matchesStatus;
+  });
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900">Sentiments Master</h2>
+          <p className="text-sm text-slate-600 mt-1">Define sentiment options for call feedback</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            <Download size={16} />
+            Template
+          </button>
+          <button
+            onClick={handleDownloadData}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            <Upload size={16} />
+            Export
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
+          >
+            <Plus size={16} />
+            Add Sentiment
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search sentiments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+          />
+          Show inactive
+        </label>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={32} className="animate-spin text-lime-600" />
+          </div>
+        ) : filteredSentiments.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="text-slate-500">No sentiments found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Preview</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Order</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-4 text-right text-xs font-black text-slate-700 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredSentiments.map((sentiment) => {
+                  const IconComponent = getIconComponent(sentiment.icon);
+                  return (
+                    <tr key={sentiment._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold ${sentiment.colorClass}`}>
+                          <IconComponent size={16} />
+                          {sentiment.name}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-900">{sentiment.name}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {sentiment.displayOrder}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                            sentiment.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {sentiment.isActive ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                          {sentiment.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {formatDate(sentiment.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenModal(sentiment)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(sentiment)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              sentiment.isActive
+                                ? 'text-red-600 hover:bg-red-50'
+                                : 'text-green-600 hover:bg-green-50'
+                            }`}
+                            title={sentiment.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {sentiment.isActive ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h3 className="text-xl font-black text-slate-900">
+                {editingSentiment ? 'Edit Sentiment' : 'Add New Sentiment'}
+              </h3>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Sentiment Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                  placeholder="e.g., Positive, Negative"
+                  disabled={isSubmitting}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Color
+                </label>
+                <div className="grid grid-cols-5 gap-2">
+                  {COLOR_OPTIONS.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, colorClass: color.value })}
+                      className={`h-10 rounded-lg border-2 transition-all ${color.preview} ${
+                        formData.colorClass === color.value 
+                          ? 'border-slate-900 ring-2 ring-offset-2 ring-slate-900' 
+                          : 'border-transparent'
+                      }`}
+                      title={color.label}
+                      disabled={isSubmitting}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Icon
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {ICON_OPTIONS.map((opt) => {
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: opt.value })}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                          formData.icon === opt.value 
+                            ? 'border-slate-900 bg-slate-50' 
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        disabled={isSubmitting}
+                      >
+                        <Icon size={20} className="text-slate-700" />
+                        <span className="text-xs text-slate-600">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Display Order
+                </label>
+                <input
+                  type="number"
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                  min="0"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                  Preview
+                </label>
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  {(() => {
+                    const Icon = getIconComponent(formData.icon);
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold ${formData.colorClass}`}>
+                        <Icon size={16} />
+                        {formData.name || 'Preview'}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-5 h-5 text-lime-600 border-slate-300 rounded focus:ring-lime-500"
+                  disabled={isSubmitting}
+                />
+                <label htmlFor="isActive" className="text-sm font-medium text-slate-700">
+                  Active
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSubmitting && <Loader2 size={18} className="animate-spin" />}
+                  {editingSentiment ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SentimentsMasterView;
