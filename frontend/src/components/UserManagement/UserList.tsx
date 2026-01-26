@@ -8,6 +8,7 @@ interface User {
   email: string;
   employeeId: string;
   role: UserRole;
+  roles?: UserRole[]; // Multiple roles support
   languageCapabilities: string[];
   teamLeadId?: string;
   teamLead?: {
@@ -114,14 +115,22 @@ const UserList: React.FC<UserListProps> = ({ users, isLoading, onEdit, onDelete,
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${ROLE_COLORS[user.role]}`}
-                    >
-                      {ROLE_LABELS[user.role]}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {/* Show all roles if available, otherwise show single role */}
+                      {(user.roles && user.roles.length > 0 ? user.roles : [user.role]).map((role, idx) => (
+                        <span
+                          key={role}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_COLORS[role]} ${idx === 0 ? 'ring-1 ring-offset-1 ring-slate-300' : ''}`}
+                          title={idx === 0 ? 'Primary role' : ''}
+                        >
+                          {ROLE_LABELS[role]}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
-                    {user.role === 'cc_agent' && user.languageCapabilities.length > 0 ? (
+                    {/* Show languages if user has cc_agent role */}
+                    {(user.roles?.includes('cc_agent') || user.role === 'cc_agent') && user.languageCapabilities.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {user.languageCapabilities.slice(0, 3).map((lang) => (
                           <span
@@ -142,7 +151,8 @@ const UserList: React.FC<UserListProps> = ({ users, isLoading, onEdit, onDelete,
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    {user.role === 'cc_agent' && user.teamLead ? (
+                    {/* Show team lead if user has cc_agent role */}
+                    {(user.roles?.includes('cc_agent') || user.role === 'cc_agent') && user.teamLead ? (
                       <div className="text-sm text-slate-700">
                         <div className="font-medium">{user.teamLead.name}</div>
                         <div className="text-xs text-slate-500">{user.teamLead.email}</div>

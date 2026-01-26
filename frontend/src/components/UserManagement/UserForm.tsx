@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Check } from 'lucide-react';
 import { usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import LanguageSelector from './LanguageSelector';
@@ -12,6 +12,7 @@ interface User {
   email: string;
   employeeId: string;
   role: UserRole;
+  roles?: UserRole[]; // Multiple roles support
   languageCapabilities: string[];
   teamLeadId?: string;
   teamLead?: {
@@ -30,12 +31,12 @@ interface UserFormProps {
   teamLeads?: Array<{ _id: string; name: string; email: string }>;
 }
 
-const CALL_CENTRE_ROLES: Array<{ value: UserRole; label: string }> = [
-  { value: 'cc_agent', label: 'CC Agent' },
-  { value: 'team_lead', label: 'Team Lead' },
-  { value: 'mis_admin', label: 'MIS Admin' },
-  { value: 'core_sales_head', label: 'Core Sales Head' },
-  { value: 'marketing_head', label: 'Marketing Head' },
+const CALL_CENTRE_ROLES: Array<{ value: UserRole; label: string; description: string }> = [
+  { value: 'cc_agent', label: 'CC Agent', description: 'Make calls & log interactions' },
+  { value: 'team_lead', label: 'Team Lead', description: 'Manage team & sampling' },
+  { value: 'mis_admin', label: 'MIS Admin', description: 'Full system access' },
+  { value: 'core_sales_head', label: 'Core Sales Head', description: 'Field team dashboards' },
+  { value: 'marketing_head', label: 'Marketing Head', description: 'Product reports' },
 ];
 
 const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, teamLeads = [] }) => {
@@ -46,7 +47,8 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
     email: '',
     password: '',
     employeeId: '',
-    role: 'cc_agent' as UserRole,
+    role: 'cc_agent' as UserRole, // Primary role (first selected)
+    roles: ['cc_agent'] as UserRole[], // All assigned roles
     languageCapabilities: [] as string[],
     teamLeadId: '',
     isActive: true,
@@ -57,12 +59,15 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
   useEffect(() => {
     if (isOpen) {
       if (user) {
+        // Get roles from user, fallback to single role if not present
+        const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
         setFormData({
           name: user.name || '',
           email: user.email || '',
           password: '', // Don't pre-fill password
           employeeId: user.employeeId || '',
           role: user.role || 'cc_agent',
+          roles: userRoles,
           languageCapabilities: user.languageCapabilities || [],
           teamLeadId: user.teamLeadId?.toString() || user.teamLead?._id || '',
           isActive: user.isActive !== undefined ? user.isActive : true,
@@ -74,6 +79,7 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
           password: '',
           employeeId: '',
           role: 'cc_agent',
+          roles: ['cc_agent'],
           languageCapabilities: [],
           teamLeadId: '',
           isActive: true,
@@ -86,13 +92,40 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
   useEffect(() => {
     if (!isOpen) return;
     if (isEditMode) return;
-    if (formData.role !== 'cc_agent') return;
+    if (!formData.roles.includes('cc_agent')) return;
     if (formData.teamLeadId) return;
     if (teamLeads.length === 1) {
       setFormData((prev) => ({ ...prev, teamLeadId: teamLeads[0]._id }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isEditMode, formData.role, teamLeads]);
+  }, [isOpen, isEditMode, formData.roles, teamLeads]);
+
+  // Toggle a role on/off
+  const toggleRole = (role: UserRole) => {
+    setFormData((prev) => {
+      const newRoles = prev.roles.includes(role)
+        ? prev.roles.filter(r => r !== role)
+        : [...prev.roles, role];
+      
+      // Ensure at least one role is selected
+      if (newRoles.length === 0) {
+        return prev;
+      }
+      
+      // Set primary role to the first in the list
+      const primaryRole = newRoles[0];
+      
+      return {
+        ...prev,
+        roles: newRoles,
+        role: primaryRole,
+        // Clear team lead if cc_agent is no longer in roles
+        teamLeadId: newRoles.includes('cc_agent') ? prev.teamLeadId : '',
+        // Clear languages if cc_agent is no longer in roles
+        languageCapabilities: newRoles.includes('cc_agent') ? prev.languageCapabilities : [],
+      };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,12 +147,16 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
       showError('Password is required for new users');
       return;
     }
-    if (formData.role === 'cc_agent' && formData.languageCapabilities.length === 0) {
-      showError('At least one language capability is required for CC Agents');
+    if (formData.roles.length === 0) {
+      showError('At least one role must be selected');
       return;
     }
-    if (formData.role === 'cc_agent' && !formData.teamLeadId) {
-      showError('Team Lead is required for CC Agents (needed for task allocation)');
+    if (formData.roles.includes('cc_agent') && formData.languageCapabilities.length === 0) {
+      showError('At least one language capability is required when CC Agent role is assigned');
+      return;
+    }
+    if (formData.roles.includes('cc_agent') && !formData.teamLeadId) {
+      showError('Team Lead is required when CC Agent role is assigned (needed for task allocation)');
       return;
     }
 
@@ -129,7 +166,8 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
         name: formData.name.trim(),
         email: formData.email.trim(),
         employeeId: formData.employeeId.trim(),
-        role: formData.role,
+        role: formData.roles[0], // Primary role is the first selected
+        roles: formData.roles, // All assigned roles
         languageCapabilities: formData.languageCapabilities,
         isActive: formData.isActive,
       };
@@ -139,8 +177,8 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
         submitData.password = formData.password;
       }
 
-      // Only include teamLeadId for CC Agents
-      if (formData.role === 'cc_agent') {
+      // Include teamLeadId if cc_agent is one of the roles
+      if (formData.roles.includes('cc_agent')) {
         submitData.teamLeadId = formData.teamLeadId;
       }
 
@@ -163,8 +201,9 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
 
   if (!isOpen) return null;
 
-  const showTeamLeadField = formData.role === 'cc_agent';
-  const showLanguageField = formData.role === 'cc_agent';
+  const hasAgentRole = formData.roles.includes('cc_agent');
+  const showTeamLeadField = hasAgentRole;
+  const showLanguageField = hasAgentRole;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -255,35 +294,56 @@ const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess, user, t
             </div>
           )}
 
-          {/* Role */}
+          {/* Roles (Multi-select) */}
           <div>
             <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
-              Role <span className="text-red-500">*</span>
+              Roles <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-slate-500 ml-2">(Select one or more)</span>
             </label>
-            <select
-              value={formData.role}
-              onChange={(e) => {
-                const newRole = e.target.value as UserRole;
-                setFormData({
-                  ...formData,
-                  role: newRole,
-                  teamLeadId: newRole !== 'cc_agent' ? '' : formData.teamLeadId,
-                  languageCapabilities: newRole !== 'cc_agent' ? [] : formData.languageCapabilities,
-                });
-              }}
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-green-700 focus:outline-none bg-white"
-              required
-              disabled={isSubmitting || isEditMode}
-            >
-              {CALL_CENTRE_ROLES.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-            {isEditMode && (
-              <p className="text-xs text-slate-500 mt-1">Role cannot be changed</p>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {CALL_CENTRE_ROLES.map((role) => {
+                const isSelected = formData.roles.includes(role.value);
+                const isPrimary = formData.roles[0] === role.value;
+                return (
+                  <button
+                    key={role.value}
+                    type="button"
+                    onClick={() => toggleRole(role.value)}
+                    disabled={isSubmitting}
+                    className={`relative flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                      isSelected
+                        ? 'border-lime-500 bg-lime-50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    {/* Checkbox indicator */}
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center mt-0.5 ${
+                      isSelected
+                        ? 'bg-lime-500 border-lime-500'
+                        : 'border-slate-300 bg-white'
+                    }`}>
+                      {isSelected && <Check size={14} className="text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold text-sm ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
+                          {role.label}
+                        </span>
+                        {isPrimary && isSelected && (
+                          <span className="px-1.5 py-0.5 bg-lime-500 text-white text-[9px] font-bold uppercase rounded">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{role.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              The first selected role becomes the primary/default role. Users with multiple roles can switch between them.
+            </p>
           </div>
 
           {/* Team Lead (only for CC Agent) */}
