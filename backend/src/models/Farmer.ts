@@ -51,7 +51,7 @@ const FarmerSchema = new Schema<IFarmer>(
 );
 
 // Indexes
-FarmerSchema.index({ mobileNumber: 1 }, { unique: true });
+// Note: mobileNumber index is auto-created by unique: true in schema definition
 FarmerSchema.index({ territory: 1 });
 FarmerSchema.index({ preferredLanguage: 1 });
 
