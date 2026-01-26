@@ -15,6 +15,17 @@ interface Sentiment {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
 const COLOR_OPTIONS = [
   { value: 'bg-green-100 text-green-800', label: 'Green', preview: 'bg-green-500' },
   { value: 'bg-red-100 text-red-800', label: 'Red', preview: 'bg-red-500' },
@@ -60,9 +71,8 @@ const SentimentsMasterView: React.FC = () => {
   const fetchSentiments = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/sentiments/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -120,7 +130,6 @@ const SentimentsMasterView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
       const url = editingSentiment
         ? `${API_BASE}/api/master-data/sentiments/${editingSentiment._id}`
         : `${API_BASE}/api/master-data/sentiments`;
@@ -128,10 +137,7 @@ const SentimentsMasterView: React.FC = () => {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -152,13 +158,9 @@ const SentimentsMasterView: React.FC = () => {
 
   const handleToggleActive = async (sentiment: Sentiment) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/sentiments/${sentiment._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !sentiment.isActive }),
       });
 

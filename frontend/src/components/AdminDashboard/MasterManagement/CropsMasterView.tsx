@@ -12,6 +12,17 @@ interface Crop {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
 const CropsMasterView: React.FC = () => {
   const { showSuccess, showError } = useToast();
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -26,9 +37,8 @@ const CropsMasterView: React.FC = () => {
   const fetchCrops = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/crops/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -73,7 +83,6 @@ const CropsMasterView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
       const url = editingCrop
         ? `${API_BASE}/api/master-data/crops/${editingCrop._id}`
         : `${API_BASE}/api/master-data/crops`;
@@ -81,10 +90,7 @@ const CropsMasterView: React.FC = () => {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -105,13 +111,9 @@ const CropsMasterView: React.FC = () => {
 
   const handleToggleActive = async (crop: Crop) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/crops/${crop._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !crop.isActive }),
       });
 

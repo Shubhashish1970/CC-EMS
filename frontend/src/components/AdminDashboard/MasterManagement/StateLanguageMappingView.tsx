@@ -14,6 +14,17 @@ interface StateLanguageMapping {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
 const AVAILABLE_LANGUAGES = [
   'Hindi',
   'Telugu',
@@ -45,9 +56,8 @@ const StateLanguageMappingView: React.FC = () => {
   const fetchMappings = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/state-languages/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -117,7 +127,6 @@ const StateLanguageMappingView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
       const url = editingMapping
         ? `${API_BASE}/api/master-data/state-languages/${editingMapping._id}`
         : `${API_BASE}/api/master-data/state-languages`;
@@ -128,10 +137,7 @@ const StateLanguageMappingView: React.FC = () => {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...formData,
           secondaryLanguages: cleanedSecondary,
@@ -155,13 +161,9 @@ const StateLanguageMappingView: React.FC = () => {
 
   const handleToggleActive = async (mapping: StateLanguageMapping) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/state-languages/${mapping._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !mapping.isActive }),
       });
 

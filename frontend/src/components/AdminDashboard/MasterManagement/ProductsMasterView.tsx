@@ -12,6 +12,17 @@ interface Product {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
 const ProductsMasterView: React.FC = () => {
   const { showSuccess, showError } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,9 +37,8 @@ const ProductsMasterView: React.FC = () => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/products/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -73,7 +83,6 @@ const ProductsMasterView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
       const url = editingProduct
         ? `${API_BASE}/api/master-data/products/${editingProduct._id}`
         : `${API_BASE}/api/master-data/products`;
@@ -81,10 +90,7 @@ const ProductsMasterView: React.FC = () => {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -105,13 +111,9 @@ const ProductsMasterView: React.FC = () => {
 
   const handleToggleActive = async (product: Product) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/products/${product._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !product.isActive }),
       });
 

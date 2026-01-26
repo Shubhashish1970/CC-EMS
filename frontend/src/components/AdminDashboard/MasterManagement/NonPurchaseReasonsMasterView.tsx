@@ -13,6 +13,17 @@ interface NonPurchaseReason {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+// Helper to get auth headers including active role
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  const activeRole = localStorage.getItem('activeRole');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
+  };
+};
+
 const NonPurchaseReasonsMasterView: React.FC = () => {
   const { showSuccess, showError } = useToast();
   const [reasons, setReasons] = useState<NonPurchaseReason[]>([]);
@@ -27,9 +38,8 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
   const fetchReasons = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/non-purchase-reasons/all`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -75,7 +85,6 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
       const url = editingReason
         ? `${API_BASE}/api/master-data/non-purchase-reasons/${editingReason._id}`
         : `${API_BASE}/api/master-data/non-purchase-reasons`;
@@ -83,10 +92,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData),
       });
 
@@ -107,13 +113,9 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
   const handleToggleActive = async (reason: NonPurchaseReason) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/master-data/non-purchase-reasons/${reason._id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !reason.isActive }),
       });
 

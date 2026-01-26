@@ -7,12 +7,19 @@ const getAuthToken = (): string | null => {
   return localStorage.getItem('authToken');
 };
 
+// Get active role from localStorage
+const getActiveRole = (): string | null => {
+  return localStorage.getItem('activeRole');
+};
+
 // Get auth headers
 const getAuthHeaders = (): HeadersInit => {
   const token = getAuthToken();
+  const activeRole = getActiveRole();
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
+    ...(activeRole && { 'X-Active-Role': activeRole }),
   };
 };
 
