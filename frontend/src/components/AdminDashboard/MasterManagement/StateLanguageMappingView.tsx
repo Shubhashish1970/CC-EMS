@@ -56,7 +56,7 @@ const StateLanguageMappingView: React.FC = () => {
   const fetchMappings = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/state-languages/all`, {
+      const response = await fetch(`${API_BASE}/master-data/state-languages/all`, {
         headers: getAuthHeaders(),
       });
       const data = await response.json();
@@ -128,8 +128,8 @@ const StateLanguageMappingView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const url = editingMapping
-        ? `${API_BASE}/api/master-data/state-languages/${editingMapping._id}`
-        : `${API_BASE}/api/master-data/state-languages`;
+        ? `${API_BASE}/master-data/state-languages/${editingMapping._id}`
+        : `${API_BASE}/master-data/state-languages`;
       const method = editingMapping ? 'PUT' : 'POST';
 
       // Remove primary language from secondary if present
@@ -161,7 +161,7 @@ const StateLanguageMappingView: React.FC = () => {
 
   const handleToggleActive = async (mapping: StateLanguageMapping) => {
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/state-languages/${mapping._id}`, {
+      const response = await fetch(`${API_BASE}/master-data/state-languages/${mapping._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !mapping.isActive }),

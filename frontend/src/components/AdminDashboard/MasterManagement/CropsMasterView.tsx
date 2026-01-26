@@ -37,7 +37,7 @@ const CropsMasterView: React.FC = () => {
   const fetchCrops = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/crops/all`, {
+      const response = await fetch(`${API_BASE}/master-data/crops/all`, {
         headers: getAuthHeaders(),
       });
       const data = await response.json();
@@ -84,8 +84,8 @@ const CropsMasterView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const url = editingCrop
-        ? `${API_BASE}/api/master-data/crops/${editingCrop._id}`
-        : `${API_BASE}/api/master-data/crops`;
+        ? `${API_BASE}/master-data/crops/${editingCrop._id}`
+        : `${API_BASE}/master-data/crops`;
       const method = editingCrop ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -111,7 +111,7 @@ const CropsMasterView: React.FC = () => {
 
   const handleToggleActive = async (crop: Crop) => {
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/crops/${crop._id}`, {
+      const response = await fetch(`${API_BASE}/master-data/crops/${crop._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !crop.isActive }),

@@ -71,7 +71,7 @@ const SentimentsMasterView: React.FC = () => {
   const fetchSentiments = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/sentiments/all`, {
+      const response = await fetch(`${API_BASE}/master-data/sentiments/all`, {
         headers: getAuthHeaders(),
       });
       const data = await response.json();
@@ -131,8 +131,8 @@ const SentimentsMasterView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const url = editingSentiment
-        ? `${API_BASE}/api/master-data/sentiments/${editingSentiment._id}`
-        : `${API_BASE}/api/master-data/sentiments`;
+        ? `${API_BASE}/master-data/sentiments/${editingSentiment._id}`
+        : `${API_BASE}/master-data/sentiments`;
       const method = editingSentiment ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -158,7 +158,7 @@ const SentimentsMasterView: React.FC = () => {
 
   const handleToggleActive = async (sentiment: Sentiment) => {
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/sentiments/${sentiment._id}`, {
+      const response = await fetch(`${API_BASE}/master-data/sentiments/${sentiment._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !sentiment.isActive }),

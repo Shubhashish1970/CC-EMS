@@ -38,7 +38,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
   const fetchReasons = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/non-purchase-reasons/all`, {
+      const response = await fetch(`${API_BASE}/master-data/non-purchase-reasons/all`, {
         headers: getAuthHeaders(),
       });
       const data = await response.json();
@@ -86,8 +86,8 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const url = editingReason
-        ? `${API_BASE}/api/master-data/non-purchase-reasons/${editingReason._id}`
-        : `${API_BASE}/api/master-data/non-purchase-reasons`;
+        ? `${API_BASE}/master-data/non-purchase-reasons/${editingReason._id}`
+        : `${API_BASE}/master-data/non-purchase-reasons`;
       const method = editingReason ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -113,7 +113,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
   const handleToggleActive = async (reason: NonPurchaseReason) => {
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/non-purchase-reasons/${reason._id}`, {
+      const response = await fetch(`${API_BASE}/master-data/non-purchase-reasons/${reason._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !reason.isActive }),

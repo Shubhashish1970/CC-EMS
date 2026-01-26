@@ -37,7 +37,7 @@ const ProductsMasterView: React.FC = () => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/products/all`, {
+      const response = await fetch(`${API_BASE}/master-data/products/all`, {
         headers: getAuthHeaders(),
       });
       const data = await response.json();
@@ -84,8 +84,8 @@ const ProductsMasterView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const url = editingProduct
-        ? `${API_BASE}/api/master-data/products/${editingProduct._id}`
-        : `${API_BASE}/api/master-data/products`;
+        ? `${API_BASE}/master-data/products/${editingProduct._id}`
+        : `${API_BASE}/master-data/products`;
       const method = editingProduct ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -111,7 +111,7 @@ const ProductsMasterView: React.FC = () => {
 
   const handleToggleActive = async (product: Product) => {
     try {
-      const response = await fetch(`${API_BASE}/api/master-data/products/${product._id}`, {
+      const response = await fetch(`${API_BASE}/master-data/products/${product._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: !product.isActive }),

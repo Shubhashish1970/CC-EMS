@@ -9,11 +9,6 @@ import logger from '../config/logger.js';
 
 const router = express.Router();
 
-// Debug endpoint - no auth required (for testing route registration)
-router.get('/ping', (req: Request, res: Response) => {
-  res.json({ success: true, message: 'Master data routes are loaded', timestamp: new Date().toISOString() });
-});
-
 // All routes require authentication
 router.use(authenticate);
 
