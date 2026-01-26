@@ -216,6 +216,7 @@ const CallTaskSchema = new Schema<ICallTask>(
 );
 
 // Indexes - Optimized for 2-3 years of data (~19M tasks over 3 years)
+// Primary access pattern indexes
 CallTaskSchema.index({ status: 1, assignedAgentId: 1 }); // For agent queue queries
 CallTaskSchema.index({ farmerId: 1, createdAt: -1 }); // For farmer history
 CallTaskSchema.index({ scheduledDate: 1 }); // For chronological ordering
@@ -227,6 +228,12 @@ CallTaskSchema.index({ status: 1, scheduledDate: 1 }); // Compound: status + sch
 CallTaskSchema.index({ status: 1, scheduledDate: 1, createdAt: -1 }); // For unassigned management
 CallTaskSchema.index({ parentTaskId: 1 }); // For callback chain queries
 CallTaskSchema.index({ isCallback: 1, status: 1 }); // For callback filtering
+
+// Performance optimization indexes (added for high-volume operations)
+CallTaskSchema.index({ status: 1, scheduledDate: 1, assignedAgentId: 1 }); // For pending tasks stats aggregation
+CallTaskSchema.index({ status: 1, callbackNumber: 1, createdAt: -1 }); // For callback candidate queries
+CallTaskSchema.index({ 'callLog.sentiment': 1, status: 1 }, { sparse: true }); // For sentiment analytics
+CallTaskSchema.index({ updatedAt: -1 }); // For recent updates tracking
 
 export const CallTask = mongoose.model<ICallTask>('CallTask', CallTaskSchema);
 

@@ -55,5 +55,8 @@ FarmerSchema.index({ mobileNumber: 1 }, { unique: true });
 FarmerSchema.index({ territory: 1 });
 FarmerSchema.index({ preferredLanguage: 1 });
 
+// Performance optimization indexes
+FarmerSchema.index({ preferredLanguage: 1, territory: 1 }); // For language-based agent matching
+
 export const Farmer = mongoose.model<IFarmer>('Farmer', FarmerSchema);
 

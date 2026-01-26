@@ -135,6 +135,7 @@ const ActivitySchema = new Schema<IActivity>(
 );
 
 // Indexes - Optimized for 2-3 years of data (600 people × 4-5 activities/day = ~2.7M activities/3 years)
+// Primary access pattern indexes
 ActivitySchema.index({ activityId: 1 }, { unique: true });
 ActivitySchema.index({ date: -1 }); // For date range queries and sorting by date
 ActivitySchema.index({ territory: 1 }); // For territory filtering
@@ -151,6 +152,11 @@ ActivitySchema.index({ buName: 1 }); // For BU filtering
 ActivitySchema.index({ syncedAt: -1 }); // For sync monitoring
 ActivitySchema.index({ farmerIds: 1 }); // For farmer lookup in activities
 ActivitySchema.index({ lifecycleStatus: 1, date: -1 }); // For sampling control list views
+
+// Performance optimization indexes (added for high-volume dashboard queries)
+ActivitySchema.index({ lifecycleStatus: 1, territoryName: 1, date: -1 }); // Sampling control with territory filter
+ActivitySchema.index({ lifecycleStatus: 1, zoneName: 1, date: -1 }); // Sampling control with zone filter
+ActivitySchema.index({ lifecycleStatus: 1, buName: 1, date: -1 }); // Sampling control with BU filter
 
 export const Activity = mongoose.model<IActivity>('Activity', ActivitySchema);
 

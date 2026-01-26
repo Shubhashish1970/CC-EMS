@@ -70,6 +70,10 @@ InboundQuerySchema.index({ assignedTo: 1 });
 InboundQuerySchema.index({ createdAt: -1 });
 InboundQuerySchema.index({ escalationLevel: 1 });
 
+// Performance optimization indexes
+InboundQuerySchema.index({ status: 1, assignedTo: 1, createdAt: -1 }); // For support queue queries
+InboundQuerySchema.index({ escalationLevel: 1, status: 1, createdAt: -1 }); // For escalation tracking
+
 export const InboundQuery = mongoose.model<IInboundQuery>('InboundQuery', InboundQuerySchema);
 
 

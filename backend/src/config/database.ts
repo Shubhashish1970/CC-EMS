@@ -8,10 +8,17 @@ const connectDB = async (): Promise<void> => {
       throw new Error('MONGODB_URI is not defined in environment variables');
     }
 
-    const options = {
-      maxPoolSize: 50, // Maximum number of connections in the pool
-      minPoolSize: 5,  // Minimum number of connections
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+    // Connection pool configuration optimized for 25-30 agents, 4000-5000 activities/day
+    const options: mongoose.ConnectOptions = {
+      maxPoolSize: 50,            // Maximum number of connections in the pool
+      minPoolSize: 10,            // Keep warm connections ready (increased from 5)
+      maxIdleTimeMS: 30000,       // Close idle connections after 30 seconds
+      socketTimeoutMS: 45000,     // Close sockets after 45 seconds of inactivity
+      serverSelectionTimeoutMS: 5000, // Fail fast if server not available
+      heartbeatFrequencyMS: 10000,    // Check server health every 10 seconds
+      retryWrites: true,          // Retry failed writes automatically
+      retryReads: true,           // Retry failed reads automatically
+      w: 'majority' as const,     // Write concern for data durability
     };
 
     await mongoose.connect(mongoURI, options);

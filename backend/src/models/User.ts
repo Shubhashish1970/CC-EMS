@@ -94,6 +94,10 @@ UserSchema.index({ role: 1, isActive: 1 });
 UserSchema.index({ roles: 1, isActive: 1 });
 UserSchema.index({ teamLeadId: 1 });
 
+// Performance optimization indexes
+UserSchema.index({ teamLeadId: 1, role: 1, isActive: 1 }); // For team member lookups
+UserSchema.index({ languageCapabilities: 1, role: 1, isActive: 1 }); // For agent language matching
+
 // Pre-save middleware to ensure roles array always contains the primary role
 UserSchema.pre('save', function(next) {
   if (this.role && (!this.roles || this.roles.length === 0)) {

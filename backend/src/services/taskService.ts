@@ -15,8 +15,9 @@ export interface TaskAssignmentOptions {
 /**
  * Get all tasks for an agent that can be shown in the dialer (queue/in-progress + completed outcomes)
  * Returns list of tasks sorted by scheduledDate (earliest first)
+ * Note: Returns lean documents (plain objects) for better performance
  */
-export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallTask[]> => {
+export const getAvailableTasksForAgent = async (agentId: string): Promise<any[]> => {
   try {
     // Get agent to check language capabilities
     const agent = await User.findById(agentId);
@@ -35,7 +36,8 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
       // Agent view needs: FDA (officerName), TM, Territory, State (+ optional legacy territory)
       .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
-      .limit(50); // Reasonable limit
+      .limit(50) // Reasonable limit
+      .lean(); // Performance: return plain objects for read-only display
 
     // Filter tasks by agent's language capabilities
     const languageFilteredTasks = tasks.filter((task) => {
@@ -83,8 +85,9 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<ICallT
  * Get the next pending task for an agent
  * Prioritizes tasks by scheduledDate (earliest first)
  * Also returns in_progress tasks if agent is already working on them
+ * Note: Returns lean document (plain object) for better performance
  */
-export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | null> => {
+export const getNextTaskForAgent = async (agentId: string): Promise<any | null> => {
   try {
     // First, try to get a sampled_in_queue task
     let task = await CallTask.findOne({
@@ -95,7 +98,8 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
       .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
-      .limit(1);
+      .limit(1)
+      .lean(); // Performance: return plain object for read-only display
 
     // If no pending task, check for in_progress tasks (agent might be continuing work)
     if (!task) {
@@ -107,7 +111,8 @@ export const getNextTaskForAgent = async (agentId: string): Promise<ICallTask | 
       .populate('farmerId', 'name location preferredLanguage mobileNumber photoUrl')
       .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 })
-      .limit(1);
+      .limit(1)
+      .lean(); // Performance: return plain object for read-only display
     }
 
     return task;
@@ -144,13 +149,19 @@ export const getPendingTasks = async (filters?: {
     }
 
     // Filter by geo through activity (territory/zone/bu)
+    // Optimized: Use lean() and limit activity IDs to prevent massive $in arrays
     if (territory || zone || bu) {
       const and: any[] = [];
       if (territory) and.push({ $or: [{ territoryName: territory }, { territory: territory }] });
       if (zone) and.push({ zoneName: zone });
       if (bu) and.push({ buName: bu });
       const activityQuery: any = and.length === 1 ? and[0] : { $and: and };
-      const activities = await Activity.find(activityQuery).select('_id');
+      // Use lean() for better performance and limit to recent activities
+      const activities = await Activity.find(activityQuery)
+        .select('_id')
+        .sort({ date: -1 }) // Most recent first
+        .limit(10000) // Cap to prevent memory issues with large datasets
+        .lean();
       query.activityId = { $in: activities.map((a) => a._id) };
     }
 
@@ -260,13 +271,18 @@ export const getPendingTasksStats = async (filters?: {
   };
 
   if (agentId) query.assignedAgentId = new mongoose.Types.ObjectId(agentId);
+  // Optimized: Use lean() and limit activity IDs to prevent massive $in arrays
   if (territory || zone || bu) {
     const and: any[] = [];
     if (territory) and.push({ $or: [{ territoryName: territory }, { territory: territory }] });
     if (zone) and.push({ zoneName: zone });
     if (bu) and.push({ buName: bu });
     const activityQuery: any = and.length === 1 ? and[0] : { $and: and };
-    const activities = await Activity.find(activityQuery).select('_id');
+    const activities = await Activity.find(activityQuery)
+      .select('_id')
+      .sort({ date: -1 })
+      .limit(10000)
+      .lean();
     query.activityId = { $in: activities.map((a) => a._id) };
   }
 
@@ -607,7 +623,8 @@ export const getUnassignedTasks = async (filters?: {
       .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean(); // Performance: return plain objects for read-only display
 
     const total = await CallTask.countDocuments(query);
 
@@ -642,7 +659,7 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
       teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
       role: 'cc_agent',
       isActive: true,
-    }).select('_id');
+    }).select('_id').lean(); // Performance: return plain objects
 
     const agentIds = teamAgents.map(agent => agent._id);
 
@@ -702,7 +719,8 @@ export const getTeamTasks = async (teamLeadId: string, filters?: {
       .populate('assignedAgentId', 'name email employeeId')
       .sort({ scheduledDate: 1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean(); // Performance: return plain objects for read-only display
 
     const total = await CallTask.countDocuments(query);
 
@@ -761,6 +779,7 @@ export const assignTaskToAgent = async (
 
 /**
  * Auto-assign tasks based on language capabilities
+ * Optimized: Uses aggregation instead of N+1 queries for task counts
  */
 export const autoAssignTask = async (taskId: string): Promise<ICallTask | null> => {
   try {
@@ -779,33 +798,53 @@ export const autoAssignTask = async (taskId: string): Promise<ICallTask | null> 
       role: 'cc_agent',
       isActive: true,
       languageCapabilities: farmer.preferredLanguage,
-    });
+    }).lean();
 
     if (agents.length === 0) {
       logger.warn(`No agents found with language capability: ${farmer.preferredLanguage}`);
       return null;
     }
 
-    // Find agent with least pending tasks
-    const agentTaskCounts = await Promise.all(
-      agents.map(async (agent) => {
-        const count = await CallTask.countDocuments({
-          assignedAgentId: agent._id,
+    const agentIds = agents.map(a => a._id);
+
+    // OPTIMIZED: Get task counts for all agents in a single aggregation query
+    // instead of N separate countDocuments calls
+    const taskCountsAgg = await CallTask.aggregate([
+      {
+        $match: {
+          assignedAgentId: { $in: agentIds },
           status: { $in: ['sampled_in_queue', 'in_progress'] },
-        });
-        return { agent, count };
-      })
-    );
+        },
+      },
+      {
+        $group: {
+          _id: '$assignedAgentId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Create a map of agent ID to task count
+    const taskCountMap = new Map<string, number>();
+    taskCountsAgg.forEach((item) => {
+      taskCountMap.set(item._id.toString(), item.count);
+    });
+
+    // Build agent task counts array (agents with no tasks have count 0)
+    const agentTaskCounts = agents.map((agent) => ({
+      agent,
+      count: taskCountMap.get(agent._id.toString()) || 0,
+    }));
 
     // Sort by task count (ascending) and pick the first one
     agentTaskCounts.sort((a, b) => a.count - b.count);
     const selectedAgent = agentTaskCounts[0].agent;
 
-    task.assignedAgentId = selectedAgent._id;
+    task.assignedAgentId = new mongoose.Types.ObjectId(selectedAgent._id.toString());
     task.status = 'sampled_in_queue';
     await task.save();
 
-    logger.info(`Task ${taskId} auto-assigned to agent ${selectedAgent.email}`);
+    logger.info(`Task ${taskId} auto-assigned to agent ${selectedAgent.email} (had ${agentTaskCounts[0].count} pending tasks)`);
 
     return task;
   } catch (error) {
