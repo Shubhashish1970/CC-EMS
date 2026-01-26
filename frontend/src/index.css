@@ -16,4 +16,93 @@ body {
   min-height: 100vh;
 }
 
+/* ============================================
+   Kweka Reach Theme - Select/Dropdown Styling
+   ============================================ */
+
+/* Base select styling */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+select:hover {
+  border-color: #84cc16 !important;
+}
+
+select:focus {
+  border-color: #84cc16 !important;
+  box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.15);
+}
+
+/* Option styling - works in Firefox and Chrome */
+select option {
+  background-color: #ffffff;
+  color: #1e293b;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+select option:hover,
+select option:focus {
+  background-color: #f0fdf4;
+  color: #166534;
+}
+
+select option:checked {
+  background-color: #dcfce7;
+  color: #166534;
+  font-weight: 600;
+}
+
+/* Disabled select styling */
+select:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+select:disabled option {
+  color: #94a3b8;
+}
+
+/* For webkit browsers (Safari/Chrome) - style the dropdown */
+@supports (-webkit-appearance: none) {
+  select {
+    background-color: #ffffff;
+  }
+  
+  select option {
+    background-color: #ffffff;
+    color: #1e293b;
+  }
+}
+
+/* Firefox specific fixes */
+@-moz-document url-prefix() {
+  select {
+    text-indent: 0.01px;
+    text-overflow: '';
+  }
+  
+  select option {
+    background-color: #ffffff;
+    color: #1e293b;
+  }
+  
+  select option:checked {
+    background: linear-gradient(#dcfce7, #dcfce7);
+    color: #166534;
+  }
+}
 
