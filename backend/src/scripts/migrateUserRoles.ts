@@ -4,19 +4,23 @@
  * For each user without a 'roles' array, this script will:
  * 1. Create a roles array containing their current 'role' value
  * 
- * Run with: npx ts-node --esm src/scripts/migrateUserRoles.ts
+ * Run with: node dist/scripts/migrateUserRoles.js
  */
 
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 import { User } from '../models/User.js';
-import connectDB from '../config/database.js';
 import logger from '../config/logger.js';
+
+dotenv.config();
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
 
 async function migrateUserRoles() {
   try {
     // Connect to database
-    await connectDB();
-    logger.info('Connected to database');
+    await mongoose.connect(MONGODB_URI);
+    logger.info(`Connected to database: ${MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
 
     // Find all users without roles array or with empty roles array
     const usersToMigrate = await User.find({
