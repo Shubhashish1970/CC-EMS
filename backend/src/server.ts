@@ -39,6 +39,8 @@ const corsOptions = {
   },
   credentials: true,
   optionsSuccessStatus: 200,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Active-Role'],
+  exposedHeaders: ['X-Active-Role'],
 };
 app.use(cors(corsOptions));
 
