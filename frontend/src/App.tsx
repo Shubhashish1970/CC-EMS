@@ -12,27 +12,28 @@ import TaskList from './components/TaskList';
 import AdminDashboardContainer from './components/AdminDashboard/AdminDashboardContainer';
 import TeamLeadDashboardContainer from './components/TeamLeadDashboard/TeamLeadDashboardContainer';
 
-// Component that routes based on user role
+// Component that routes based on user's active role
+// All users now land on Module Selection first, then route to workspace based on active role
 const AppContent: React.FC = () => {
-  const { user } = useAuth();
+  // All roles now see Module Selection first to choose their role (if multi-role) and workspace
+  return <ModuleSelection />;
+};
 
-  // CC Agents see Module Selection (or auto-redirect to workspace if single module)
-  if (user?.role === 'cc_agent') {
-    return <ModuleSelection />;
+// EMS Workspace - routes to correct dashboard based on active role
+const EMSWorkspace: React.FC = () => {
+  const { activeRole, user } = useAuth();
+  const currentRole = activeRole || user?.role;
+
+  // Route based on active role
+  switch (currentRole) {
+    case 'mis_admin':
+      return <AdminDashboardContainer />;
+    case 'team_lead':
+      return <TeamLeadDashboardContainer />;
+    case 'cc_agent':
+    default:
+      return <AgentWorkspace />;
   }
-
-  // MIS Admin sees Admin Dashboard
-  if (user?.role === 'mis_admin') {
-    return <AdminDashboardContainer />;
-  }
-
-  // Team Leads see Task Management
-  if (user?.role === 'team_lead') {
-    return <TeamLeadDashboardContainer />;
-  }
-
-  // Other roles (Sales Head, Marketing Head) - for now show Task List
-  return <TaskList />;
 };
 
 const App: React.FC = () => {
@@ -56,12 +57,12 @@ const App: React.FC = () => {
               }
             />
             
-            {/* Module workspace routes */}
+            {/* Module workspace routes - route to correct dashboard based on active role */}
             <Route
               path="/workspace/ems"
               element={
                 <ProtectedRoute>
-                  <AgentWorkspace />
+                  <EMSWorkspace />
                 </ProtectedRoute>
               }
             />

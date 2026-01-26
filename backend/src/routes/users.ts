@@ -148,6 +148,8 @@ router.post(
     body('email').isEmail().withMessage('Please provide a valid email'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('role').isIn(['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head']).withMessage('Invalid role'),
+    body('roles').optional().isArray().withMessage('Roles must be an array'),
+    body('roles.*').optional().isIn(['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head']).withMessage('Invalid role in roles array'),
     body('employeeId').trim().notEmpty().withMessage('Employee ID is required'),
     body('languageCapabilities').optional().isArray(),
     body('assignedTerritories').optional().isArray(),
@@ -163,7 +165,7 @@ router.post(
         });
       }
 
-      const { name, email, password, role, employeeId, languageCapabilities = [], assignedTerritories = [], teamLeadId } = req.body;
+      const { name, email, password, role, roles, employeeId, languageCapabilities = [], assignedTerritories = [], teamLeadId } = req.body;
 
       // Check if email already exists
       const existingUser = await User.findOne({ $or: [{ email }, { employeeId }] });
@@ -186,12 +188,19 @@ router.post(
       // Hash password
       const hashedPassword = await hashPassword(password);
 
+      // Ensure roles array contains at least the primary role
+      let userRoles = roles && roles.length > 0 ? roles : [role];
+      if (!userRoles.includes(role)) {
+        userRoles = [role, ...userRoles];
+      }
+
       // Create user
       const user = await User.create({
         name,
         email,
         password: hashedPassword,
         role,
+        roles: userRoles,
         employeeId,
         languageCapabilities,
         assignedTerritories,
@@ -208,6 +217,7 @@ router.post(
             name: user.name,
             email: user.email,
             role: user.role,
+            roles: user.roles,
             employeeId: user.employeeId,
             languageCapabilities: user.languageCapabilities,
             assignedTerritories: user.assignedTerritories,
@@ -232,6 +242,8 @@ router.put(
     body('name').optional().trim().notEmpty(),
     body('email').optional().isEmail(),
     body('role').optional().isIn(['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head']),
+    body('roles').optional().isArray().withMessage('Roles must be an array'),
+    body('roles.*').optional().isIn(['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head']).withMessage('Invalid role'),
     body('languageCapabilities').optional().isArray(),
     body('assignedTerritories').optional().isArray(),
     body('teamLeadId').optional().isMongoId(),
@@ -253,6 +265,15 @@ router.put(
       if (req.body.name) updateData.name = req.body.name;
       if (req.body.email) updateData.email = req.body.email;
       if (req.body.role) updateData.role = req.body.role;
+      if (req.body.roles) {
+        // Ensure the primary role is always in the roles array
+        let userRoles = req.body.roles;
+        const primaryRole = req.body.role || (await User.findById(userId))?.role;
+        if (primaryRole && !userRoles.includes(primaryRole)) {
+          userRoles = [primaryRole, ...userRoles];
+        }
+        updateData.roles = userRoles;
+      }
       if (req.body.languageCapabilities) updateData.languageCapabilities = req.body.languageCapabilities;
       if (req.body.assignedTerritories) updateData.assignedTerritories = req.body.assignedTerritories;
       if (req.body.teamLeadId !== undefined) {

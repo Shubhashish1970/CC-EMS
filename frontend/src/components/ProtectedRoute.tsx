@@ -9,14 +9,14 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, activeRole, loading } = useAuth();
 
   // Show loading screen while checking authentication
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#f1f5f1]">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="animate-spin mx-auto mb-4 text-green-700" size={32} />
+          <Loader2 className="animate-spin mx-auto mb-4 text-lime-600" size={32} />
           <p className="text-sm text-slate-600 font-medium">Checking authentication...</p>
         </div>
       </div>
@@ -28,12 +28,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  // Use activeRole for permission check (falls back to primary role if not set)
+  const currentRole = activeRole || user.role;
+
+  if (allowedRoles && !allowedRoles.includes(currentRole)) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#f1f5f1]">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <h1 className="text-2xl font-black text-slate-800 mb-2">Access Denied</h1>
-          <p className="text-sm text-slate-600">You don't have permission to access this page.</p>
+          <p className="text-sm text-slate-600">You don't have permission to access this page with your current role.</p>
+          <p className="text-xs text-slate-400 mt-2">Current role: {currentRole}</p>
         </div>
       </div>
     );

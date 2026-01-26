@@ -2,11 +2,14 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export type UserRole = 'cc_agent' | 'team_lead' | 'mis_admin' | 'core_sales_head' | 'marketing_head';
 
+export const ALL_ROLES: UserRole[] = ['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head'];
+
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
+  role: UserRole; // Primary/default role (backward compatible)
+  roles: UserRole[]; // All roles this user can assume
   employeeId: string;
   languageCapabilities: string[];
   assignedTerritories: string[];
@@ -44,6 +47,14 @@ const UserSchema = new Schema<IUser>(
       enum: ['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head'],
       required: [true, 'Role is required'],
     },
+    roles: {
+      type: [String],
+      enum: ['cc_agent', 'team_lead', 'mis_admin', 'core_sales_head', 'marketing_head'],
+      default: function(this: any) {
+        // Default to array containing the primary role
+        return this.role ? [this.role] : [];
+      },
+    },
     employeeId: {
       type: String,
       required: [true, 'Employee ID is required'],
@@ -80,7 +91,20 @@ const UserSchema = new Schema<IUser>(
 
 // Indexes (email and employeeId already have unique: true, so no need to index again)
 UserSchema.index({ role: 1, isActive: 1 });
+UserSchema.index({ roles: 1, isActive: 1 });
 UserSchema.index({ teamLeadId: 1 });
+
+// Pre-save middleware to ensure roles array always contains the primary role
+UserSchema.pre('save', function(next) {
+  if (this.role && (!this.roles || this.roles.length === 0)) {
+    this.roles = [this.role];
+  }
+  // Ensure primary role is always in roles array
+  if (this.role && !this.roles.includes(this.role)) {
+    this.roles.push(this.role);
+  }
+  next();
+});
 
 // Virtual for team members (for team_lead role)
 UserSchema.virtual('teamMembers', {

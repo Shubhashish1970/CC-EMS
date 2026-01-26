@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authAPI } from '../services/api.js';
 
+export type UserRole = 'cc_agent' | 'team_lead' | 'mis_admin' | 'core_sales_head' | 'marketing_head';
+
 interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: string; // Primary/default role
+  roles: string[]; // All available roles
   employeeId: string;
   languageCapabilities: string[];
   assignedTerritories: string[];
@@ -15,16 +18,20 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  activeRole: string | null; // Currently active role for this session
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  switchRole: (role: string) => void; // Switch active role
   isAuthenticated: boolean;
+  hasMultipleRoles: boolean; // Convenience check
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Check if user is already logged in
@@ -32,10 +39,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const checkAuth = async () => {
       // Always start with loading true and user null
       setUser(null);
+      setActiveRole(null);
       setLoading(true);
 
       const token = localStorage.getItem('authToken');
       const storedUser = localStorage.getItem('user');
+      const storedActiveRole = localStorage.getItem('activeRole');
 
       if (token && storedUser) {
         try {
@@ -50,23 +59,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]) as any;
 
           if (response?.success && response?.data?.user) {
-            setUser(response.data.user);
+            const fetchedUser = response.data.user;
+            // Ensure roles array exists (backward compatibility)
+            if (!fetchedUser.roles || fetchedUser.roles.length === 0) {
+              fetchedUser.roles = [fetchedUser.role];
+            }
+            setUser(fetchedUser);
+            
+            // Restore active role from storage or use primary role
+            const validActiveRole = storedActiveRole && fetchedUser.roles.includes(storedActiveRole)
+              ? storedActiveRole
+              : fetchedUser.role;
+            setActiveRole(validActiveRole);
+            localStorage.setItem('activeRole', validActiveRole);
           } else {
             // Token invalid, clear storage
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
+            localStorage.removeItem('activeRole');
             setUser(null);
+            setActiveRole(null);
           }
         } catch (error) {
           // Token invalid or network error, clear storage
           console.error('Auth check failed:', error);
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
+          localStorage.removeItem('activeRole');
           setUser(null);
+          setActiveRole(null);
         }
       } else {
         // No token or user in storage, ensure user is null
         setUser(null);
+        setActiveRole(null);
       }
       setLoading(false);
     };
@@ -77,7 +103,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     const response = await authAPI.login(email, password);
     if (response.success) {
-      setUser(response.data.user);
+      const loggedInUser = response.data.user;
+      // Ensure roles array exists (backward compatibility)
+      if (!loggedInUser.roles || loggedInUser.roles.length === 0) {
+        loggedInUser.roles = [loggedInUser.role];
+      }
+      setUser(loggedInUser);
+      
+      // Set active role to primary role on login
+      setActiveRole(loggedInUser.role);
+      localStorage.setItem('activeRole', loggedInUser.role);
     } else {
       throw new Error('Login failed');
     }
@@ -85,15 +120,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     await authAPI.logout();
+    localStorage.removeItem('activeRole');
     setUser(null);
+    setActiveRole(null);
+  };
+
+  const switchRole = (role: string) => {
+    if (user && user.roles.includes(role)) {
+      setActiveRole(role);
+      localStorage.setItem('activeRole', role);
+    }
   };
 
   const value: AuthContextType = {
     user,
+    activeRole,
     loading,
     login,
     logout,
+    switchRole,
     isAuthenticated: !!user,
+    hasMultipleRoles: !!user && user.roles && user.roles.length > 1,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

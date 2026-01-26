@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Leaf, Phone, ArrowUpRight, ClipboardList, Truck, Headphones } from 'lucide-react';
+import { Loader2, Leaf, Phone, ArrowUpRight, ClipboardList, Truck, Headphones, LogOut, User, Users, Settings, BarChart3, Megaphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface Module {
@@ -13,11 +13,46 @@ interface Module {
   available: boolean;
 }
 
+// Role display configuration
+const ROLE_CONFIG: Record<string, { label: string; shortLabel: string; icon: React.ReactNode; color: string }> = {
+  cc_agent: { 
+    label: 'Call Centre Agent', 
+    shortLabel: 'Agent',
+    icon: <Phone size={14} />,
+    color: 'bg-blue-500'
+  },
+  team_lead: { 
+    label: 'Team Lead', 
+    shortLabel: 'Team Lead',
+    icon: <Users size={14} />,
+    color: 'bg-purple-500'
+  },
+  mis_admin: { 
+    label: 'MIS Administrator', 
+    shortLabel: 'Admin',
+    icon: <Settings size={14} />,
+    color: 'bg-red-500'
+  },
+  core_sales_head: { 
+    label: 'Core Sales Head', 
+    shortLabel: 'Sales Head',
+    icon: <BarChart3 size={14} />,
+    color: 'bg-green-500'
+  },
+  marketing_head: { 
+    label: 'Marketing Head', 
+    shortLabel: 'Marketing',
+    icon: <Megaphone size={14} />,
+    color: 'bg-orange-500'
+  },
+};
+
 const ModuleSelection: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeRole, switchRole, logout, hasMultipleRoles } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [modules, setModules] = useState<Module[]>([]);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     // Available modules/workspaces
@@ -67,6 +102,28 @@ const ModuleSelection: React.FC = () => {
   const handleModuleClick = (module: Module) => {
     if (!module.available) return;
     navigate(`/workspace/${module.code}`, { replace: true });
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleRoleSwitch = (role: string) => {
+    switchRole(role);
+  };
+
+  // Get user initials for avatar
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   if (isLoading) {
@@ -166,28 +223,122 @@ const ModuleSelection: React.FC = () => {
       <div className="w-full lg:w-1/2 bg-slate-50 flex flex-col">
         {/* Mobile Header */}
         <div className="lg:hidden bg-slate-900 p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
-              <Leaf className="text-slate-900" size={20} />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
+                <Leaf className="text-slate-900" size={20} />
+              </div>
+              <div>
+                <h1 className="text-lg font-black text-white">Kweka Reach</h1>
+                <p className="text-[10px] text-lime-400 uppercase tracking-wider">Farmer Engagement</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-black text-white">Kweka Reach</h1>
-              <p className="text-[10px] text-lime-400 uppercase tracking-wider">Farmer Engagement</p>
-            </div>
+            {/* Mobile Logout */}
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-8 lg:p-12 flex flex-col justify-center">
-          <div className="max-w-lg mx-auto w-full">
-            {/* Header */}
-            <div className="mb-8">
+        <div className="flex-1 p-8 lg:p-12 flex flex-col">
+          <div className="max-w-lg mx-auto w-full flex-1 flex flex-col">
+            
+            {/* User Card - Role Switcher & Logout */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-8">
+              {/* User Info Row */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <div className="w-11 h-11 bg-slate-900 rounded-xl flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">{getInitials(user?.name || '')}</span>
+                  </div>
+                  {/* Name & Email */}
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">{user?.name || 'User'}</p>
+                    <p className="text-xs text-slate-500">{user?.email || ''}</p>
+                  </div>
+                </div>
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium"
+                >
+                  {isLoggingOut ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <LogOut size={16} />
+                  )}
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </div>
+
+              {/* Role Switcher - Only show if multiple roles */}
+              {hasMultipleRoles && user?.roles && (
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Acting As</p>
+                  <div className="flex flex-wrap gap-2">
+                    {user.roles.map((role) => {
+                      const config = ROLE_CONFIG[role] || { 
+                        label: role, 
+                        shortLabel: role,
+                        icon: <User size={14} />,
+                        color: 'bg-slate-500'
+                      };
+                      const isActive = activeRole === role;
+                      
+                      return (
+                        <button
+                          key={role}
+                          onClick={() => handleRoleSwitch(role)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                            isActive
+                              ? 'bg-slate-900 text-white shadow-md'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center ${
+                            isActive ? 'bg-lime-500 text-slate-900' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {config.icon}
+                          </span>
+                          {config.shortLabel}
+                          {isActive && (
+                            <span className="w-2 h-2 bg-lime-400 rounded-full" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Single role display */}
+              {!hasMultipleRoles && activeRole && (
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Role:</span>
+                    <span className="px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
+                      {ROLE_CONFIG[activeRole]?.shortLabel || activeRole}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Workspace Selection Header */}
+            <div className="mb-6">
               <h2 className="text-2xl lg:text-3xl font-black text-slate-900 mb-2">Select Workspace</h2>
               <p className="text-slate-500">Choose a module to start your work session</p>
             </div>
 
             {/* Workspace Grid - Stacked Boxes Style */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 flex-1">
               {modules.map((module) => (
                 <div
                   key={module.code}
@@ -203,7 +354,7 @@ const ModuleSelection: React.FC = () => {
                       ? 'bg-slate-800'
                       : 'bg-white border border-slate-200 hover:border-slate-300'
                   }`}
-                  style={{ minHeight: '160px' }}
+                  style={{ minHeight: '140px' }}
                 >
                   {/* Arrow Icon */}
                   <div className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center ${

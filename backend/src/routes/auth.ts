@@ -103,6 +103,9 @@ router.post(
 
       logger.info(`User logged in: ${user.email} (${user.role})`);
 
+      // Ensure roles array exists (for backward compatibility with existing users)
+      const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+
       res.json({
         success: true,
         data: {
@@ -111,7 +114,8 @@ router.post(
             id: user._id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            role: user.role, // Primary/default role
+            roles: userRoles, // All available roles
             employeeId: user.employeeId,
             languageCapabilities: user.languageCapabilities,
             assignedTerritories: user.assignedTerritories,
@@ -158,6 +162,9 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
       throw error;
     }
 
+    // Ensure roles array exists (for backward compatibility with existing users)
+    const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+
     res.json({
       success: true,
       data: {
@@ -165,7 +172,8 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
           id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          role: user.role, // Primary/default role
+          roles: userRoles, // All available roles
           employeeId: user.employeeId,
           languageCapabilities: user.languageCapabilities,
           assignedTerritories: user.assignedTerritories,
