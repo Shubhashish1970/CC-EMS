@@ -290,9 +290,10 @@ const CropsMasterView: React.FC = () => {
 
             const data = await response.json();
             if (response.ok && data.success) {
+              // Success (201 created or 200 reactivated)
               successCount++;
             } else if (response.status === 409) {
-              // Crop already exists - skip it, don't count as error
+              // Active duplicate - skip it, don't count as error
               skippedCount++;
             } else {
               errorCount++;

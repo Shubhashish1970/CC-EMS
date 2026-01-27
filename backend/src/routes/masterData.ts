@@ -92,10 +92,24 @@ router.post(
       // Escape special regex characters in the name
       const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+      
       if (existing) {
-        const error: AppError = new Error('Crop already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existing.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Crop already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it
+          existing.isActive = isActive;
+          await existing.save();
+          logger.info(`Master crop reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Crop reactivated successfully',
+            data: { crop: existing },
+          });
+        }
       }
 
       const crop = new MasterCrop({
@@ -341,9 +355,27 @@ router.post(
       // Check if product already exists
       const existing = await MasterProduct.findOne({ name });
       if (existing) {
-        const error: AppError = new Error('Product already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existing.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Product already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existing.category = category;
+          existing.segment = segment;
+          existing.subcategory = subcategory;
+          existing.productCode = productCode;
+          existing.focusProducts = focusProducts;
+          existing.isActive = isActive;
+          await existing.save();
+          logger.info(`Master product reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Product reactivated successfully',
+            data: { product: existing },
+          });
+        }
       }
 
       const product = new MasterProduct({
@@ -593,9 +625,23 @@ router.post(
       // Check if reason already exists
       const existing = await NonPurchaseReason.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
       if (existing) {
-        const error: AppError = new Error('Non-purchase reason already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existing.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Non-purchase reason already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existing.displayOrder = displayOrder;
+          existing.isActive = isActive;
+          await existing.save();
+          logger.info(`Non-purchase reason reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Non-purchase reason reactivated successfully',
+            data: { reason: existing },
+          });
+        }
       }
 
       const reason = new NonPurchaseReason({
@@ -758,9 +804,25 @@ router.post(
       // Check if sentiment already exists
       const existing = await Sentiment.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
       if (existing) {
-        const error: AppError = new Error('Sentiment already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existing.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Sentiment already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existing.colorClass = colorClass || existing.colorClass || 'bg-slate-100 text-slate-800';
+          existing.icon = icon || existing.icon || 'circle';
+          existing.displayOrder = displayOrder;
+          existing.isActive = isActive;
+          await existing.save();
+          logger.info(`Sentiment reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Sentiment reactivated successfully',
+            data: { sentiment: existing },
+          });
+        }
       }
 
       const sentiment = new Sentiment({
@@ -923,9 +985,24 @@ router.post(
       // Check if state already exists
       const existing = await StateLanguageMapping.findOne({ state: { $regex: new RegExp(`^${state}$`, 'i') } });
       if (existing) {
-        const error: AppError = new Error('State mapping already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existing.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('State mapping already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existing.primaryLanguage = primaryLanguage;
+          existing.secondaryLanguages = secondaryLanguages;
+          existing.isActive = isActive;
+          await existing.save();
+          logger.info(`State-language mapping reactivated: ${existing.state} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'State-language mapping reactivated successfully',
+            data: { mapping: existing },
+          });
+        }
       }
 
       const mapping = new StateLanguageMapping({
@@ -1082,24 +1159,56 @@ router.post(
 
       const { name, code, displayOrder = 0, isActive = true } = req.body;
 
+      const codeUpper = code.toUpperCase();
+      
       // Check if language already exists by name or code
       const existingByName = await MasterLanguage.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
       if (existingByName) {
-        const error: AppError = new Error('Language with this name already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existingByName.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Language with this name already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existingByName.code = codeUpper;
+          existingByName.displayOrder = displayOrder;
+          existingByName.isActive = isActive;
+          await existingByName.save();
+          logger.info(`Master language reactivated: ${existingByName.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Language reactivated successfully',
+            data: { language: existingByName },
+          });
+        }
       }
 
-      const existingByCode = await MasterLanguage.findOne({ code: code.toUpperCase() });
+      const existingByCode = await MasterLanguage.findOne({ code: codeUpper });
       if (existingByCode) {
-        const error: AppError = new Error('Language with this code already exists');
-        error.statusCode = 409;
-        throw error;
+        if (existingByCode.isActive) {
+          // Active duplicate - conflict
+          const error: AppError = new Error('Language with this code already exists');
+          error.statusCode = 409;
+          throw error;
+        } else {
+          // Inactive record - reactivate it and update fields
+          existingByCode.name = name;
+          existingByCode.displayOrder = displayOrder;
+          existingByCode.isActive = isActive;
+          await existingByCode.save();
+          logger.info(`Master language reactivated: ${existingByCode.name} by ${(req as AuthRequest).user.email}`);
+          return res.status(200).json({
+            success: true,
+            message: 'Language reactivated successfully',
+            data: { language: existingByCode },
+          });
+        }
       }
 
       const language = new MasterLanguage({
         name,
-        code: code.toUpperCase(),
+        code: codeUpper,
         displayOrder,
         isActive,
       });
