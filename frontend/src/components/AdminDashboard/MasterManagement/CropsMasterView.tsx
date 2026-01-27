@@ -394,6 +394,27 @@ const CropsMasterView: React.FC = () => {
         </div>
       </div>
 
+      {/* Import Progress Bar */}
+      {isImporting && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-slate-700">Importing crops...</span>
+            <span className="text-sm font-bold text-slate-600">
+              {importProgress} / {importTotal}
+            </span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-lime-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Processing {importProgress} of {importTotal} crops...
+          </p>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
