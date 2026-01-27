@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
+import ConfirmationModal from '../../shared/ConfirmationModal';
 
 interface Product {
   _id: string;
@@ -33,6 +34,9 @@ const ProductsMasterView: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({ name: '', isActive: true });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -129,6 +133,53 @@ const ProductsMasterView: React.FC = () => {
     }
   };
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map((p) => p._id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${API_BASE}/master-data/products/bulk`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(`${data.data.modifiedCount} product(s) deleted successfully`);
+        setSelectedIds(new Set());
+        setShowBulkDeleteModal(false);
+        fetchProducts();
+      } else {
+        showError(data.error?.message || 'Bulk delete failed');
+      }
+    } catch (error) {
+      showError('Bulk delete failed');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDownloadTemplate = () => {
     const headers = ['Name', 'Status (Active/Inactive)'];
     const sampleData = [
@@ -185,6 +236,15 @@ const ProductsMasterView: React.FC = () => {
           <p className="text-sm text-slate-600 mt-1">Manage product catalog for call interactions</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete ({selectedIds.size})
+            </button>
+          )}
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
@@ -247,6 +307,19 @@ const ProductsMasterView: React.FC = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider w-12">
+                    <button
+                      onClick={handleSelectAll}
+                      className="p-1 hover:bg-slate-200 rounded transition-colors"
+                      title="Select all"
+                    >
+                      {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? (
+                        <CheckSquare size={18} className="text-lime-600" />
+                      ) : (
+                        <Square size={18} className="text-slate-400" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Created</th>
@@ -256,6 +329,18 @@ const ProductsMasterView: React.FC = () => {
               <tbody className="divide-y divide-slate-200">
                 {filteredProducts.map((product) => (
                   <tr key={product._id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggleSelect(product._id)}
+                        className="p-1 hover:bg-slate-200 rounded transition-colors"
+                      >
+                        {selectedIds.has(product._id) ? (
+                          <CheckSquare size={18} className="text-lime-600" />
+                        ) : (
+                          <Square size={18} className="text-slate-400" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-slate-900">{product.name}</span>
                     </td>
@@ -362,6 +447,18 @@ const ProductsMasterView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Products"
+        message={`Are you sure you want to delete ${selectedIds.size} product(s)? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

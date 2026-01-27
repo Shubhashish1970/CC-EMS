@@ -202,6 +202,46 @@ router.delete(
   }
 );
 
+// @route   DELETE /api/master-data/crops/bulk
+// @desc    Bulk delete crops (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin, Core Sales Head)
+router.delete(
+  '/crops/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await MasterCrop.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} crops by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} crop(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ==================== PRODUCTS ====================
 
 // @route   GET /api/master-data/products
@@ -385,6 +425,46 @@ router.delete(
       res.json({
         success: true,
         message: 'Product deactivated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/products/bulk
+// @desc    Bulk delete products (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin, Core Sales Head)
+router.delete(
+  '/products/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await MasterProduct.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} products by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} product(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
       });
     } catch (error) {
       next(error);
@@ -1054,6 +1134,168 @@ router.put(
         success: true,
         message: 'Language updated successfully',
         data: { language },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==================== BULK DELETE ENDPOINTS ====================
+
+// @route   DELETE /api/master-data/languages/bulk
+// @desc    Bulk delete languages (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin)
+router.delete(
+  '/languages/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await MasterLanguage.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} languages by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} language(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/sentiments/bulk
+// @desc    Bulk delete sentiments (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin)
+router.delete(
+  '/sentiments/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await Sentiment.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} sentiments by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} sentiment(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/non-purchase-reasons/bulk
+// @desc    Bulk delete non-purchase reasons (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin)
+router.delete(
+  '/non-purchase-reasons/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await NonPurchaseReason.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} non-purchase reasons by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} non-purchase reason(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/state-languages/bulk
+// @desc    Bulk delete state-language mappings (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin)
+router.delete(
+  '/state-languages/bulk',
+  requirePermission('master_data.delete'),
+  [
+    body('ids').isArray().withMessage('ids must be an array'),
+    body('ids.*').isMongoId().withMessage('Each id must be a valid MongoDB ID'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { ids } = req.body;
+
+      const result = await StateLanguageMapping.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isActive: false } }
+      );
+
+      logger.info(`Bulk deactivated ${result.modifiedCount} state-language mappings by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: `${result.modifiedCount} state-language mapping(s) deactivated successfully`,
+        data: { modifiedCount: result.modifiedCount },
       });
     } catch (error) {
       next(error);

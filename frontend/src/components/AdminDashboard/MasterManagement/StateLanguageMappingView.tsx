@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Globe, Check } from 'lucide-react';
+import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Globe, Check, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import StyledSelect from '../../shared/StyledSelect';
+import ConfirmationModal from '../../shared/ConfirmationModal';
 
 interface StateLanguageMapping {
   _id: string;
@@ -55,6 +56,9 @@ const StateLanguageMappingView: React.FC = () => {
     isActive: true 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchLanguages = async () => {
     try {
@@ -197,6 +201,53 @@ const StateLanguageMappingView: React.FC = () => {
     }
   };
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredMappings.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredMappings.map((m) => m._id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${API_BASE}/master-data/state-languages/bulk`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(`${data.data.modifiedCount} mapping(s) deleted successfully`);
+        setSelectedIds(new Set());
+        setShowBulkDeleteModal(false);
+        fetchMappings();
+      } else {
+        showError(data.error?.message || 'Bulk delete failed');
+      }
+    } catch (error) {
+      showError('Bulk delete failed');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDownloadTemplate = () => {
     const headers = ['State', 'Primary Language', 'Secondary Languages (comma-separated)', 'Status (Active/Inactive)'];
     const sampleData = [
@@ -257,6 +308,15 @@ const StateLanguageMappingView: React.FC = () => {
           <p className="text-sm text-slate-600 mt-1">Map states to their primary and secondary languages</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete ({selectedIds.size})
+            </button>
+          )}
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
@@ -320,6 +380,19 @@ const StateLanguageMappingView: React.FC = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider w-12">
+                    <button
+                      onClick={handleSelectAll}
+                      className="p-1 hover:bg-slate-200 rounded transition-colors"
+                      title="Select all"
+                    >
+                      {selectedIds.size === filteredMappings.length && filteredMappings.length > 0 ? (
+                        <CheckSquare size={18} className="text-lime-600" />
+                      ) : (
+                        <Square size={18} className="text-slate-400" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">State</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Primary Language</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Secondary Languages</th>
@@ -330,6 +403,18 @@ const StateLanguageMappingView: React.FC = () => {
               <tbody className="divide-y divide-slate-200">
                 {filteredMappings.map((mapping) => (
                   <tr key={mapping._id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggleSelect(mapping._id)}
+                        className="p-1 hover:bg-slate-200 rounded transition-colors"
+                      >
+                        {selectedIds.has(mapping._id) ? (
+                          <CheckSquare size={18} className="text-lime-600" />
+                        ) : (
+                          <Square size={18} className="text-slate-400" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-slate-900">{mapping.state}</span>
                     </td>
@@ -504,6 +589,18 @@ const StateLanguageMappingView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete State-Language Mappings"
+        message={`Are you sure you want to delete ${selectedIds.size} mapping(s)? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 };
