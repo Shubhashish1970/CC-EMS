@@ -288,15 +288,19 @@ const CropsMasterView: React.FC = () => {
             });
 
             const data = await response.json();
-            if (data.success) {
+            if (response.ok && data.success) {
               successCount++;
             } else {
               errorCount++;
-              errors.push(`${name}: ${data.error?.message || 'Failed'}`);
+              const errorMsg = data.error?.message || data.error || `HTTP ${response.status}: ${response.statusText}`;
+              errors.push(`${name}: ${errorMsg}`);
+              console.error(`Import error for ${name}:`, { status: response.status, data });
             }
-          } catch (error) {
+          } catch (error: any) {
             errorCount++;
-            errors.push(`${name}: Import failed`);
+            const errorMsg = error?.message || 'Network error';
+            errors.push(`${name}: ${errorMsg}`);
+            console.error(`Import exception for ${name}:`, error);
           }
 
           // Update progress

@@ -81,8 +81,17 @@ router.post(
 
       const { name, isActive = true } = req.body;
 
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        const error: AppError = new Error('Crop name cannot be empty');
+        error.statusCode = 400;
+        throw error;
+      }
+
       // Check if crop already exists (case-insensitive)
-      const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      // Escape special regex characters in the name
+      const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
       if (existing) {
         const error: AppError = new Error('Crop already exists');
         error.statusCode = 409;
@@ -90,7 +99,7 @@ router.post(
       }
 
       const crop = new MasterCrop({
-        name: name.trim(),
+        name: trimmedName,
         isActive,
       });
 
@@ -139,15 +148,20 @@ router.put(
         throw error;
       }
 
-      if (name && name.trim().toLowerCase() !== crop.name.toLowerCase()) {
-        // Check if new name already exists (case-insensitive)
-        const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
-        if (existing) {
-          const error: AppError = new Error('Crop name already exists');
-          error.statusCode = 409;
-          throw error;
+      if (name) {
+        const trimmedName = name.trim();
+        if (trimmedName.toLowerCase() !== crop.name.toLowerCase()) {
+          // Check if new name already exists (case-insensitive)
+          // Escape special regex characters in the name
+          const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+          if (existing) {
+            const error: AppError = new Error('Crop name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+          crop.name = trimmedName;
         }
-        crop.name = name.trim();
       }
 
       if (isActive !== undefined) {
