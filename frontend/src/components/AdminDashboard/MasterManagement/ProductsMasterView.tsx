@@ -6,6 +6,11 @@ import ConfirmationModal from '../../shared/ConfirmationModal';
 interface Product {
   _id: string;
   name: string;
+  category?: string;
+  segment?: string;
+  subcategory?: string;
+  productCode?: string;
+  focusProducts?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -32,7 +37,15 @@ const ProductsMasterView: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({ name: '', isActive: true });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    category: '', 
+    segment: '', 
+    subcategory: '', 
+    productCode: '', 
+    focusProducts: false, 
+    isActive: true 
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -64,10 +77,26 @@ const ProductsMasterView: React.FC = () => {
   const handleOpenModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
-      setFormData({ name: product.name, isActive: product.isActive });
+      setFormData({ 
+        name: product.name || '', 
+        category: product.category || '', 
+        segment: product.segment || '', 
+        subcategory: product.subcategory || '', 
+        productCode: product.productCode || '', 
+        focusProducts: product.focusProducts || false, 
+        isActive: product.isActive 
+      });
     } else {
       setEditingProduct(null);
-      setFormData({ name: '', isActive: true });
+      setFormData({ 
+        name: '', 
+        category: '', 
+        segment: '', 
+        subcategory: '', 
+        productCode: '', 
+        focusProducts: false, 
+        isActive: true 
+      });
     }
     setIsModalOpen(true);
   };
@@ -75,7 +104,15 @@ const ProductsMasterView: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProduct(null);
-    setFormData({ name: '', isActive: true });
+    setFormData({ 
+      name: '', 
+      category: '', 
+      segment: '', 
+      subcategory: '', 
+      productCode: '', 
+      focusProducts: false, 
+      isActive: true 
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -181,10 +218,10 @@ const ProductsMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Status (Active/Inactive)'];
+    const headers = ['Name', 'Category', 'Segment', 'Subcategory', 'Product Code', 'Focus Products (Yes/No)', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['NACL Soil Conditioner', 'Active'],
-      ['Bio-Stimulant Pro', 'Active'],
+      ['NACL Soil Conditioner', 'Agri Inputs', 'Crop Protection', 'Soil Conditioners', 'SC-001', 'Yes', 'Active'],
+      ['Bio-Stimulant Pro', 'Agri Inputs', 'Plant Nutrition', 'Bio-Stimulants', 'BS-002', 'No', 'Active'],
     ];
     const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -197,9 +234,14 @@ const ProductsMasterView: React.FC = () => {
   };
 
   const handleDownloadData = () => {
-    const headers = ['Name', 'Status', 'Created At'];
+    const headers = ['Name', 'Category', 'Segment', 'Subcategory', 'Product Code', 'Focus Products', 'Status', 'Created At'];
     const csvData = products.map(product => [
-      `"${product.name}"`,
+      `"${product.name || ''}"`,
+      `"${product.category || ''}"`,
+      `"${product.segment || ''}"`,
+      `"${product.subcategory || ''}"`,
+      `"${product.productCode || ''}"`,
+      product.focusProducts ? 'Yes' : 'No',
       product.isActive ? 'Active' : 'Inactive',
       new Date(product.createdAt).toLocaleDateString(),
     ]);
@@ -211,6 +253,117 @@ const ProductsMasterView: React.FC = () => {
     a.download = 'products_export.csv';
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result.map(v => v.replace(/^"|"$/g, ''));
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length < 2) {
+          showError('CSV file must have at least a header row and one data row');
+          return;
+        }
+
+        const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => h.includes('name') && !h.includes('code'));
+        const categoryIdx = headers.findIndex(h => h.includes('category'));
+        const segmentIdx = headers.findIndex(h => h.includes('segment'));
+        const subcategoryIdx = headers.findIndex(h => h.includes('subcategory'));
+        const productCodeIdx = headers.findIndex(h => (h.includes('product code') || h.includes('productcode')) && !h.includes('focus'));
+        const focusProductsIdx = headers.findIndex(h => h.includes('focus'));
+        const statusIdx = headers.findIndex(h => h.includes('status'));
+
+        if (nameIdx === -1) {
+          showError('CSV must have a "Name" column');
+          return;
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i]);
+          const name = values[nameIdx];
+          if (!name) continue;
+
+          const category = categoryIdx >= 0 ? (values[categoryIdx] || '') : '';
+          const segment = segmentIdx >= 0 ? (values[segmentIdx] || '') : '';
+          const subcategory = subcategoryIdx >= 0 ? (values[subcategoryIdx] || '') : '';
+          const productCode = productCodeIdx >= 0 ? (values[productCodeIdx] || '') : '';
+          const focusProducts = focusProductsIdx >= 0 ? 
+            (values[focusProductsIdx]?.toLowerCase() === 'yes' || values[focusProductsIdx]?.toLowerCase() === 'true') : false;
+          const isActive = statusIdx >= 0 ? 
+            (values[statusIdx]?.toLowerCase() === 'active') : true;
+
+          try {
+            const response = await fetch(`${API_BASE}/master-data/products`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                name,
+                category: category || undefined,
+                segment: segment || undefined,
+                subcategory: subcategory || undefined,
+                productCode: productCode || undefined,
+                focusProducts,
+                isActive,
+              }),
+            });
+
+            const data = await response.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              errors.push(`${name}: ${data.error?.message || 'Failed'}`);
+            }
+          } catch (error) {
+            errorCount++;
+            errors.push(`${name}: Import failed`);
+          }
+        }
+
+        if (successCount > 0) {
+          showSuccess(`${successCount} product(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+          if (errorCount > 0 && errors.length > 0) {
+            console.error('Import errors:', errors);
+          }
+          fetchProducts();
+        } else {
+          showError(`Failed to import products. ${errorCount} error(s)`);
+        }
+      } catch (error) {
+        showError('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
   };
 
   const filteredProducts = products.filter(product => {
@@ -245,6 +398,16 @@ const ProductsMasterView: React.FC = () => {
               Delete ({selectedIds.size})
             </button>
           )}
+          <label className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
+            <Upload size={16} />
+            Import
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
@@ -256,7 +419,7 @@ const ProductsMasterView: React.FC = () => {
             onClick={handleDownloadData}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
           >
-            <Upload size={16} />
+            <Download size={16} />
             Export
           </button>
           <button
@@ -321,6 +484,10 @@ const ProductsMasterView: React.FC = () => {
                     </button>
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Segment</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Product Code</th>
+                  <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Focus</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">Created</th>
                   <th className="px-6 py-4 text-right text-xs font-black text-slate-700 uppercase tracking-wider">Actions</th>
@@ -342,7 +509,37 @@ const ProductsMasterView: React.FC = () => {
                       </button>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-bold text-slate-900">{product.name}</span>
+                      <div>
+                        <span className="font-bold text-slate-900">{product.name}</span>
+                        {product.subcategory && (
+                          <div className="text-xs text-slate-500 mt-0.5">{product.subcategory}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {product.category || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {product.segment || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      {product.productCode ? (
+                        <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-mono rounded">
+                          {product.productCode}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {product.focusProducts ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-lime-100 text-lime-800 text-xs font-bold rounded-full">
+                          <CheckCircle size={12} />
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">No</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -392,13 +589,13 @@ const ProductsMasterView: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
             <div className="px-6 py-4 border-b border-slate-200">
               <h3 className="text-xl font-black text-slate-900">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h3>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   Product Name <span className="text-red-500">*</span>
@@ -412,6 +609,79 @@ const ProductsMasterView: React.FC = () => {
                   disabled={isSubmitting}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                    placeholder="e.g., Agri Inputs"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Segment
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.segment}
+                    onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                    placeholder="e.g., Crop Protection"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Subcategory
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.subcategory}
+                    onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                    placeholder="e.g., Soil Conditioners"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Product Code
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.productCode}
+                    onChange={(e) => setFormData({ ...formData, productCode: e.target.value.toUpperCase() })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                    placeholder="e.g., SC-001"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="focusProducts"
+                  checked={formData.focusProducts}
+                  onChange={(e) => setFormData({ ...formData, focusProducts: e.target.checked })}
+                  className="w-5 h-5 text-lime-600 border-slate-300 rounded focus:ring-lime-500"
+                  disabled={isSubmitting}
+                />
+                <label htmlFor="focusProducts" className="text-sm font-medium text-slate-700">
+                  Focus Product
+                </label>
+              </div>
+
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"

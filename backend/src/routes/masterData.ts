@@ -305,6 +305,11 @@ router.post(
   requirePermission('master_data.create'),
   [
     body('name').trim().notEmpty().withMessage('Product name is required'),
+    body('category').optional().trim(),
+    body('segment').optional().trim(),
+    body('subcategory').optional().trim(),
+    body('productCode').optional().trim(),
+    body('focusProducts').optional().isBoolean(),
     body('isActive').optional().isBoolean(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
@@ -317,7 +322,7 @@ router.post(
         });
       }
 
-      const { name, isActive = true } = req.body;
+      const { name, category, segment, subcategory, productCode, focusProducts = false, isActive = true } = req.body;
 
       // Check if product already exists
       const existing = await MasterProduct.findOne({ name });
@@ -329,6 +334,11 @@ router.post(
 
       const product = new MasterProduct({
         name,
+        category,
+        segment,
+        subcategory,
+        productCode,
+        focusProducts,
         isActive,
       });
 
@@ -355,6 +365,11 @@ router.put(
   requirePermission('master_data.update'),
   [
     body('name').optional().trim().notEmpty(),
+    body('category').optional().trim(),
+    body('segment').optional().trim(),
+    body('subcategory').optional().trim(),
+    body('productCode').optional().trim(),
+    body('focusProducts').optional().isBoolean(),
     body('isActive').optional().isBoolean(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
@@ -368,7 +383,7 @@ router.put(
       }
 
       const { id } = req.params;
-      const { name, isActive } = req.body;
+      const { name, category, segment, subcategory, productCode, focusProducts, isActive } = req.body;
 
       const product = await MasterProduct.findById(id);
       if (!product) {
@@ -388,9 +403,12 @@ router.put(
         product.name = name;
       }
 
-      if (isActive !== undefined) {
-        product.isActive = isActive;
-      }
+      if (category !== undefined) product.category = category;
+      if (segment !== undefined) product.segment = segment;
+      if (subcategory !== undefined) product.subcategory = subcategory;
+      if (productCode !== undefined) product.productCode = productCode;
+      if (focusProducts !== undefined) product.focusProducts = focusProducts;
+      if (isActive !== undefined) product.isActive = isActive;
 
       await product.save();
 

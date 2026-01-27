@@ -9,6 +9,11 @@ export interface IMasterCrop extends Document {
 
 export interface IMasterProduct extends Document {
   name: string;
+  category?: string;
+  segment?: string;
+  subcategory?: string;
+  productCode?: string;
+  focusProducts?: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +69,26 @@ const MasterProductSchema = new Schema<IMasterProduct>(
       type: String,
       required: [true, 'Product name is required'],
       trim: true,
+    },
+    category: {
+      type: String,
+      trim: true,
+    },
+    segment: {
+      type: String,
+      trim: true,
+    },
+    subcategory: {
+      type: String,
+      trim: true,
+    },
+    productCode: {
+      type: String,
+      trim: true,
+    },
+    focusProducts: {
+      type: Boolean,
+      default: false,
     },
     isActive: {
       type: Boolean,
