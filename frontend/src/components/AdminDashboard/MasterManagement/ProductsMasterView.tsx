@@ -321,6 +321,7 @@ const ProductsMasterView: React.FC = () => {
 
         setImportTotal(validRows.length);
         let successCount = 0;
+        let skippedCount = 0;
         let errorCount = 0;
         const errors: string[] = [];
 
@@ -357,15 +358,22 @@ const ProductsMasterView: React.FC = () => {
             });
 
             const data = await response.json();
-            if (data.success) {
+            if (response.ok && data.success) {
               successCount++;
+            } else if (response.status === 409) {
+              // Product already exists - skip it, don't count as error
+              skippedCount++;
             } else {
               errorCount++;
-              errors.push(`${name}: ${data.error?.message || 'Failed'}`);
+              const errorMsg = data.error?.message || data.error || `HTTP ${response.status}: ${response.statusText}`;
+              errors.push(`${name}: ${errorMsg}`);
+              console.error(`Import error for ${name}:`, { status: response.status, data });
             }
-          } catch (error) {
+          } catch (error: any) {
             errorCount++;
-            errors.push(`${name}: Import failed`);
+            const errorMsg = error?.message || 'Network error';
+            errors.push(`${name}: ${errorMsg}`);
+            console.error(`Import exception for ${name}:`, error);
           }
 
           // Update progress
@@ -376,8 +384,18 @@ const ProductsMasterView: React.FC = () => {
         setImportProgress(0);
         setImportTotal(0);
 
-        if (successCount > 0) {
-          showSuccess(`${successCount} product(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+        if (successCount > 0 || skippedCount > 0) {
+          let message = '';
+          if (successCount > 0) {
+            message = `${successCount} product(s) imported successfully`;
+          }
+          if (skippedCount > 0) {
+            message += message ? `. ${skippedCount} skipped (already exist)` : `${skippedCount} product(s) skipped (already exist)`;
+          }
+          if (errorCount > 0) {
+            message += `. ${errorCount} failed`;
+          }
+          showSuccess(message);
           if (errorCount > 0 && errors.length > 0) {
             console.error('Import errors:', errors);
           }

@@ -331,6 +331,7 @@ const StateLanguageMappingView: React.FC = () => {
 
         setImportTotal(validRows.length);
         let successCount = 0;
+        let skippedCount = 0;
         let errorCount = 0;
         const errors: string[] = [];
 
@@ -365,15 +366,22 @@ const StateLanguageMappingView: React.FC = () => {
             });
 
             const data = await response.json();
-            if (data.success) {
+            if (response.ok && data.success) {
               successCount++;
+            } else if (response.status === 409) {
+              // Mapping already exists - skip it, don't count as error
+              skippedCount++;
             } else {
               errorCount++;
-              errors.push(`${state}: ${data.error?.message || 'Failed'}`);
+              const errorMsg = data.error?.message || data.error || `HTTP ${response.status}: ${response.statusText}`;
+              errors.push(`${state}: ${errorMsg}`);
+              console.error(`Import error for ${state}:`, { status: response.status, data });
             }
-          } catch (error) {
+          } catch (error: any) {
             errorCount++;
-            errors.push(`${state}: Import failed`);
+            const errorMsg = error?.message || 'Network error';
+            errors.push(`${state}: ${errorMsg}`);
+            console.error(`Import exception for ${state}:`, error);
           }
 
           // Update progress
@@ -384,8 +392,18 @@ const StateLanguageMappingView: React.FC = () => {
         setImportProgress(0);
         setImportTotal(0);
 
-        if (successCount > 0) {
-          showSuccess(`${successCount} mapping(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+        if (successCount > 0 || skippedCount > 0) {
+          let message = '';
+          if (successCount > 0) {
+            message = `${successCount} mapping(s) imported successfully`;
+          }
+          if (skippedCount > 0) {
+            message += message ? `. ${skippedCount} skipped (already exist)` : `${skippedCount} mapping(s) skipped (already exist)`;
+          }
+          if (errorCount > 0) {
+            message += `. ${errorCount} failed`;
+          }
+          showSuccess(message);
           if (errorCount > 0 && errors.length > 0) {
             console.error('Import errors:', errors);
           }

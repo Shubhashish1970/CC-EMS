@@ -263,6 +263,7 @@ const CropsMasterView: React.FC = () => {
 
         setImportTotal(validRows.length);
         let successCount = 0;
+        let skippedCount = 0;
         let errorCount = 0;
         const errors: string[] = [];
 
@@ -290,6 +291,9 @@ const CropsMasterView: React.FC = () => {
             const data = await response.json();
             if (response.ok && data.success) {
               successCount++;
+            } else if (response.status === 409) {
+              // Crop already exists - skip it, don't count as error
+              skippedCount++;
             } else {
               errorCount++;
               const errorMsg = data.error?.message || data.error || `HTTP ${response.status}: ${response.statusText}`;
@@ -311,8 +315,18 @@ const CropsMasterView: React.FC = () => {
         setImportProgress(0);
         setImportTotal(0);
 
-        if (successCount > 0) {
-          showSuccess(`${successCount} crop(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+        if (successCount > 0 || skippedCount > 0) {
+          let message = '';
+          if (successCount > 0) {
+            message = `${successCount} crop(s) imported successfully`;
+          }
+          if (skippedCount > 0) {
+            message += message ? `. ${skippedCount} skipped (already exist)` : `${skippedCount} crop(s) skipped (already exist)`;
+          }
+          if (errorCount > 0) {
+            message += `. ${errorCount} failed`;
+          }
+          showSuccess(message);
           if (errorCount > 0 && errors.length > 0) {
             console.error('Import errors:', errors);
           }
