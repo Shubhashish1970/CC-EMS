@@ -169,42 +169,10 @@ router.put(
   }
 );
 
-// @route   DELETE /api/master-data/crops/:id
-// @desc    Delete crop (soft delete by setting isActive=false) - Admin only
-// @access  Private (MIS Admin, Core Sales Head)
-router.delete(
-  '/crops/:id',
-  requirePermission('master_data.delete'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-
-      const crop = await MasterCrop.findById(id);
-      if (!crop) {
-        const error: AppError = new Error('Crop not found');
-        error.statusCode = 404;
-        throw error;
-      }
-
-      // Soft delete
-      crop.isActive = false;
-      await crop.save();
-
-      logger.info(`Master crop deactivated: ${crop.name} by ${(req as AuthRequest).user.email}`);
-
-      res.json({
-        success: true,
-        message: 'Crop deactivated successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
 // @route   DELETE /api/master-data/crops/bulk
 // @desc    Bulk delete crops (soft delete by setting isActive=false) - Admin only
 // @access  Private (MIS Admin, Core Sales Head)
+// NOTE: Must be defined BEFORE /crops/:id to avoid route conflict
 router.delete(
   '/crops/bulk',
   requirePermission('master_data.delete'),
@@ -235,6 +203,46 @@ router.delete(
         success: true,
         message: `${result.modifiedCount} crop(s) deactivated successfully`,
         data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/crops/:id
+// @desc    Delete crop (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin, Core Sales Head)
+router.delete(
+  '/crops/:id',
+  requirePermission('master_data.delete'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      // Prevent "bulk" from being treated as an ID
+      if (id === 'bulk') {
+        const error: AppError = new Error('Invalid route');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const crop = await MasterCrop.findById(id);
+      if (!crop) {
+        const error: AppError = new Error('Crop not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Soft delete
+      crop.isActive = false;
+      await crop.save();
+
+      logger.info(`Master crop deactivated: ${crop.name} by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: 'Crop deactivated successfully',
       });
     } catch (error) {
       next(error);
@@ -399,42 +407,10 @@ router.put(
   }
 );
 
-// @route   DELETE /api/master-data/products/:id
-// @desc    Delete product (soft delete by setting isActive=false) - Admin only
-// @access  Private (MIS Admin, Core Sales Head)
-router.delete(
-  '/products/:id',
-  requirePermission('master_data.delete'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
-
-      const product = await MasterProduct.findById(id);
-      if (!product) {
-        const error: AppError = new Error('Product not found');
-        error.statusCode = 404;
-        throw error;
-      }
-
-      // Soft delete
-      product.isActive = false;
-      await product.save();
-
-      logger.info(`Master product deactivated: ${product.name} by ${(req as AuthRequest).user.email}`);
-
-      res.json({
-        success: true,
-        message: 'Product deactivated successfully',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
 // @route   DELETE /api/master-data/products/bulk
 // @desc    Bulk delete products (soft delete by setting isActive=false) - Admin only
 // @access  Private (MIS Admin, Core Sales Head)
+// NOTE: Must be defined BEFORE /products/:id to avoid route conflict
 router.delete(
   '/products/bulk',
   requirePermission('master_data.delete'),
@@ -465,6 +441,46 @@ router.delete(
         success: true,
         message: `${result.modifiedCount} product(s) deactivated successfully`,
         data: { modifiedCount: result.modifiedCount },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   DELETE /api/master-data/products/:id
+// @desc    Delete product (soft delete by setting isActive=false) - Admin only
+// @access  Private (MIS Admin, Core Sales Head)
+router.delete(
+  '/products/:id',
+  requirePermission('master_data.delete'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      // Prevent "bulk" from being treated as an ID
+      if (id === 'bulk') {
+        const error: AppError = new Error('Invalid route');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const product = await MasterProduct.findById(id);
+      if (!product) {
+        const error: AppError = new Error('Product not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      // Soft delete
+      product.isActive = false;
+      await product.save();
+
+      logger.info(`Master product deactivated: ${product.name} by ${(req as AuthRequest).user.email}`);
+
+      res.json({
+        success: true,
+        message: 'Product deactivated successfully',
       });
     } catch (error) {
       next(error);
