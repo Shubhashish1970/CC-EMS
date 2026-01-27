@@ -110,7 +110,8 @@ router.post(
       }).sort({ updatedAt: -1 }); // Get most recently updated inactive record
       
       if (existingInactive) {
-        // Inactive record - reactivate it (most recent one if multiple exist)
+        // Inactive record - reactivate it and update name with correct case from import
+        existingInactive.name = trimmedName; // Update with correct case from Excel
         existingInactive.isActive = isActive;
         await existingInactive.save();
         
@@ -385,6 +386,7 @@ router.post(
       const existingInactive = await MasterProduct.findOne({ name, isActive: false }).sort({ updatedAt: -1 });
       if (existingInactive) {
         // Inactive record - reactivate it and update fields (most recent one if multiple exist)
+        existingInactive.name = name.trim(); // Update with correct case from Excel
         existingInactive.category = category;
         existingInactive.segment = segment;
         existingInactive.subcategory = subcategory;
@@ -669,7 +671,8 @@ router.post(
       }).sort({ updatedAt: -1 });
       
       if (existingInactive) {
-        // Inactive record - reactivate it and update fields
+        // Inactive record - reactivate it and update fields with correct case
+        existingInactive.name = name.trim(); // Update with correct case from Excel
         existingInactive.displayOrder = displayOrder;
         existingInactive.isActive = isActive;
         await existingInactive.save();
@@ -867,7 +870,8 @@ router.post(
       }).sort({ updatedAt: -1 });
       
       if (existingInactive) {
-        // Inactive record - reactivate it and update fields
+        // Inactive record - reactivate it and update fields with correct case
+        existingInactive.name = name.trim(); // Update with correct case from Excel
         existingInactive.colorClass = colorClass || existingInactive.colorClass || 'bg-slate-100 text-slate-800';
         existingInactive.icon = icon || existingInactive.icon || 'circle';
         existingInactive.displayOrder = displayOrder;
@@ -1067,7 +1071,8 @@ router.post(
       }).sort({ updatedAt: -1 });
       
       if (existingInactive) {
-        // Inactive record - reactivate it and update fields
+        // Inactive record - reactivate it and update fields with correct case
+        existingInactive.state = state.trim(); // Update with correct case from Excel
         existingInactive.primaryLanguage = primaryLanguage;
         existingInactive.secondaryLanguages = secondaryLanguages;
         existingInactive.isActive = isActive;
@@ -1273,7 +1278,8 @@ router.post(
       }).sort({ updatedAt: -1 });
       
       if (existingByNameInactive) {
-        // Inactive record by name - reactivate it and update fields
+        // Inactive record by name - reactivate it and update fields with correct case
+        existingByNameInactive.name = name.trim(); // Update with correct case from Excel
         existingByNameInactive.code = codeUpper;
         existingByNameInactive.displayOrder = displayOrder;
         existingByNameInactive.isActive = isActive;
@@ -1304,8 +1310,8 @@ router.post(
       }).sort({ updatedAt: -1 });
       
       if (existingByCodeInactive) {
-        // Inactive record by code - reactivate it and update fields
-        existingByCodeInactive.name = name;
+        // Inactive record by code - reactivate it and update fields with correct case
+        existingByCodeInactive.name = name.trim(); // Update with correct case from Excel
         existingByCodeInactive.displayOrder = displayOrder;
         existingByCodeInactive.isActive = isActive;
         await existingByCodeInactive.save();
