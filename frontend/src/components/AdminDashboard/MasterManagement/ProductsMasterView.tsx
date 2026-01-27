@@ -51,6 +51,9 @@ const ProductsMasterView: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -268,12 +271,17 @@ const ProductsMasterView: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportTotal(0);
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
         if (!data) {
           showError('Failed to read file');
+          setIsImporting(false);
           return;
         }
 
@@ -284,6 +292,7 @@ const ProductsMasterView: React.FC = () => {
 
         if (rows.length === 0) {
           showError('Excel file must have at least one data row');
+          setIsImporting(false);
           return;
         }
 
@@ -300,16 +309,28 @@ const ProductsMasterView: React.FC = () => {
 
         if (!nameKey) {
           showError('Excel must have a "Name" column');
+          setIsImporting(false);
           return;
         }
 
+        // Filter out empty rows
+        const validRows = rows.filter((row: any) => {
+          const name = String(row[nameKey] || '').trim();
+          return name.length > 0;
+        });
+
+        setImportTotal(validRows.length);
         let successCount = 0;
         let errorCount = 0;
         const errors: string[] = [];
 
-        for (const row of rows) {
+        for (let i = 0; i < validRows.length; i++) {
+          const row = validRows[i];
           const name = String(row[nameKey] || '').trim();
-          if (!name) continue;
+          if (!name) {
+            setImportProgress(i + 1);
+            continue;
+          }
 
           const category = categoryKey ? String(row[categoryKey] || '').trim() : '';
           const segment = segmentKey ? String(row[segmentKey] || '').trim() : '';
@@ -346,7 +367,14 @@ const ProductsMasterView: React.FC = () => {
             errorCount++;
             errors.push(`${name}: Import failed`);
           }
+
+          // Update progress
+          setImportProgress(i + 1);
         }
+
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
 
         if (successCount > 0) {
           showSuccess(`${successCount} product(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
@@ -358,6 +386,9 @@ const ProductsMasterView: React.FC = () => {
           showError(`Failed to import products. ${errorCount} error(s)`);
         }
       } catch (error) {
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
         showError('Failed to parse Excel file');
       }
     };
@@ -397,13 +428,14 @@ const ProductsMasterView: React.FC = () => {
               Delete ({selectedIds.size})
             </button>
           )}
-          <label className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
-            <Upload size={16} />
-            Import
+          <label className={`flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer ${isImporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}`}>
+            <Upload size={16} className={isImporting ? 'animate-spin' : ''} />
+            {isImporting ? 'Importing...' : 'Import'}
             <input
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileUpload}
+              disabled={isImporting}
               className="hidden"
             />
           </label>
@@ -430,6 +462,27 @@ const ProductsMasterView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Import Progress Bar */}
+      {isImporting && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-slate-700">Importing products...</span>
+            <span className="text-sm font-bold text-slate-600">
+              {importProgress} / {importTotal}
+            </span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-lime-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Processing {importProgress} of {importTotal} products...
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
