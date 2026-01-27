@@ -40,6 +40,9 @@ const LanguagesMasterView: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
 
   const fetchLanguages = async () => {
     setIsLoading(true);
@@ -211,6 +214,125 @@ const LanguagesMasterView: React.FC = () => {
     XLSX.writeFile(wb, `languages_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportTotal(0);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          showError('Failed to read file');
+          setIsImporting(false);
+          return;
+        }
+
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(worksheet, { defval: '' });
+
+        if (rows.length === 0) {
+          showError('Excel file must have at least one data row');
+          setIsImporting(false);
+          return;
+        }
+
+        // Get headers from first row
+        const firstRow = rows[0];
+        const nameKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('name')) || '';
+        const codeKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('code')) || '';
+        const displayOrderKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('display order') || k.toLowerCase().includes('displayorder')) || '';
+        const activeKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('active')) || '';
+
+        if (!nameKey || !codeKey) {
+          showError('Excel must have "Name" and "Code" columns');
+          setIsImporting(false);
+          return;
+        }
+
+        // Filter out empty rows
+        const validRows = rows.filter((row: any) => {
+          const name = String(row[nameKey] || '').trim();
+          const code = String(row[codeKey] || '').trim();
+          return name.length > 0 && code.length > 0;
+        });
+
+        setImportTotal(validRows.length);
+        let successCount = 0;
+        let errorCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < validRows.length; i++) {
+          const row = validRows[i];
+          const name = String(row[nameKey] || '').trim();
+          const code = String(row[codeKey] || '').trim();
+          if (!name || !code) {
+            setImportProgress(i + 1);
+            continue;
+          }
+
+          const displayOrder = displayOrderKey ? parseInt(String(row[displayOrderKey] || '0'), 10) || 0 : 0;
+          const activeValue = activeKey ? String(row[activeKey] || '').trim().toLowerCase() : '';
+          const isActive = activeValue === 'active' || activeValue === '';
+
+          try {
+            const response = await fetch(`${API_BASE}/master-data/languages`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                name,
+                code,
+                displayOrder,
+                isActive,
+              }),
+            });
+
+            const data = await response.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              errors.push(`${name} (${code}): ${data.error?.message || 'Failed'}`);
+            }
+          } catch (error) {
+            errorCount++;
+            errors.push(`${name} (${code}): Import failed`);
+          }
+
+          // Update progress
+          setImportProgress(i + 1);
+        }
+
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
+
+        if (successCount > 0) {
+          showSuccess(`${successCount} language(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+          if (errorCount > 0 && errors.length > 0) {
+            console.error('Import errors:', errors);
+          }
+          fetchLanguages();
+        } else {
+          showError(`Failed to import languages. ${errorCount} error(s)`);
+        }
+      } catch (error) {
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
+        showError('Failed to parse Excel file');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = '';
+  };
+
   const filteredLanguages = languages.filter((language) => {
     const matchesSearch =
       language.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,6 +359,17 @@ const LanguagesMasterView: React.FC = () => {
               Delete ({selectedIds.size})
             </button>
           )}
+          <label className={`flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <Upload size={16} className={isImporting ? 'animate-spin' : ''} />
+            {isImporting ? 'Importing...' : 'Import'}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              disabled={isImporting}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
@@ -260,6 +393,27 @@ const LanguagesMasterView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Import Progress Bar */}
+      {isImporting && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold text-slate-700">Importing languages...</span>
+            <span className="text-sm font-bold text-slate-600">
+              {importProgress} / {importTotal}
+            </span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-lime-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Processing {importProgress} of {importTotal} languages...
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6">

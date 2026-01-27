@@ -60,6 +60,9 @@ const StateLanguageMappingView: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
 
   const fetchLanguages = async () => {
     try {
@@ -277,6 +280,130 @@ const StateLanguageMappingView: React.FC = () => {
     XLSX.writeFile(wb, `state_language_mapping_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportTotal(0);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          showError('Failed to read file');
+          setIsImporting(false);
+          return;
+        }
+
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(worksheet, { defval: '' });
+
+        if (rows.length === 0) {
+          showError('Excel file must have at least one data row');
+          setIsImporting(false);
+          return;
+        }
+
+        // Get headers from first row
+        const firstRow = rows[0];
+        const stateKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('state')) || '';
+        const primaryLanguageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('primary language') || k.toLowerCase().includes('primarylanguage')) || '';
+        const secondaryLanguagesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('secondary language') || k.toLowerCase().includes('secondarylanguage')) || '';
+        const statusKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('status')) || '';
+
+        if (!stateKey || !primaryLanguageKey) {
+          showError('Excel must have "State" and "Primary Language" columns');
+          setIsImporting(false);
+          return;
+        }
+
+        // Filter out empty rows
+        const validRows = rows.filter((row: any) => {
+          const state = String(row[stateKey] || '').trim();
+          const primaryLanguage = String(row[primaryLanguageKey] || '').trim();
+          return state.length > 0 && primaryLanguage.length > 0;
+        });
+
+        setImportTotal(validRows.length);
+        let successCount = 0;
+        let errorCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < validRows.length; i++) {
+          const row = validRows[i];
+          const state = String(row[stateKey] || '').trim();
+          const primaryLanguage = String(row[primaryLanguageKey] || '').trim();
+          if (!state || !primaryLanguage) {
+            setImportProgress(i + 1);
+            continue;
+          }
+
+          // Parse secondary languages (comma-separated)
+          const secondaryLanguagesStr = secondaryLanguagesKey ? String(row[secondaryLanguagesKey] || '').trim() : '';
+          const secondaryLanguages = secondaryLanguagesStr
+            ? secondaryLanguagesStr.split(',').map((lang: string) => lang.trim()).filter((lang: string) => lang.length > 0)
+            : [];
+
+          const statusValue = statusKey ? String(row[statusKey] || '').trim().toLowerCase() : '';
+          const isActive = statusValue === 'active' || statusValue === '';
+
+          try {
+            const response = await fetch(`${API_BASE}/master-data/state-languages`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                state,
+                primaryLanguage,
+                secondaryLanguages,
+                isActive,
+              }),
+            });
+
+            const data = await response.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              errors.push(`${state}: ${data.error?.message || 'Failed'}`);
+            }
+          } catch (error) {
+            errorCount++;
+            errors.push(`${state}: Import failed`);
+          }
+
+          // Update progress
+          setImportProgress(i + 1);
+        }
+
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
+
+        if (successCount > 0) {
+          showSuccess(`${successCount} mapping(s) imported successfully${errorCount > 0 ? `. ${errorCount} failed` : ''}`);
+          if (errorCount > 0 && errors.length > 0) {
+            console.error('Import errors:', errors);
+          }
+          fetchMappings();
+        } else {
+          showError(`Failed to import mappings. ${errorCount} error(s)`);
+        }
+      } catch (error) {
+        setIsImporting(false);
+        setImportProgress(0);
+        setImportTotal(0);
+        showError('Failed to parse Excel file');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = '';
+  };
+
   const filteredMappings = mappings.filter(m => {
     const matchesSearch = m.state.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.primaryLanguage.toLowerCase().includes(searchTerm.toLowerCase());
@@ -310,6 +437,17 @@ const StateLanguageMappingView: React.FC = () => {
               Delete ({selectedIds.size})
             </button>
           )}
+          <label className={`flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer ${isImporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}`}>
+            <Upload size={16} className={isImporting ? 'animate-spin' : ''} />
+            {isImporting ? 'Importing...' : 'Import'}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              disabled={isImporting}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
@@ -321,7 +459,7 @@ const StateLanguageMappingView: React.FC = () => {
             onClick={handleDownloadData}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
           >
-            <Upload size={16} />
+            <Download size={16} />
             Export
           </button>
           <button
