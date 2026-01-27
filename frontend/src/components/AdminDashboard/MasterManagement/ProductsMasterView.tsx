@@ -221,20 +221,20 @@ const ProductsMasterView: React.FC = () => {
   const handleDownloadTemplate = () => {
     const sampleData = [
       {
-        'Name': 'NACL Soil Conditioner',
-        'Category': 'Agri Inputs',
-        'Segment': 'Crop Protection',
-        'Subcategory': 'Soil Conditioners',
-        'Product Code': 'SC-001',
+        'Name': 'Sample Product 1',
+        'Category': 'Category 1',
+        'Segment': 'Segment 1',
+        'Subcategory': 'Subcategory 1',
+        'Product Code': 'PRD-001',
         'Focus Products (Yes/No)': 'Yes',
         'Status (Active/Inactive)': 'Active',
       },
       {
-        'Name': 'Bio-Stimulant Pro',
-        'Category': 'Agri Inputs',
-        'Segment': 'Plant Nutrition',
-        'Subcategory': 'Bio-Stimulants',
-        'Product Code': 'BS-002',
+        'Name': 'Sample Product 2',
+        'Category': 'Category 2',
+        'Segment': 'Segment 2',
+        'Subcategory': 'Subcategory 2',
+        'Product Code': 'PRD-002',
         'Focus Products (Yes/No)': 'No',
         'Status (Active/Inactive)': 'Active',
       },
@@ -604,7 +604,7 @@ const ProductsMasterView: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
-                  placeholder="e.g., NACL Soil Conditioner"
+                  placeholder="Enter product name"
                   disabled={isSubmitting}
                 />
               </div>

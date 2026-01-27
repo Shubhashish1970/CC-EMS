@@ -230,9 +230,9 @@ const SentimentsMasterView: React.FC = () => {
 
   const handleDownloadTemplate = () => {
     const sampleData = [
-      { 'Name': 'Positive', 'Color (Green/Red/Yellow/Blue/Gray)': 'Green', 'Icon (smile/frown/meh/help)': 'smile', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
-      { 'Name': 'Negative', 'Color (Green/Red/Yellow/Blue/Gray)': 'Red', 'Icon (smile/frown/meh/help)': 'frown', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
-      { 'Name': 'Neutral', 'Color (Green/Red/Yellow/Blue/Gray)': 'Gray', 'Icon (smile/frown/meh/help)': 'meh', 'Display Order': 3, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Sentiment 1', 'Color (Green/Red/Yellow/Blue/Gray)': 'Green', 'Icon (smile/frown/meh/help)': 'smile', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Sentiment 2', 'Color (Green/Red/Yellow/Blue/Gray)': 'Red', 'Icon (smile/frown/meh/help)': 'frown', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Sentiment 3', 'Color (Green/Red/Yellow/Blue/Gray)': 'Gray', 'Icon (smile/frown/meh/help)': 'meh', 'Display Order': 3, 'Status (Active/Inactive)': 'Active' },
     ];
 
     const wb = XLSX.utils.book_new();

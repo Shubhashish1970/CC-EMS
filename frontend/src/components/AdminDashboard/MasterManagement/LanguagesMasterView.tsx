@@ -186,9 +186,9 @@ const LanguagesMasterView: React.FC = () => {
 
   const handleDownloadTemplate = () => {
     const sampleData = [
-      { 'Name': 'Hindi', 'Code': 'HI', 'Display Order': 1, 'Active': 'Active' },
-      { 'Name': 'Telugu', 'Code': 'TE', 'Display Order': 2, 'Active': 'Active' },
-      { 'Name': 'Marathi', 'Code': 'MR', 'Display Order': 3, 'Active': 'Active' },
+      { 'Name': 'Language 1', 'Code': 'L1', 'Display Order': 1, 'Active': 'Active' },
+      { 'Name': 'Language 2', 'Code': 'L2', 'Display Order': 2, 'Active': 'Active' },
+      { 'Name': 'Language 3', 'Code': 'L3', 'Display Order': 3, 'Active': 'Active' },
     ];
 
     const wb = XLSX.utils.book_new();

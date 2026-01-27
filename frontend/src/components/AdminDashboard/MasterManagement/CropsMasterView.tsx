@@ -184,11 +184,11 @@ const CropsMasterView: React.FC = () => {
   const handleDownloadTemplate = () => {
     const sampleData = [
       {
-        'Name': 'Cotton',
+        'Name': 'Sample Crop 1',
         'Status (Active/Inactive)': 'Active',
       },
       {
-        'Name': 'Paddy',
+        'Name': 'Sample Crop 2',
         'Status (Active/Inactive)': 'Active',
       },
     ];

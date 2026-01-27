@@ -185,8 +185,8 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
   const handleDownloadTemplate = () => {
     const sampleData = [
-      { 'Name': 'Price', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
-      { 'Name': 'Availability', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Reason 1', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Reason 2', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
     ];
 
     const wb = XLSX.utils.book_new();

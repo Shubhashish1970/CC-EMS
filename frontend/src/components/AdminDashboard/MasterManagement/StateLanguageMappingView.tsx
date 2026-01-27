@@ -251,9 +251,9 @@ const StateLanguageMappingView: React.FC = () => {
 
   const handleDownloadTemplate = () => {
     const sampleData = [
-      { 'State': 'Uttar Pradesh', 'Primary Language': 'Hindi', 'Secondary Languages (comma-separated)': '', 'Status (Active/Inactive)': 'Active' },
-      { 'State': 'Andhra Pradesh', 'Primary Language': 'Telugu', 'Secondary Languages (comma-separated)': 'Hindi,English', 'Status (Active/Inactive)': 'Active' },
-      { 'State': 'Maharashtra', 'Primary Language': 'Marathi', 'Secondary Languages (comma-separated)': 'Hindi', 'Status (Active/Inactive)': 'Active' },
+      { 'State': 'State 1', 'Primary Language': 'Language 1', 'Secondary Languages (comma-separated)': '', 'Status (Active/Inactive)': 'Active' },
+      { 'State': 'State 2', 'Primary Language': 'Language 2', 'Secondary Languages (comma-separated)': 'Language 3,Language 4', 'Status (Active/Inactive)': 'Active' },
+      { 'State': 'State 3', 'Primary Language': 'Language 5', 'Secondary Languages (comma-separated)': 'Language 6', 'Status (Active/Inactive)': 'Active' },
     ];
 
     const wb = XLSX.utils.book_new();
