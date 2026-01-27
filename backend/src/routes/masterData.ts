@@ -91,25 +91,45 @@ router.post(
       // Check if crop already exists (case-insensitive)
       // Escape special regex characters in the name
       const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+      const existingActive = await MasterCrop.findOne({ 
+        name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+        isActive: true 
+      });
       
-      if (existing) {
-        if (existing.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Crop already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it
-          existing.isActive = isActive;
-          await existing.save();
-          logger.info(`Master crop reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Crop reactivated successfully',
-            data: { crop: existing },
-          });
-        }
+      if (existingActive) {
+        // Active duplicate - conflict
+        const error: AppError = new Error('Crop already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records
+      const existingInactive = await MasterCrop.findOne({ 
+        name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+        isActive: false 
+      }).sort({ updatedAt: -1 }); // Get most recently updated inactive record
+      
+      if (existingInactive) {
+        // Inactive record - reactivate it (most recent one if multiple exist)
+        existingInactive.isActive = isActive;
+        await existingInactive.save();
+        
+        // If there are other inactive duplicates, ensure they stay inactive
+        await MasterCrop.updateMany(
+          { 
+            name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+            isActive: false,
+            _id: { $ne: existingInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Master crop reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Crop reactivated successfully',
+          data: { crop: existingInactive },
+        });
       }
 
       const crop = new MasterCrop({
@@ -352,30 +372,39 @@ router.post(
 
       const { name, category, segment, subcategory, productCode, focusProducts = false, isActive = true } = req.body;
 
-      // Check if product already exists
-      const existing = await MasterProduct.findOne({ name });
-      if (existing) {
-        if (existing.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Product already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existing.category = category;
-          existing.segment = segment;
-          existing.subcategory = subcategory;
-          existing.productCode = productCode;
-          existing.focusProducts = focusProducts;
-          existing.isActive = isActive;
-          await existing.save();
-          logger.info(`Master product reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Product reactivated successfully',
-            data: { product: existing },
-          });
-        }
+      // Check if product already exists (active)
+      const existingActive = await MasterProduct.findOne({ name, isActive: true });
+      if (existingActive) {
+        // Active duplicate - conflict
+        const error: AppError = new Error('Product already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records
+      const existingInactive = await MasterProduct.findOne({ name, isActive: false }).sort({ updatedAt: -1 });
+      if (existingInactive) {
+        // Inactive record - reactivate it and update fields (most recent one if multiple exist)
+        existingInactive.category = category;
+        existingInactive.segment = segment;
+        existingInactive.subcategory = subcategory;
+        existingInactive.productCode = productCode;
+        existingInactive.focusProducts = focusProducts;
+        existingInactive.isActive = isActive;
+        await existingInactive.save();
+        
+        // If there are other inactive duplicates, ensure they stay inactive
+        await MasterProduct.updateMany(
+          { name, isActive: false, _id: { $ne: existingInactive._id } },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Master product reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Product reactivated successfully',
+          data: { product: existingInactive },
+        });
       }
 
       const product = new MasterProduct({
@@ -622,26 +651,45 @@ router.post(
 
       const { name, displayOrder = 0, isActive = true } = req.body;
 
-      // Check if reason already exists
-      const existing = await NonPurchaseReason.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-      if (existing) {
-        if (existing.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Non-purchase reason already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existing.displayOrder = displayOrder;
-          existing.isActive = isActive;
-          await existing.save();
-          logger.info(`Non-purchase reason reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Non-purchase reason reactivated successfully',
-            data: { reason: existing },
-          });
-        }
+      // Check if reason already exists (active)
+      const existingActive = await NonPurchaseReason.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: true 
+      });
+      if (existingActive) {
+        const error: AppError = new Error('Non-purchase reason already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records (most recent)
+      const existingInactive = await NonPurchaseReason.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: false 
+      }).sort({ updatedAt: -1 });
+      
+      if (existingInactive) {
+        // Inactive record - reactivate it and update fields
+        existingInactive.displayOrder = displayOrder;
+        existingInactive.isActive = isActive;
+        await existingInactive.save();
+        
+        // Ensure other inactive duplicates stay inactive
+        await NonPurchaseReason.updateMany(
+          { 
+            name: { $regex: new RegExp(`^${name}$`, 'i') },
+            isActive: false,
+            _id: { $ne: existingInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Non-purchase reason reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Non-purchase reason reactivated successfully',
+          data: { reason: existingInactive },
+        });
       }
 
       const reason = new NonPurchaseReason({
@@ -801,28 +849,47 @@ router.post(
 
       const { name, colorClass, icon, displayOrder = 0, isActive = true } = req.body;
 
-      // Check if sentiment already exists
-      const existing = await Sentiment.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-      if (existing) {
-        if (existing.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Sentiment already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existing.colorClass = colorClass || existing.colorClass || 'bg-slate-100 text-slate-800';
-          existing.icon = icon || existing.icon || 'circle';
-          existing.displayOrder = displayOrder;
-          existing.isActive = isActive;
-          await existing.save();
-          logger.info(`Sentiment reactivated: ${existing.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Sentiment reactivated successfully',
-            data: { sentiment: existing },
-          });
-        }
+      // Check if sentiment already exists (active)
+      const existingActive = await Sentiment.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: true 
+      });
+      if (existingActive) {
+        const error: AppError = new Error('Sentiment already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records (most recent)
+      const existingInactive = await Sentiment.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: false 
+      }).sort({ updatedAt: -1 });
+      
+      if (existingInactive) {
+        // Inactive record - reactivate it and update fields
+        existingInactive.colorClass = colorClass || existingInactive.colorClass || 'bg-slate-100 text-slate-800';
+        existingInactive.icon = icon || existingInactive.icon || 'circle';
+        existingInactive.displayOrder = displayOrder;
+        existingInactive.isActive = isActive;
+        await existingInactive.save();
+        
+        // Ensure other inactive duplicates stay inactive
+        await Sentiment.updateMany(
+          { 
+            name: { $regex: new RegExp(`^${name}$`, 'i') },
+            isActive: false,
+            _id: { $ne: existingInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Sentiment reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Sentiment reactivated successfully',
+          data: { sentiment: existingInactive },
+        });
       }
 
       const sentiment = new Sentiment({
@@ -982,27 +1049,46 @@ router.post(
 
       const { state, primaryLanguage, secondaryLanguages = [], isActive = true } = req.body;
 
-      // Check if state already exists
-      const existing = await StateLanguageMapping.findOne({ state: { $regex: new RegExp(`^${state}$`, 'i') } });
-      if (existing) {
-        if (existing.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('State mapping already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existing.primaryLanguage = primaryLanguage;
-          existing.secondaryLanguages = secondaryLanguages;
-          existing.isActive = isActive;
-          await existing.save();
-          logger.info(`State-language mapping reactivated: ${existing.state} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'State-language mapping reactivated successfully',
-            data: { mapping: existing },
-          });
-        }
+      // Check if state already exists (active)
+      const existingActive = await StateLanguageMapping.findOne({ 
+        state: { $regex: new RegExp(`^${state}$`, 'i') },
+        isActive: true 
+      });
+      if (existingActive) {
+        const error: AppError = new Error('State mapping already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records (most recent)
+      const existingInactive = await StateLanguageMapping.findOne({ 
+        state: { $regex: new RegExp(`^${state}$`, 'i') },
+        isActive: false 
+      }).sort({ updatedAt: -1 });
+      
+      if (existingInactive) {
+        // Inactive record - reactivate it and update fields
+        existingInactive.primaryLanguage = primaryLanguage;
+        existingInactive.secondaryLanguages = secondaryLanguages;
+        existingInactive.isActive = isActive;
+        await existingInactive.save();
+        
+        // Ensure other inactive duplicates stay inactive
+        await StateLanguageMapping.updateMany(
+          { 
+            state: { $regex: new RegExp(`^${state}$`, 'i') },
+            isActive: false,
+            _id: { $ne: existingInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`State-language mapping reactivated: ${existingInactive.state} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'State-language mapping reactivated successfully',
+          data: { mapping: existingInactive },
+        });
       }
 
       const mapping = new StateLanguageMapping({
@@ -1161,49 +1247,85 @@ router.post(
 
       const codeUpper = code.toUpperCase();
       
-      // Check if language already exists by name or code
-      const existingByName = await MasterLanguage.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-      if (existingByName) {
-        if (existingByName.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Language with this name already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existingByName.code = codeUpper;
-          existingByName.displayOrder = displayOrder;
-          existingByName.isActive = isActive;
-          await existingByName.save();
-          logger.info(`Master language reactivated: ${existingByName.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Language reactivated successfully',
-            data: { language: existingByName },
-          });
-        }
+      // Check if language already exists by name (active)
+      const existingByNameActive = await MasterLanguage.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: true 
+      });
+      if (existingByNameActive) {
+        const error: AppError = new Error('Language with this name already exists');
+        error.statusCode = 409;
+        throw error;
       }
 
-      const existingByCode = await MasterLanguage.findOne({ code: codeUpper });
-      if (existingByCode) {
-        if (existingByCode.isActive) {
-          // Active duplicate - conflict
-          const error: AppError = new Error('Language with this code already exists');
-          error.statusCode = 409;
-          throw error;
-        } else {
-          // Inactive record - reactivate it and update fields
-          existingByCode.name = name;
-          existingByCode.displayOrder = displayOrder;
-          existingByCode.isActive = isActive;
-          await existingByCode.save();
-          logger.info(`Master language reactivated: ${existingByCode.name} by ${(req as AuthRequest).user.email}`);
-          return res.status(200).json({
-            success: true,
-            message: 'Language reactivated successfully',
-            data: { language: existingByCode },
-          });
-        }
+      // Check if language already exists by code (active)
+      const existingByCodeActive = await MasterLanguage.findOne({ code: codeUpper, isActive: true });
+      if (existingByCodeActive) {
+        const error: AppError = new Error('Language with this code already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Check for inactive records by name (most recent)
+      const existingByNameInactive = await MasterLanguage.findOne({ 
+        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        isActive: false 
+      }).sort({ updatedAt: -1 });
+      
+      if (existingByNameInactive) {
+        // Inactive record by name - reactivate it and update fields
+        existingByNameInactive.code = codeUpper;
+        existingByNameInactive.displayOrder = displayOrder;
+        existingByNameInactive.isActive = isActive;
+        await existingByNameInactive.save();
+        
+        // Ensure other inactive duplicates stay inactive
+        await MasterLanguage.updateMany(
+          { 
+            name: { $regex: new RegExp(`^${name}$`, 'i') },
+            isActive: false,
+            _id: { $ne: existingByNameInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Master language reactivated: ${existingByNameInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Language reactivated successfully',
+          data: { language: existingByNameInactive },
+        });
+      }
+
+      // Check for inactive records by code (most recent)
+      const existingByCodeInactive = await MasterLanguage.findOne({ 
+        code: codeUpper,
+        isActive: false 
+      }).sort({ updatedAt: -1 });
+      
+      if (existingByCodeInactive) {
+        // Inactive record by code - reactivate it and update fields
+        existingByCodeInactive.name = name;
+        existingByCodeInactive.displayOrder = displayOrder;
+        existingByCodeInactive.isActive = isActive;
+        await existingByCodeInactive.save();
+        
+        // Ensure other inactive duplicates stay inactive
+        await MasterLanguage.updateMany(
+          { 
+            code: codeUpper,
+            isActive: false,
+            _id: { $ne: existingByCodeInactive._id }
+          },
+          { $set: { isActive: false } }
+        );
+        
+        logger.info(`Master language reactivated: ${existingByCodeInactive.name} by ${(req as AuthRequest).user.email}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Language reactivated successfully',
+          data: { language: existingByCodeInactive },
+        });
       }
 
       const language = new MasterLanguage({
