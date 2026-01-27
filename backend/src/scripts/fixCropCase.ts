@@ -37,20 +37,39 @@ async function fixCropCase() {
         // Convert to title case (first letter uppercase, rest lowercase)
         const titleCase = originalName.charAt(0).toUpperCase() + originalName.slice(1).toLowerCase();
         
+        // Escape special regex characters
+        const escapedTitleCase = titleCase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
         // Check if title case version already exists (case-insensitive)
         const existing = await MasterCrop.findOne({
-          name: { $regex: new RegExp(`^${titleCase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          name: { $regex: new RegExp(`^${escapedTitleCase}$`, 'i') },
           _id: { $ne: crop._id }
         });
 
         if (!existing) {
+          // No duplicate - just update the case
           crop.name = titleCase;
           await crop.save();
           updatedCount++;
           updates.push({ old: originalName, new: titleCase });
           console.log(`Updated: "${originalName}" → "${titleCase}"`);
         } else {
-          console.log(`Skipped: "${originalName}" (title case "${titleCase}" already exists)`);
+          // Duplicate exists - check if the existing one is proper case
+          if (existing.name === titleCase || existing.name !== existing.name.toUpperCase()) {
+            // Proper case version exists - deactivate the uppercase duplicate
+            crop.isActive = false;
+            await crop.save();
+            updatedCount++;
+            updates.push({ old: originalName, new: `[DEACTIVATED - duplicate of "${existing.name}"]` });
+            console.log(`Deactivated: "${originalName}" (proper case "${existing.name}" already exists)`);
+          } else {
+            // Both are uppercase - update this one to proper case
+            crop.name = titleCase;
+            await crop.save();
+            updatedCount++;
+            updates.push({ old: originalName, new: titleCase });
+            console.log(`Updated: "${originalName}" → "${titleCase}" (both were uppercase)`);
+          }
         }
       }
     }
