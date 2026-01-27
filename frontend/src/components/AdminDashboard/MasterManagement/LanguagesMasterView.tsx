@@ -408,7 +408,7 @@ const LanguagesMasterView: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Hindi, Telugu"
+                  placeholder="Enter language name"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                   required
                 />

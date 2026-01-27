@@ -411,7 +411,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
-                  placeholder="e.g., Price, Availability"
+                  placeholder="Enter reason name"
                   disabled={isSubmitting}
                 />
               </div>
