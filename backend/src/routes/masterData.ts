@@ -81,8 +81,8 @@ router.post(
 
       const { name, isActive = true } = req.body;
 
-      // Check if crop already exists
-      const existing = await MasterCrop.findOne({ name: name.toUpperCase() });
+      // Check if crop already exists (case-insensitive)
+      const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
       if (existing) {
         const error: AppError = new Error('Crop already exists');
         error.statusCode = 409;
@@ -90,7 +90,7 @@ router.post(
       }
 
       const crop = new MasterCrop({
-        name: name.toUpperCase(),
+        name: name.trim(),
         isActive,
       });
 
@@ -139,15 +139,15 @@ router.put(
         throw error;
       }
 
-      if (name && name.toUpperCase() !== crop.name) {
-        // Check if new name already exists
-        const existing = await MasterCrop.findOne({ name: name.toUpperCase() });
+      if (name && name.trim().toLowerCase() !== crop.name.toLowerCase()) {
+        // Check if new name already exists (case-insensitive)
+        const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
         if (existing) {
           const error: AppError = new Error('Crop name already exists');
           error.statusCode = 409;
           throw error;
         }
-        crop.name = name.toUpperCase();
+        crop.name = name.trim();
       }
 
       if (isActive !== undefined) {
