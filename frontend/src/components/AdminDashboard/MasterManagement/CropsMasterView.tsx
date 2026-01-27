@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Loader2, Download, Upload, Search, CheckCircle, XCircle, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface Crop {
   _id: string;
@@ -181,36 +182,34 @@ const CropsMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['Cotton', 'Active'],
-      ['Paddy', 'Active'],
+      {
+        'Name': 'Cotton',
+        'Status (Active/Inactive)': 'Active',
+      },
+      {
+        'Name': 'Paddy',
+        'Status (Active/Inactive)': 'Active',
+      },
     ];
-    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'crops_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Crops');
+    XLSX.writeFile(wb, 'crops_template.xlsx');
   };
 
   const handleDownloadData = () => {
-    const headers = ['Name', 'Status', 'Created At'];
-    const csvData = crops.map(crop => [
-      crop.name,
-      crop.isActive ? 'Active' : 'Inactive',
-      new Date(crop.createdAt).toLocaleDateString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'crops_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const excelData = crops.map(crop => ({
+      'Name': crop.name,
+      'Status': crop.isActive ? 'Active' : 'Inactive',
+      'Created At': new Date(crop.createdAt).toLocaleDateString(),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Crops');
+    XLSX.writeFile(wb, `crops_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const filteredCrops = crops.filter(crop => {

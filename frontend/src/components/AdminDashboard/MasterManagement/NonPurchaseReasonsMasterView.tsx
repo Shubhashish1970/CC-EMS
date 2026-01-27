@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, GripVertical, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface NonPurchaseReason {
   _id: string;
@@ -183,37 +184,29 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Display Order', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['Price', '1', 'Active'],
-      ['Availability', '2', 'Active'],
+      { 'Name': 'Price', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Availability', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
     ];
-    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'non_purchase_reasons_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Non-Purchase Reasons');
+    XLSX.writeFile(wb, 'non_purchase_reasons_template.xlsx');
   };
 
   const handleDownloadData = () => {
-    const headers = ['Name', 'Display Order', 'Status', 'Created At'];
-    const csvData = reasons.map(reason => [
-      `"${reason.name}"`,
-      reason.displayOrder,
-      reason.isActive ? 'Active' : 'Inactive',
-      new Date(reason.createdAt).toLocaleDateString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'non_purchase_reasons_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const excelData = reasons.map(reason => ({
+      'Name': reason.name,
+      'Display Order': reason.displayOrder,
+      'Status': reason.isActive ? 'Active' : 'Inactive',
+      'Created At': new Date(reason.createdAt).toLocaleDateString(),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Non-Purchase Reasons');
+    XLSX.writeFile(wb, `non_purchase_reasons_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const filteredReasons = reasons.filter(reason => {

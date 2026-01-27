@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Globe, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface Language {
   _id: string;
@@ -184,29 +185,30 @@ const LanguagesMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const template = 'Name,Code,Display Order,Active\nHindi,HI,1,Active\nTelugu,TE,2,Active\nMarathi,MR,3,Active';
-    const blob = new Blob([template], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'languages_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const sampleData = [
+      { 'Name': 'Hindi', 'Code': 'HI', 'Display Order': 1, 'Active': 'Active' },
+      { 'Name': 'Telugu', 'Code': 'TE', 'Display Order': 2, 'Active': 'Active' },
+      { 'Name': 'Marathi', 'Code': 'MR', 'Display Order': 3, 'Active': 'Active' },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Languages');
+    XLSX.writeFile(wb, 'languages_template.xlsx');
   };
 
   const handleExport = () => {
-    const csvContent = [
-      ['Name', 'Code', 'Display Order', 'Active'].join(','),
-      ...languages.map(l => [l.name, l.code, l.displayOrder, l.isActive ? 'Active' : 'Inactive'].join(',')),
-    ].join('\n');
+    const excelData = languages.map(l => ({
+      'Name': l.name,
+      'Code': l.code,
+      'Display Order': l.displayOrder,
+      'Active': l.isActive ? 'Active' : 'Inactive',
+    }));
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `languages_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Languages');
+    XLSX.writeFile(wb, `languages_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const filteredLanguages = languages.filter((language) => {

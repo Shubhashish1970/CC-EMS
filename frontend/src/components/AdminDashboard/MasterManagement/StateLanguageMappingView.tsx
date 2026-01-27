@@ -3,6 +3,7 @@ import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, G
 import { useToast } from '../../../context/ToastContext';
 import StyledSelect from '../../shared/StyledSelect';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface StateLanguageMapping {
   _id: string;
@@ -249,39 +250,31 @@ const StateLanguageMappingView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['State', 'Primary Language', 'Secondary Languages (comma-separated)', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['Uttar Pradesh', 'Hindi', '', 'Active'],
-      ['Andhra Pradesh', 'Telugu', 'Hindi,English', 'Active'],
-      ['Maharashtra', 'Marathi', 'Hindi', 'Active'],
+      { 'State': 'Uttar Pradesh', 'Primary Language': 'Hindi', 'Secondary Languages (comma-separated)': '', 'Status (Active/Inactive)': 'Active' },
+      { 'State': 'Andhra Pradesh', 'Primary Language': 'Telugu', 'Secondary Languages (comma-separated)': 'Hindi,English', 'Status (Active/Inactive)': 'Active' },
+      { 'State': 'Maharashtra', 'Primary Language': 'Marathi', 'Secondary Languages (comma-separated)': 'Hindi', 'Status (Active/Inactive)': 'Active' },
     ];
-    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'state_language_mapping_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'State-Language Mapping');
+    XLSX.writeFile(wb, 'state_language_mapping_template.xlsx');
   };
 
   const handleDownloadData = () => {
-    const headers = ['State', 'Primary Language', 'Secondary Languages', 'Status', 'Created At'];
-    const csvData = mappings.map(m => [
-      `"${m.state}"`,
-      m.primaryLanguage,
-      `"${(m.secondaryLanguages || []).join(', ')}"`,
-      m.isActive ? 'Active' : 'Inactive',
-      new Date(m.createdAt).toLocaleDateString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'state_language_mapping_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const excelData = mappings.map(m => ({
+      'State': m.state,
+      'Primary Language': m.primaryLanguage,
+      'Secondary Languages': (m.secondaryLanguages || []).join(', '),
+      'Status': m.isActive ? 'Active' : 'Inactive',
+      'Created At': new Date(m.createdAt).toLocaleDateString(),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'State-Language Mapping');
+    XLSX.writeFile(wb, `state_language_mapping_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const filteredMappings = mappings.filter(m => {

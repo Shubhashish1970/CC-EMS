@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface Product {
   _id: string;
@@ -218,61 +219,49 @@ const ProductsMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Category', 'Segment', 'Subcategory', 'Product Code', 'Focus Products (Yes/No)', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['NACL Soil Conditioner', 'Agri Inputs', 'Crop Protection', 'Soil Conditioners', 'SC-001', 'Yes', 'Active'],
-      ['Bio-Stimulant Pro', 'Agri Inputs', 'Plant Nutrition', 'Bio-Stimulants', 'BS-002', 'No', 'Active'],
+      {
+        'Name': 'NACL Soil Conditioner',
+        'Category': 'Agri Inputs',
+        'Segment': 'Crop Protection',
+        'Subcategory': 'Soil Conditioners',
+        'Product Code': 'SC-001',
+        'Focus Products (Yes/No)': 'Yes',
+        'Status (Active/Inactive)': 'Active',
+      },
+      {
+        'Name': 'Bio-Stimulant Pro',
+        'Category': 'Agri Inputs',
+        'Segment': 'Plant Nutrition',
+        'Subcategory': 'Bio-Stimulants',
+        'Product Code': 'BS-002',
+        'Focus Products (Yes/No)': 'No',
+        'Status (Active/Inactive)': 'Active',
+      },
     ];
-    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'products_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, 'products_template.xlsx');
   };
 
   const handleDownloadData = () => {
-    const headers = ['Name', 'Category', 'Segment', 'Subcategory', 'Product Code', 'Focus Products', 'Status', 'Created At'];
-    const csvData = products.map(product => [
-      `"${product.name || ''}"`,
-      `"${product.category || ''}"`,
-      `"${product.segment || ''}"`,
-      `"${product.subcategory || ''}"`,
-      `"${product.productCode || ''}"`,
-      product.focusProducts ? 'Yes' : 'No',
-      product.isActive ? 'Active' : 'Inactive',
-      new Date(product.createdAt).toLocaleDateString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'products_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+    const excelData = products.map(product => ({
+      'Name': product.name || '',
+      'Category': product.category || '',
+      'Segment': product.segment || '',
+      'Subcategory': product.subcategory || '',
+      'Product Code': product.productCode || '',
+      'Focus Products': product.focusProducts ? 'Yes' : 'No',
+      'Status': product.isActive ? 'Active' : 'Inactive',
+      'Created At': new Date(product.createdAt).toLocaleDateString(),
+    }));
 
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    result.push(current.trim());
-    return result.map(v => v.replace(/^"|"$/g, ''));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, `products_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,24 +271,35 @@ const ProductsMasterView: React.FC = () => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        if (lines.length < 2) {
-          showError('CSV file must have at least a header row and one data row');
+        const data = e.target?.result;
+        if (!data) {
+          showError('Failed to read file');
           return;
         }
 
-        const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-        const nameIdx = headers.findIndex(h => h.includes('name') && !h.includes('code'));
-        const categoryIdx = headers.findIndex(h => h.includes('category'));
-        const segmentIdx = headers.findIndex(h => h.includes('segment'));
-        const subcategoryIdx = headers.findIndex(h => h.includes('subcategory'));
-        const productCodeIdx = headers.findIndex(h => (h.includes('product code') || h.includes('productcode')) && !h.includes('focus'));
-        const focusProductsIdx = headers.findIndex(h => h.includes('focus'));
-        const statusIdx = headers.findIndex(h => h.includes('status'));
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(worksheet, { defval: '' });
 
-        if (nameIdx === -1) {
-          showError('CSV must have a "Name" column');
+        if (rows.length === 0) {
+          showError('Excel file must have at least one data row');
+          return;
+        }
+
+        // Get headers from first row
+        const firstRow = rows[0];
+        const headers = Object.keys(firstRow).map(h => h.trim().toLowerCase());
+        const nameKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('name') && !k.toLowerCase().includes('code')) || '';
+        const categoryKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('category')) || '';
+        const segmentKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('segment')) || '';
+        const subcategoryKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('subcategory')) || '';
+        const productCodeKey = Object.keys(firstRow).find(k => (k.toLowerCase().includes('product code') || k.toLowerCase().includes('productcode')) && !k.toLowerCase().includes('focus')) || '';
+        const focusProductsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('focus')) || '';
+        const statusKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('status')) || '';
+
+        if (!nameKey) {
+          showError('Excel must have a "Name" column');
           return;
         }
 
@@ -307,19 +307,18 @@ const ProductsMasterView: React.FC = () => {
         let errorCount = 0;
         const errors: string[] = [];
 
-        for (let i = 1; i < lines.length; i++) {
-          const values = parseCSVLine(lines[i]);
-          const name = values[nameIdx];
+        for (const row of rows) {
+          const name = String(row[nameKey] || '').trim();
           if (!name) continue;
 
-          const category = categoryIdx >= 0 ? (values[categoryIdx] || '') : '';
-          const segment = segmentIdx >= 0 ? (values[segmentIdx] || '') : '';
-          const subcategory = subcategoryIdx >= 0 ? (values[subcategoryIdx] || '') : '';
-          const productCode = productCodeIdx >= 0 ? (values[productCodeIdx] || '') : '';
-          const focusProducts = focusProductsIdx >= 0 ? 
-            (values[focusProductsIdx]?.toLowerCase() === 'yes' || values[focusProductsIdx]?.toLowerCase() === 'true') : false;
-          const isActive = statusIdx >= 0 ? 
-            (values[statusIdx]?.toLowerCase() === 'active') : true;
+          const category = categoryKey ? String(row[categoryKey] || '').trim() : '';
+          const segment = segmentKey ? String(row[segmentKey] || '').trim() : '';
+          const subcategory = subcategoryKey ? String(row[subcategoryKey] || '').trim() : '';
+          const productCode = productCodeKey ? String(row[productCodeKey] || '').trim() : '';
+          const focusProductsValue = focusProductsKey ? String(row[focusProductsKey] || '').trim().toLowerCase() : '';
+          const focusProducts = focusProductsValue === 'yes' || focusProductsValue === 'true';
+          const statusValue = statusKey ? String(row[statusKey] || '').trim().toLowerCase() : '';
+          const isActive = statusValue === 'active' || statusValue === '';
 
           try {
             const response = await fetch(`${API_BASE}/master-data/products`, {
@@ -359,10 +358,10 @@ const ProductsMasterView: React.FC = () => {
           showError(`Failed to import products. ${errorCount} error(s)`);
         }
       } catch (error) {
-        showError('Failed to parse CSV file');
+        showError('Failed to parse Excel file');
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     event.target.value = '';
   };
 
@@ -403,7 +402,7 @@ const ProductsMasterView: React.FC = () => {
             Import
             <input
               type="file"
-              accept=".csv"
+              accept=".xlsx,.xls"
               onChange={handleFileUpload}
               className="hidden"
             />

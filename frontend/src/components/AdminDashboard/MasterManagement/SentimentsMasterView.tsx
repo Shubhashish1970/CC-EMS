@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, Smile, Frown, Meh, HelpCircle, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import * as XLSX from 'xlsx';
 
 interface Sentiment {
   _id: string;
@@ -228,40 +229,32 @@ const SentimentsMasterView: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'Color (Green/Red/Yellow/Blue/Gray)', 'Icon (smile/frown/meh/help)', 'Display Order', 'Status (Active/Inactive)'];
     const sampleData = [
-      ['Positive', 'Green', 'smile', '1', 'Active'],
-      ['Negative', 'Red', 'frown', '2', 'Active'],
-      ['Neutral', 'Gray', 'meh', '3', 'Active'],
+      { 'Name': 'Positive', 'Color (Green/Red/Yellow/Blue/Gray)': 'Green', 'Icon (smile/frown/meh/help)': 'smile', 'Display Order': 1, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Negative', 'Color (Green/Red/Yellow/Blue/Gray)': 'Red', 'Icon (smile/frown/meh/help)': 'frown', 'Display Order': 2, 'Status (Active/Inactive)': 'Active' },
+      { 'Name': 'Neutral', 'Color (Green/Red/Yellow/Blue/Gray)': 'Gray', 'Icon (smile/frown/meh/help)': 'meh', 'Display Order': 3, 'Status (Active/Inactive)': 'Active' },
     ];
-    const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sentiments_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Sentiments');
+    XLSX.writeFile(wb, 'sentiments_template.xlsx');
   };
 
   const handleDownloadData = () => {
-    const headers = ['Name', 'Color Class', 'Icon', 'Display Order', 'Status', 'Created At'];
-    const csvData = sentiments.map(s => [
-      `"${s.name}"`,
-      `"${s.colorClass}"`,
-      s.icon,
-      s.displayOrder,
-      s.isActive ? 'Active' : 'Inactive',
-      new Date(s.createdAt).toLocaleDateString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sentiments_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const excelData = sentiments.map(s => ({
+      'Name': s.name,
+      'Color Class': s.colorClass,
+      'Icon': s.icon,
+      'Display Order': s.displayOrder,
+      'Status': s.isActive ? 'Active' : 'Inactive',
+      'Created At': new Date(s.createdAt).toLocaleDateString(),
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Sentiments');
+    XLSX.writeFile(wb, `sentiments_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const filteredSentiments = sentiments.filter(s => {
