@@ -88,7 +88,7 @@ router.post(
         throw error;
       }
 
-      // Check if crop already exists (case-insensitive)
+      // Check if crop already exists (case-insensitive) and is active
       // Escape special regex characters in the name
       const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const existingActive = await MasterCrop.findOne({ 
@@ -97,41 +97,14 @@ router.post(
       });
       
       if (existingActive) {
-        // Active duplicate - conflict
+        // Active duplicate - conflict (skip during import)
         const error: AppError = new Error('Crop already exists');
         error.statusCode = 409;
         throw error;
       }
 
-      // Check for inactive records
-      const existingInactive = await MasterCrop.findOne({ 
-        name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-        isActive: false 
-      }).sort({ updatedAt: -1 }); // Get most recently updated inactive record
-      
-      if (existingInactive) {
-        // Inactive record - reactivate it and update name with correct case from import
-        existingInactive.name = trimmedName; // Update with correct case from Excel
-        existingInactive.isActive = isActive;
-        await existingInactive.save();
-        
-        // If there are other inactive duplicates, ensure they stay inactive
-        await MasterCrop.updateMany(
-          { 
-            name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-            isActive: false,
-            _id: { $ne: existingInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Master crop reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Crop reactivated successfully',
-          data: { crop: existingInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const crop = new MasterCrop({
         name: trimmedName,
@@ -376,38 +349,14 @@ router.post(
       // Check if product already exists (active)
       const existingActive = await MasterProduct.findOne({ name, isActive: true });
       if (existingActive) {
-        // Active duplicate - conflict
+        // Active duplicate - conflict (skip during import)
         const error: AppError = new Error('Product already exists');
         error.statusCode = 409;
         throw error;
       }
 
-      // Check for inactive records
-      const existingInactive = await MasterProduct.findOne({ name, isActive: false }).sort({ updatedAt: -1 });
-      if (existingInactive) {
-        // Inactive record - reactivate it and update fields (most recent one if multiple exist)
-        existingInactive.name = name.trim(); // Update with correct case from Excel
-        existingInactive.category = category;
-        existingInactive.segment = segment;
-        existingInactive.subcategory = subcategory;
-        existingInactive.productCode = productCode;
-        existingInactive.focusProducts = focusProducts;
-        existingInactive.isActive = isActive;
-        await existingInactive.save();
-        
-        // If there are other inactive duplicates, ensure they stay inactive
-        await MasterProduct.updateMany(
-          { name, isActive: false, _id: { $ne: existingInactive._id } },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Master product reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Product reactivated successfully',
-          data: { product: existingInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const product = new MasterProduct({
         name,
@@ -664,36 +613,8 @@ router.post(
         throw error;
       }
 
-      // Check for inactive records (most recent)
-      const existingInactive = await NonPurchaseReason.findOne({ 
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
-        isActive: false 
-      }).sort({ updatedAt: -1 });
-      
-      if (existingInactive) {
-        // Inactive record - reactivate it and update fields with correct case
-        existingInactive.name = name.trim(); // Update with correct case from Excel
-        existingInactive.displayOrder = displayOrder;
-        existingInactive.isActive = isActive;
-        await existingInactive.save();
-        
-        // Ensure other inactive duplicates stay inactive
-        await NonPurchaseReason.updateMany(
-          { 
-            name: { $regex: new RegExp(`^${name}$`, 'i') },
-            isActive: false,
-            _id: { $ne: existingInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Non-purchase reason reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Non-purchase reason reactivated successfully',
-          data: { reason: existingInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const reason = new NonPurchaseReason({
         name,
@@ -863,38 +784,8 @@ router.post(
         throw error;
       }
 
-      // Check for inactive records (most recent)
-      const existingInactive = await Sentiment.findOne({ 
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
-        isActive: false 
-      }).sort({ updatedAt: -1 });
-      
-      if (existingInactive) {
-        // Inactive record - reactivate it and update fields with correct case
-        existingInactive.name = name.trim(); // Update with correct case from Excel
-        existingInactive.colorClass = colorClass || existingInactive.colorClass || 'bg-slate-100 text-slate-800';
-        existingInactive.icon = icon || existingInactive.icon || 'circle';
-        existingInactive.displayOrder = displayOrder;
-        existingInactive.isActive = isActive;
-        await existingInactive.save();
-        
-        // Ensure other inactive duplicates stay inactive
-        await Sentiment.updateMany(
-          { 
-            name: { $regex: new RegExp(`^${name}$`, 'i') },
-            isActive: false,
-            _id: { $ne: existingInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Sentiment reactivated: ${existingInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Sentiment reactivated successfully',
-          data: { sentiment: existingInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const sentiment = new Sentiment({
         name,
@@ -1064,37 +955,8 @@ router.post(
         throw error;
       }
 
-      // Check for inactive records (most recent)
-      const existingInactive = await StateLanguageMapping.findOne({ 
-        state: { $regex: new RegExp(`^${state}$`, 'i') },
-        isActive: false 
-      }).sort({ updatedAt: -1 });
-      
-      if (existingInactive) {
-        // Inactive record - reactivate it and update fields with correct case
-        existingInactive.state = state.trim(); // Update with correct case from Excel
-        existingInactive.primaryLanguage = primaryLanguage;
-        existingInactive.secondaryLanguages = secondaryLanguages;
-        existingInactive.isActive = isActive;
-        await existingInactive.save();
-        
-        // Ensure other inactive duplicates stay inactive
-        await StateLanguageMapping.updateMany(
-          { 
-            state: { $regex: new RegExp(`^${state}$`, 'i') },
-            isActive: false,
-            _id: { $ne: existingInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`State-language mapping reactivated: ${existingInactive.state} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'State-language mapping reactivated successfully',
-          data: { mapping: existingInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const mapping = new StateLanguageMapping({
         state,
@@ -1271,68 +1133,8 @@ router.post(
         throw error;
       }
 
-      // Check for inactive records by name (most recent)
-      const existingByNameInactive = await MasterLanguage.findOne({ 
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
-        isActive: false 
-      }).sort({ updatedAt: -1 });
-      
-      if (existingByNameInactive) {
-        // Inactive record by name - reactivate it and update fields with correct case
-        existingByNameInactive.name = name.trim(); // Update with correct case from Excel
-        existingByNameInactive.code = codeUpper;
-        existingByNameInactive.displayOrder = displayOrder;
-        existingByNameInactive.isActive = isActive;
-        await existingByNameInactive.save();
-        
-        // Ensure other inactive duplicates stay inactive
-        await MasterLanguage.updateMany(
-          { 
-            name: { $regex: new RegExp(`^${name}$`, 'i') },
-            isActive: false,
-            _id: { $ne: existingByNameInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Master language reactivated: ${existingByNameInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Language reactivated successfully',
-          data: { language: existingByNameInactive },
-        });
-      }
-
-      // Check for inactive records by code (most recent)
-      const existingByCodeInactive = await MasterLanguage.findOne({ 
-        code: codeUpper,
-        isActive: false 
-      }).sort({ updatedAt: -1 });
-      
-      if (existingByCodeInactive) {
-        // Inactive record by code - reactivate it and update fields with correct case
-        existingByCodeInactive.name = name.trim(); // Update with correct case from Excel
-        existingByCodeInactive.displayOrder = displayOrder;
-        existingByCodeInactive.isActive = isActive;
-        await existingByCodeInactive.save();
-        
-        // Ensure other inactive duplicates stay inactive
-        await MasterLanguage.updateMany(
-          { 
-            code: codeUpper,
-            isActive: false,
-            _id: { $ne: existingByCodeInactive._id }
-          },
-          { $set: { isActive: false } }
-        );
-        
-        logger.info(`Master language reactivated: ${existingByCodeInactive.name} by ${(req as AuthRequest).user.email}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Language reactivated successfully',
-          data: { language: existingByCodeInactive },
-        });
-      }
+      // Don't reactivate inactive records - create new record from import file
+      // This ensures imports create exactly what's in the file
 
       const language = new MasterLanguage({
         name,
