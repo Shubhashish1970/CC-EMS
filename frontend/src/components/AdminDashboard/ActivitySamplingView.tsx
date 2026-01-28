@@ -1277,6 +1277,80 @@ const ActivitySamplingView: React.FC = () => {
                           <tr className="bg-white">
                             <td colSpan={13} className="px-3 pb-3 pt-2">
                               <div className="space-y-2">
+                        {/* Activity Summary Information */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                          {/* Date (When) */}
+                          <div className="flex items-start gap-2">
+                            <Calendar size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">When</p>
+                              <p className="text-xs font-bold text-slate-900">
+                                {item.activity.date ? new Date(item.activity.date).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric'
+                                }) : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Location */}
+                          <div className="flex items-start gap-2">
+                            <MapPin size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">Location</p>
+                              <p className="text-xs font-bold text-slate-900 truncate" title={item.activity.location || item.activity.territory || 'N/A'}>
+                                {item.activity.location || item.activity.territory || 'N/A'}
+                              </p>
+                              {(item.activity.territoryName || item.activity.zoneName || item.activity.buName) && (
+                                <p className="text-[10px] text-slate-600 mt-0.5">
+                                  {[item.activity.territoryName, item.activity.zoneName, item.activity.buName].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Number of Farmers */}
+                          <div className="flex items-start gap-2">
+                            <UsersIcon size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">Number of Farmers</p>
+                              <p className="text-xs font-bold text-slate-900">
+                                {item.activity.farmerIds?.length || item.samplingAudit?.totalFarmers || 0}
+                              </p>
+                              {item.samplingAudit && (
+                                <p className="text-[10px] text-slate-600 mt-0.5">
+                                  {item.samplingAudit.sampledCount} sampled
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Products */}
+                          <div className="flex items-start gap-2">
+                            <ActivityIcon size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">Products</p>
+                              {item.activity.products && item.activity.products.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {item.activity.products.slice(0, 2).map((product, idx) => (
+                                    <span key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium border border-blue-200 truncate max-w-full">
+                                      {product}
+                                    </span>
+                                  ))}
+                                  {item.activity.products.length > 2 && (
+                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-medium">
+                                      +{item.activity.products.length - 2} more
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400">No products</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Assigned Agents */}
                         {item.assignedAgents.length > 0 && (
                           <div>
@@ -1321,21 +1395,35 @@ const ActivitySamplingView: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Crops and Products */}
+                        {/* Crops and Products - Full List */}
                         {(item.activity.crops?.length > 0 || item.activity.products?.length > 0) && (
                           <div>
                             <h4 className="text-xs font-black text-slate-700 mb-1">Activity Details</h4>
-                            <div className="flex flex-wrap gap-1.5">
-                              {item.activity.crops?.map((crop, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
-                                  {crop}
-                                </span>
-                              ))}
-                              {item.activity.products?.map((product, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
-                                  {product}
-                                </span>
-                              ))}
+                            <div className="space-y-1.5">
+                              {item.activity.crops && item.activity.crops.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-slate-500 mb-1">Crops:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {item.activity.crops.map((crop, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
+                                        {crop}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {item.activity.products && item.activity.products.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-slate-500 mb-1">Products:</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {item.activity.products.map((product, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
+                                        {product}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
