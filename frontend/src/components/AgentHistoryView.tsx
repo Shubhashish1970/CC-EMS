@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, ChevronUp } from 'lucide-react';
+import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, ChevronUp, User as UserIcon, Activity as ActivityIcon, Phone, MessageSquare, Package } from 'lucide-react';
 import Button from './shared/Button';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -816,7 +816,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                   <div className="grid grid-cols-4 gap-4">
                                     {/* Farmer Info */}
                                     <div>
-                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Farmer</h4>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                        <UserIcon size={12} className="text-slate-400" />
+                                        Farmer
+                                      </h4>
                                       <p className="text-xs font-semibold text-slate-900">{detail.farmerId?.name || 'Unknown'}</p>
                                       <p className="text-[10px] text-slate-600">{detail.farmerId?.mobileNumber || ''}</p>
                                       <p className="text-[10px] text-slate-500 mt-0.5">{detail.farmerId?.location || ''}</p>
@@ -825,7 +828,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
                                     {/* Activity Info */}
                                     <div>
-                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Activity</h4>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                        <ActivityIcon size={12} className="text-slate-400" />
+                                        Activity
+                                      </h4>
                                       <p className="text-xs font-semibold text-slate-900">{detail.activityId?.type || '-'}</p>
                                       <p className="text-[10px] text-slate-600">Officer: <span className="font-semibold">{detail.activityId?.officerName || '-'}</span></p>
                                       <p className="text-[10px] text-slate-600">Territory: <span className="font-semibold">{detail.activityId?.territoryName || detail.activityId?.territory || '-'}</span></p>
@@ -834,7 +840,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
                                     {/* Call Info */}
                                     <div>
-                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Call Info</h4>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                        <Phone size={12} className="text-slate-400" />
+                                        Call Info
+                                      </h4>
                                       <p className="text-[10px] text-slate-600">Status: <span className="text-xs font-semibold text-slate-900">{detail.callLog?.callStatus || '-'}</span></p>
                                       <p className="text-[10px] text-slate-600">Started: <span className="font-semibold">{formatDateTime(detail.callStartedAt) || '-'}</span></p>
                                       <p className="text-[10px] text-slate-600">Duration: <span className="font-semibold">{Number(detail.callLog?.callDurationSeconds || 0)}s</span></p>
@@ -842,7 +851,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
                                     {/* Feedback */}
                                     <div>
-                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Feedback</h4>
+                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                        <MessageSquare size={12} className="text-slate-400" />
+                                        Feedback
+                                      </h4>
                                       <p className="text-[10px] text-slate-600">Sentiment: <span className="font-semibold">{detail.callLog?.sentiment || 'N/A'}</span></p>
                                       <p className="text-[10px] text-slate-600 line-clamp-2">Comments: <span className="font-medium">{detail.callLog?.farmerComments || '-'}</span></p>
                                     </div>
@@ -852,7 +864,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                   {((detail.callLog?.cropsDiscussed && detail.callLog.cropsDiscussed.length > 0) || 
                                     (detail.callLog?.productsDiscussed && detail.callLog.productsDiscussed.length > 0)) && (
                                     <div className="mt-2 pt-2 border-t border-slate-200 flex items-center gap-2 flex-wrap">
-                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Details:</span>
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                        <Package size={12} className="text-slate-400" />
+                                        Details:
+                                      </span>
                                       {detail.callLog?.cropsDiscussed?.map((crop, idx) => (
                                         <span key={idx} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-medium">
                                           {crop}
