@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
-import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
+import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, ArrowUpToLine, UserCheck, Package, BarChart } from 'lucide-react';
 import Button from '../shared/Button';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
@@ -1354,7 +1354,10 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Assigned Agents */}
                         {item.assignedAgents.length > 0 && (
                           <div>
-                            <h4 className="text-xs font-black text-slate-700 mb-1">Assigned Agents</h4>
+                            <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-slate-500" />
+                              Assigned Agents
+                            </h4>
                             <div className="space-y-1.5">
                               {item.assignedAgents.map((agent) => (
                                 <div
@@ -1377,7 +1380,10 @@ const ActivitySamplingView: React.FC = () => {
                         {/* Sampling Audit Details */}
                         {item.samplingAudit && (
                           <div>
-                            <h4 className="text-xs font-black text-slate-700 mb-1">Sampling Details</h4>
+                            <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
+                              <BarChart size={14} className="text-slate-500" />
+                              Sampling Details
+                            </h4>
                             <div className="flex items-center gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] text-slate-500">Sampling %:</span>
@@ -1396,42 +1402,54 @@ const ActivitySamplingView: React.FC = () => {
                         )}
 
                         {/* Crops and Products - Full List */}
-                        {(item.activity.crops?.length > 0 || item.activity.products?.length > 0) && (
-                          <div>
-                            <h4 className="text-xs font-black text-slate-700 mb-1">Activity Details</h4>
-                            <div className="space-y-1.5">
-                              {item.activity.crops && item.activity.crops.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-1">Crops:</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {item.activity.crops.map((crop, idx) => (
-                                      <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
-                                        {crop}
-                                      </span>
-                                    ))}
-                                  </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
+                            <Package size={14} className="text-slate-500" />
+                            Activity Details
+                          </h4>
+                          <div className="space-y-1.5">
+                            {item.activity.crops && item.activity.crops.length > 0 ? (
+                              <div>
+                                <p className="text-[10px] text-slate-500 mb-1">Crops:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.activity.crops.map((crop, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium border border-green-200">
+                                      {crop}
+                                    </span>
+                                  ))}
                                 </div>
-                              )}
-                              {item.activity.products && item.activity.products.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] text-slate-500 mb-1">Products:</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {item.activity.products.map((product, idx) => (
-                                      <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
-                                        {product}
-                                      </span>
-                                    ))}
-                                  </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-[10px] text-slate-500 mb-1">Crops:</p>
+                                <p className="text-xs text-slate-400">No crops</p>
+                              </div>
+                            )}
+                            {item.activity.products && item.activity.products.length > 0 ? (
+                              <div>
+                                <p className="text-[10px] text-slate-500 mb-1">Products:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.activity.products.map((product, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium border border-blue-200">
+                                      {product}
+                                    </span>
+                                  ))}
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-[10px] text-slate-500 mb-1">Products:</p>
+                                <p className="text-xs text-slate-400">No products</p>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
 
                         {/* Farmers List */}
                         {item.farmers && item.farmers.length > 0 ? (
                           <div>
-                            <h4 className="text-xs font-black text-slate-700 mb-1.5">
+                            <h4 className="text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1.5">
+                              <UsersIcon size={14} className="text-slate-500" />
                               Farmers List ({item.farmers.length} of {item.activity.farmerIds?.length || 0})
                               <span className="ml-2 text-[10px] font-normal text-slate-500">
                                 ({item.farmers.filter(f => f.isSampled).length} sampled, {item.farmers.filter(f => !f.isSampled).length} not sampled)
