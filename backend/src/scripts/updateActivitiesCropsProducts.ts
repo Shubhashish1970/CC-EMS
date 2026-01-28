@@ -184,11 +184,9 @@ async function updateActivitiesCropsProducts() {
                 needsUpdate = true;
               }
             } else {
+              // Remove unmatched products - only keep products from master data
+              needsUpdate = true;
               unmatchedProducts.push(product.trim());
-              // Keep original if no match found (preserve data)
-              if (!newProducts.includes(product.trim())) {
-                newProducts.push(product.trim());
-              }
             }
           }
         });
@@ -203,8 +201,9 @@ async function updateActivitiesCropsProducts() {
             needsUpdate = true;
           }
         } else {
+          // Remove unmatched products - only keep products from master data
+          needsUpdate = true;
           unmatchedProducts.push(activity.products.trim());
-          newProducts.push(activity.products.trim());
         }
       }
 
@@ -224,10 +223,10 @@ async function updateActivitiesCropsProducts() {
         if (unmatchedCrops.length > 0 || unmatchedProducts.length > 0) {
           console.log(`   Activity ${activity._id}:`);
           if (unmatchedCrops.length > 0) {
-            console.log(`     ⚠️  Unmatched crops (kept as-is): ${unmatchedCrops.join(', ')}`);
+            console.log(`     ⚠️  Unmatched crops (removed): ${unmatchedCrops.join(', ')}`);
           }
           if (unmatchedProducts.length > 0) {
-            console.log(`     ⚠️  Unmatched products (kept as-is): ${unmatchedProducts.join(', ')}`);
+            console.log(`     ⚠️  Unmatched products (removed): ${unmatchedProducts.join(', ')}`);
           }
         }
       } else {
@@ -298,9 +297,8 @@ async function updateActivitiesCropsProducts() {
                 needsUpdate = true;
               }
             } else {
-              if (!newProductsDiscussed.includes(product.trim())) {
-                newProductsDiscussed.push(product.trim());
-              }
+              // Remove unmatched products - only keep products from master data
+              needsUpdate = true;
             }
           }
         });
@@ -343,8 +341,8 @@ async function updateActivitiesCropsProducts() {
     console.log(`   Activities: ${activitiesUpdated} updated`);
     console.log(`   Call Tasks: ${tasksUpdated} updated`);
     console.log(`\n✅ Migration completed successfully!`);
-    console.log(`\n💡 Note: Unmatched crops/products were kept as-is to preserve data.`);
-    console.log(`   You can manually review and update them if needed.\n`);
+    console.log(`\n💡 Note: Unmatched crops/products were removed to ensure only master data is used.`);
+    console.log(`   All activities and tasks now use crops/products from master data only.\n`);
 
   } catch (error) {
     console.error('❌ Error:', error);
