@@ -172,11 +172,15 @@ router.put(
       if (name) {
         const trimmedName = name.trim();
         if (trimmedName.toLowerCase() !== crop.name.toLowerCase()) {
-          // Check if new name already exists (case-insensitive)
+          // Check if new name already exists as active (case-insensitive)
           // Escape special regex characters in the name
           const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const existing = await MasterCrop.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
-          if (existing) {
+          const existingActive = await MasterCrop.findOne({ 
+            name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+            isActive: true,
+            _id: { $ne: id } // Exclude current record
+          });
+          if (existingActive) {
             const error: AppError = new Error('Crop name already exists');
             error.statusCode = 409;
             throw error;
@@ -189,7 +193,19 @@ router.put(
         crop.isActive = isActive;
       }
 
-      await crop.save();
+      try {
+        await crop.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Crop name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Master crop updated: ${crop.name} by ${(req as AuthRequest).user.email}`);
 
@@ -444,9 +460,13 @@ router.put(
       }
 
       if (name && name !== product.name) {
-        // Check if new name already exists
-        const existing = await MasterProduct.findOne({ name });
-        if (existing) {
+        // Check if new name already exists as active
+        const existingActive = await MasterProduct.findOne({ 
+          name,
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('Product name already exists');
           error.statusCode = 409;
           throw error;
@@ -461,7 +481,19 @@ router.put(
       if (focusProducts !== undefined) product.focusProducts = focusProducts;
       if (isActive !== undefined) product.isActive = isActive;
 
-      await product.save();
+      try {
+        await product.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Product name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Master product updated: ${product.name} by ${(req as AuthRequest).user.email}`);
 
@@ -706,8 +738,13 @@ router.put(
       }
 
       if (name && name.toLowerCase() !== reason.name.toLowerCase()) {
-        const existing = await NonPurchaseReason.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-        if (existing) {
+        // Check if new name already exists as active (case-insensitive)
+        const existingActive = await NonPurchaseReason.findOne({ 
+          name: { $regex: new RegExp(`^${name}$`, 'i') },
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('Non-purchase reason name already exists');
           error.statusCode = 409;
           throw error;
@@ -723,7 +760,19 @@ router.put(
         reason.isActive = isActive;
       }
 
-      await reason.save();
+      try {
+        await reason.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Non-purchase reason name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Non-purchase reason updated: ${reason.name} by ${(req as AuthRequest).user.email}`);
 
@@ -893,8 +942,13 @@ router.put(
       }
 
       if (name && name.toLowerCase() !== sentiment.name.toLowerCase()) {
-        const existing = await Sentiment.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-        if (existing) {
+        // Check if new name already exists as active (case-insensitive)
+        const existingActive = await Sentiment.findOne({ 
+          name: { $regex: new RegExp(`^${name}$`, 'i') },
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('Sentiment name already exists');
           error.statusCode = 409;
           throw error;
@@ -907,7 +961,19 @@ router.put(
       if (displayOrder !== undefined) sentiment.displayOrder = displayOrder;
       if (isActive !== undefined) sentiment.isActive = isActive;
 
-      await sentiment.save();
+      try {
+        await sentiment.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Sentiment name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Sentiment updated: ${sentiment.name} by ${(req as AuthRequest).user.email}`);
 
@@ -1074,8 +1140,13 @@ router.put(
       }
 
       if (state && state.toLowerCase() !== mapping.state.toLowerCase()) {
-        const existing = await StateLanguageMapping.findOne({ state: { $regex: new RegExp(`^${state}$`, 'i') } });
-        if (existing) {
+        // Check if new state already exists as active (case-insensitive)
+        const existingActive = await StateLanguageMapping.findOne({ 
+          state: { $regex: new RegExp(`^${state}$`, 'i') },
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('State mapping already exists');
           error.statusCode = 409;
           throw error;
@@ -1087,7 +1158,19 @@ router.put(
       if (secondaryLanguages !== undefined) mapping.secondaryLanguages = secondaryLanguages;
       if (isActive !== undefined) mapping.isActive = isActive;
 
-      await mapping.save();
+      try {
+        await mapping.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.state) {
+            const error: AppError = new Error('State mapping already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`State-language mapping updated: ${mapping.state} by ${(req as AuthRequest).user.email}`);
 
@@ -1269,8 +1352,13 @@ router.put(
       }
 
       if (name && name.toLowerCase() !== language.name.toLowerCase()) {
-        const existing = await MasterLanguage.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-        if (existing) {
+        // Check if new name already exists as active (case-insensitive)
+        const existingActive = await MasterLanguage.findOne({ 
+          name: { $regex: new RegExp(`^${name}$`, 'i') },
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('Language name already exists');
           error.statusCode = 409;
           throw error;
@@ -1279,8 +1367,13 @@ router.put(
       }
 
       if (code && code.toUpperCase() !== language.code) {
-        const existing = await MasterLanguage.findOne({ code: code.toUpperCase() });
-        if (existing) {
+        // Check if new code already exists as active
+        const existingActive = await MasterLanguage.findOne({ 
+          code: code.toUpperCase(),
+          isActive: true,
+          _id: { $ne: id } // Exclude current record
+        });
+        if (existingActive) {
           const error: AppError = new Error('Language code already exists');
           error.statusCode = 409;
           throw error;
@@ -1291,7 +1384,24 @@ router.put(
       if (displayOrder !== undefined) language.displayOrder = displayOrder;
       if (isActive !== undefined) language.isActive = isActive;
 
-      await language.save();
+      try {
+        await language.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - fallback if index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Language name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+          if (saveError.keyPattern?.code) {
+            const error: AppError = new Error('Language code already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Language updated: ${language.name} by ${(req as AuthRequest).user.email}`);
 
