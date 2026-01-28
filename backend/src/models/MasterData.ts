@@ -177,17 +177,18 @@ const MasterLanguageSchema = new Schema<IMasterLanguage>(
   }
 );
 
-// Indexes
-MasterCropSchema.index({ name: 1 }, { unique: true });
+// Indexes - Partial unique indexes (only unique when isActive: true)
+// This allows inactive records to have duplicate names, but active records must be unique
+MasterCropSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 MasterCropSchema.index({ isActive: 1 });
-MasterProductSchema.index({ name: 1 }, { unique: true });
+MasterProductSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 MasterProductSchema.index({ isActive: 1 });
-NonPurchaseReasonSchema.index({ name: 1 }, { unique: true });
+NonPurchaseReasonSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 NonPurchaseReasonSchema.index({ isActive: 1, displayOrder: 1 });
-SentimentSchema.index({ name: 1 }, { unique: true });
+SentimentSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 SentimentSchema.index({ isActive: 1, displayOrder: 1 });
-MasterLanguageSchema.index({ name: 1 }, { unique: true });
-MasterLanguageSchema.index({ code: 1 }, { unique: true });
+MasterLanguageSchema.index({ name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
+MasterLanguageSchema.index({ code: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
 MasterLanguageSchema.index({ isActive: 1, displayOrder: 1 });
 
 export const MasterCrop = mongoose.model<IMasterCrop>('MasterCrop', MasterCropSchema);

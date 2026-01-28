@@ -111,7 +111,20 @@ router.post(
         isActive,
       });
 
-      await crop.save();
+      try {
+        await crop.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          // Check if it's a duplicate name error
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Crop already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Master crop created: ${crop.name} by ${(req as AuthRequest).user.email}`);
 
@@ -368,7 +381,19 @@ router.post(
         isActive,
       });
 
-      await product.save();
+      try {
+        await product.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Product already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Master product created: ${product.name} by ${(req as AuthRequest).user.email}`);
 
@@ -622,7 +647,19 @@ router.post(
         isActive,
       });
 
-      await reason.save();
+      try {
+        await reason.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Non-purchase reason already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Non-purchase reason created: ${reason.name} by ${(req as AuthRequest).user.email}`);
 
@@ -795,7 +832,19 @@ router.post(
         isActive,
       });
 
-      await sentiment.save();
+      try {
+        await sentiment.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Sentiment already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Sentiment created: ${sentiment.name} by ${(req as AuthRequest).user.email}`);
 
@@ -965,7 +1014,19 @@ router.post(
         isActive,
       });
 
-      await mapping.save();
+      try {
+        await mapping.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.state) {
+            const error: AppError = new Error('State mapping already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`State-language mapping created: ${mapping.state} by ${(req as AuthRequest).user.email}`);
 
@@ -1143,7 +1204,24 @@ router.post(
         isActive,
       });
 
-      await language.save();
+      try {
+        await language.save();
+      } catch (saveError: any) {
+        // Handle duplicate key error (E11000) - can happen if unique index constraint is violated
+        if (saveError.code === 11000) {
+          if (saveError.keyPattern?.name) {
+            const error: AppError = new Error('Language with this name already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+          if (saveError.keyPattern?.code) {
+            const error: AppError = new Error('Language with this code already exists');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+        throw saveError;
+      }
 
       logger.info(`Language created: ${language.name} (${language.code}) by ${(req as AuthRequest).user.email}`);
 

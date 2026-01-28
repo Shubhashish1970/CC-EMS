@@ -306,6 +306,15 @@ const CropsMasterView: React.FC = () => {
             const errorMsg = error?.message || 'Network error';
             errors.push(`${name}: ${errorMsg}`);
             console.error(`Import exception for ${name}:`, error);
+            // If we get too many errors (e.g., all 500s), stop early
+            if (errorCount > validRows.length * 0.5) {
+              // More than 50% errors - likely a systemic issue, stop processing
+              showError(`Import stopped: Too many errors (${errorCount}/${i + 1} processed). Please check the file format and try again.`);
+              setIsImporting(false);
+              setImportProgress(0);
+              setImportTotal(0);
+              return;
+            }
           }
 
           // Update progress
