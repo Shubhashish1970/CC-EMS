@@ -7,6 +7,10 @@ export interface IActivity extends Document {
   lifecycleStatus?: 'active' | 'sampled' | 'inactive' | 'not_eligible';
   lifecycleUpdatedAt?: Date;
   lastSamplingRunAt?: Date;
+  /** True once this activity has been processed in a first-sample run; never reset by ad-hoc runs */
+  firstSampleRun?: boolean;
+  /** Set when firstSampleRun is set to true */
+  firstSampledAt?: Date;
   officerId: string;
   officerName: string;
   location: string;
@@ -59,6 +63,15 @@ const ActivitySchema = new Schema<IActivity>(
       default: Date.now,
     },
     lastSamplingRunAt: {
+      type: Date,
+      default: null,
+    },
+    firstSampleRun: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    firstSampledAt: {
       type: Date,
       default: null,
     },
@@ -157,6 +170,7 @@ ActivitySchema.index({ lifecycleStatus: 1, date: -1 }); // For sampling control 
 ActivitySchema.index({ lifecycleStatus: 1, territoryName: 1, date: -1 }); // Sampling control with territory filter
 ActivitySchema.index({ lifecycleStatus: 1, zoneName: 1, date: -1 }); // Sampling control with zone filter
 ActivitySchema.index({ lifecycleStatus: 1, buName: 1, date: -1 }); // Sampling control with BU filter
+ActivitySchema.index({ firstSampleRun: 1, date: 1 }); // First sample / ad-hoc run queries
 
 export const Activity = mongoose.model<IActivity>('Activity', ActivitySchema);
 

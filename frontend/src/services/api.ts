@@ -512,6 +512,9 @@ export const samplingAPI = {
   getLatestRunStatus: async () => {
     return apiRequest('/sampling/run-status/latest');
   },
+  getFirstSampleRange: async () => {
+    return apiRequest('/sampling/first-sample-range');
+  },
   applyEligibility: async (eligibleActivityTypes: string[]) => {
     // Can take time if updating many activities; allow longer timeout
     return apiRequest('/sampling/apply-eligibility', {
@@ -533,6 +536,7 @@ export const samplingAPI = {
     }, undefined, 180000);
   },
   runSampling: async (payload: {
+    runType?: 'first_sample' | 'adhoc';
     activityIds?: string[];
     lifecycleStatus?: 'active' | 'sampled' | 'inactive' | 'not_eligible';
     dateFrom?: string;

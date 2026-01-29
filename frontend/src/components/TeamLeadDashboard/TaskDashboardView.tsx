@@ -600,6 +600,21 @@ const TaskDashboardView: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {/* Why zeros? Show when all counts are 0 (and not loading) */}
+        {!isLoading && (totals.totalOpen ?? 0) === 0 && (totals.unassigned ?? 0) === 0 && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-bold mb-1">Why is everything zero?</p>
+            <p className="text-amber-800">
+              <strong>Task Allocation is scoped to your team.</strong> It shows only <strong>unassigned</strong> tasks and tasks assigned to <strong>agents who report to you</strong> (agents whose Team Lead is you). Admin → Agent Queues shows all agents across the system; this view shows only your team.
+            </p>
+            <ul className="mt-2 list-disc list-inside text-amber-800 space-y-1">
+              <li><strong>No agents under you?</strong> Ask an MIS Admin to assign CC agents to you in <strong>User Management</strong> (set each agent&apos;s Team Lead to your user). Until then, you&apos;ll only see unassigned tasks here—and if all tasks are already allocated to other agents, counts will be zero.</li>
+              <li><strong>Date range:</strong> Tasks are filtered by <strong>scheduled date</strong>. Try &quot;Last 30 days&quot; or a range that includes when tasks were created.</li>
+              <li><strong>Create tasks:</strong> Use <strong>Sampling Control</strong> to sample activities and create unassigned tasks, then allocate them from this tab.</li>
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Unassigned by language */}

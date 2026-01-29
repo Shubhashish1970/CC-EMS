@@ -16,6 +16,29 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
+/** Compute auto date range for next first-sample run: (day after last first_sample run's dateTo) to today. If no previous first_sample run, use (today - 30 days) to today. */
+const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise<{ dateFrom: Date; dateTo: Date }> => {
+  const lastFirst = await SamplingRun.findOne({
+    createdByUserId: userId,
+    runType: 'first_sample',
+  })
+    .sort({ startedAt: -1 })
+    .select('filters')
+    .lean();
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (lastFirst?.filters?.dateTo) {
+    const dayAfter = new Date(lastFirst.filters.dateTo);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    dayAfter.setHours(0, 0, 0, 0);
+    return { dateFrom: dayAfter, dateTo: today };
+  }
+  const dateFrom = new Date(today);
+  dateFrom.setDate(dateFrom.getDate() - 30);
+  dateFrom.setHours(0, 0, 0, 0);
+  return { dateFrom, dateTo: today };
+};
+
 // ============================================================================
 // Sampling Control (Team Lead + MIS Admin)
 // ============================================================================
@@ -414,13 +437,40 @@ router.post(
   }
 );
 
+// @route   GET /api/sampling/first-sample-range
+// @desc    Get auto date range for next first-sample run (for UI display)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/first-sample-range',
+  requirePermission('config.sampling'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUserId = (req as any).user?._id;
+      if (!authUserId) {
+        return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+      }
+      const { dateFrom, dateTo } = await getFirstSampleAutoRange(authUserId);
+      res.json({
+        success: true,
+        data: {
+          dateFrom: dateFrom.toISOString().split('T')[0],
+          dateTo: dateTo.toISOString().split('T')[0],
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   POST /api/sampling/run
-// @desc    Run sampling (single or bulk) for Active activities; creates Unassigned tasks; sets Activity to Sampled/Inactive
+// @desc    Run sampling: first_sample (auto date range, firstSampleRun=false only) or adhoc (user date range, firstSampleRun=true only). Creates Unassigned tasks; sets Activity to Sampled/Inactive.
 // @access  Private (Team Lead, MIS Admin)
 router.post(
   '/run',
   requirePermission('config.sampling'),
   [
+    body('runType').optional().isIn(['first_sample', 'adhoc']),
     body('activityIds').optional().isArray(),
     body('lifecycleStatus').optional().isIn(['active', 'sampled', 'inactive', 'not_eligible']),
     body('dateFrom').optional().isISO8601(),
@@ -440,28 +490,51 @@ router.post(
       }
 
       const authUserId = (req as any).user?._id?.toString();
-      const { activityIds, lifecycleStatus, dateFrom, dateTo, samplingPercentage, forceRun, includeResults } = req.body as any;
+      const authUserObjId = (req as any).user?._id;
+      const { runType, activityIds, lifecycleStatus, dateFrom, dateTo, samplingPercentage, forceRun, includeResults } = req.body as any;
 
+      const effectiveRunType = runType === 'first_sample' ? 'first_sample' : 'adhoc';
       const MAX_BULK = 5000;
       let matchedCount = 0;
+      let resolvedDateFrom: string | null = null;
+      let resolvedDateTo: string | null = null;
 
       let ids: string[] = [];
+
       if (Array.isArray(activityIds) && activityIds.length > 0) {
         ids = activityIds;
         matchedCount = activityIds.length;
-      } else {
-        // Default to Active activities if no status is provided
+      } else if (effectiveRunType === 'first_sample') {
+        const { dateFrom: autoFrom, dateTo: autoTo } = await getFirstSampleAutoRange(authUserObjId);
+        resolvedDateFrom = autoFrom.toISOString().split('T')[0];
+        resolvedDateTo = autoTo.toISOString().split('T')[0];
         const q: any = {
+          firstSampleRun: { $ne: true },
           lifecycleStatus: lifecycleStatus || 'active',
+          date: { $gte: autoFrom, $lte: autoTo },
         };
-        if (dateFrom || dateTo) {
-          q.date = {};
-          if (dateFrom) q.date.$gte = new Date(dateFrom);
-          if (dateTo) q.date.$lte = new Date(dateTo);
-        }
-
         matchedCount = await Activity.countDocuments(q);
-
+        const docs = await Activity.find(q)
+          .select('_id')
+          .sort({ date: -1 })
+          .limit(MAX_BULK)
+          .lean();
+        ids = docs.map((a) => a._id.toString());
+      } else {
+        // adhoc: require date range
+        if (!dateFrom || !dateTo) {
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Ad-hoc run requires dateFrom and dateTo' },
+          });
+        }
+        resolvedDateFrom = dateFrom;
+        resolvedDateTo = dateTo;
+        const q: any = {
+          firstSampleRun: true,
+          date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
+        };
+        matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
           .select('_id')
           .sort({ date: -1 })
@@ -474,9 +547,9 @@ router.post(
         logger.warn('Sampling run truncated by safety cap', { matchedCount, processed: ids.length, MAX_BULK });
       }
 
-      logger.info('Sampling run requested', { requestedCount: ids.length, forceRun: !!forceRun });
+      logger.info('Sampling run requested', { runType: effectiveRunType, requestedCount: ids.length, forceRun: !!forceRun });
 
-      const shouldIncludeResults = includeResults === true; // default false to avoid huge payloads/timeouts
+      const shouldIncludeResults = includeResults === true;
       const results: any[] = [];
       let tasksCreatedTotal = 0;
       let sampledActivities = 0;
@@ -484,15 +557,15 @@ router.post(
       let skipped = 0;
       const errorsList: string[] = [];
 
-      // Create a run tracker so the UI can poll status/progress
       const runDoc = await SamplingRun.create({
         createdByUserId: authUserId ? new mongoose.Types.ObjectId(authUserId) : null,
+        runType: effectiveRunType,
         status: 'running',
         startedAt: new Date(),
         filters: {
           lifecycleStatus: lifecycleStatus || 'active',
-          dateFrom: dateFrom ? new Date(dateFrom) : null,
-          dateTo: dateTo ? new Date(dateTo) : null,
+          dateFrom: resolvedDateFrom ? new Date(resolvedDateFrom) : null,
+          dateTo: resolvedDateTo ? new Date(resolvedDateTo) : null,
           samplingPercentage: samplingPercentage ?? null,
           forceRun: !!forceRun,
         },
@@ -508,14 +581,24 @@ router.post(
       });
 
       const runId = runDoc._id.toString();
+      const setFirstSampleRun = effectiveRunType === 'first_sample';
 
       let processed = 0;
       for (const id of ids) {
         try {
+          if (effectiveRunType === 'adhoc') {
+            await CallTask.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
+            await SamplingAudit.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
+            await Activity.updateOne(
+              { _id: new mongoose.Types.ObjectId(id) },
+              { $set: { lifecycleStatus: 'active', lifecycleUpdatedAt: new Date() } }
+            );
+          }
           const r = await sampleAndCreateTasks(id, samplingPercentage, {
             runByUserId: authUserId,
             forceRun: !!forceRun,
             scheduledDate: new Date(),
+            setFirstSampleRun,
           });
           if (shouldIncludeResults) {
             results.push({ activityId: id, ...r });
@@ -530,7 +613,6 @@ router.post(
           logger.error(msg, e);
         } finally {
           processed++;
-          // Persist progress every 5 activities (or at end) to reduce DB writes
           if (processed % 5 === 0 || processed === ids.length) {
             await SamplingRun.updateOne(
               { _id: runDoc._id },
@@ -576,6 +658,9 @@ router.post(
         message: 'Sampling run completed',
         data: {
           runId,
+          runType: effectiveRunType,
+          dateFrom: resolvedDateFrom,
+          dateTo: resolvedDateTo,
           matched: matchedCount,
           processed: ids.length,
           sampledActivities,
@@ -585,8 +670,8 @@ router.post(
           errorCount: errorsList.length,
           errors: errorsList.slice(-10),
           ...(shouldIncludeResults ? { results } : {}),
-      },
-    });
+        },
+      });
     } catch (error) {
       next(error);
     }

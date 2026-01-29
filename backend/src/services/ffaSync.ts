@@ -247,6 +247,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
         $setOnInsert: {
           lifecycleStatus: 'active',
           lifecycleUpdatedAt: new Date(),
+          firstSampleRun: false, // New synced activities are eligible for first-sample run
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }

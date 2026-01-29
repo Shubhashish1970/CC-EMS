@@ -117,6 +117,8 @@ export const sampleAndCreateTasks = async (
     runByUserId?: string;
     forceRun?: boolean; // ignore activityCoolingDays gate (still respects lifecycle status)
     scheduledDate?: Date; // defaults to now (Team Lead run time)
+    /** When true (first-sample run), set activity.firstSampleRun = true and firstSampledAt after sampling. When false (adhoc), do not change firstSampleRun. */
+    setFirstSampleRun?: boolean;
   }
 ): Promise<{
   skipped?: boolean;
@@ -240,6 +242,10 @@ export const sampleAndCreateTasks = async (
     activity.lifecycleStatus = newLifecycleStatus as any;
     activity.lifecycleUpdatedAt = now;
     activity.lastSamplingRunAt = now;
+    if (options?.setFirstSampleRun === true) {
+      (activity as any).firstSampleRun = true;
+      (activity as any).firstSampledAt = now;
+    }
     await activity.save();
 
     // Log sampling audit

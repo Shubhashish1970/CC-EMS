@@ -61,6 +61,10 @@ const SamplingControlView: React.FC = () => {
     dateTo: '',
   });
 
+  /** first_sample = auto date range, no user selection; adhoc = user picks date range */
+  const [runType, setRunType] = useState<'first_sample' | 'adhoc'>('first_sample');
+  const [firstSampleRange, setFirstSampleRange] = useState<{ dateFrom: string; dateTo: string } | null>(null);
+
   // Date range dropdown (same UX as Admin Activity Sampling)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -242,6 +246,14 @@ const SamplingControlView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (runType !== 'first_sample') return;
+    samplingAPI.getFirstSampleRange().then((r: any) => {
+      const d = r?.data;
+      if (d?.dateFrom && d?.dateTo) setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
+    }).catch(() => setFirstSampleRange(null));
+  }, [runType]);
+
   const isSamplingRunning = latestRun?.status === 'running';
   const progressPct = useMemo(() => {
     const processed = Number(latestRun?.processed ?? 0);
@@ -361,27 +373,32 @@ const SamplingControlView: React.FC = () => {
   // Note: Save & Apply is the single action (save config + apply eligibility).
 
   const handleRunSampling = async () => {
-    if (totalMatchingByLifecycle === 0) {
-      toast.showError('No activities match the current filters');
-      return;
+    if (runType === 'adhoc') {
+      if (!activityFilters.dateFrom || !activityFilters.dateTo) {
+        toast.showError('Select date range for ad-hoc run');
+        return;
+      }
+      if (totalMatchingByLifecycle === 0) {
+        toast.showError('No activities match the current filters');
+        return;
+      }
     }
     setIsLoading(true);
     try {
-      // Optimistic UI: show progress immediately so users know the run has begun.
-      // This will be reconciled with the real backend run status via polling within ~1-2 seconds.
       setLatestRun({
         _id: 'optimistic',
         status: 'running',
-        matched: totalMatchingByLifecycle,
+        matched: runType === 'first_sample' ? 0 : totalMatchingByLifecycle,
         processed: 0,
         tasksCreatedTotal: 0,
         errorCount: 0,
       });
 
       const res: any = await samplingAPI.runSampling({
+        runType,
         lifecycleStatus: activityFilters.lifecycleStatus,
-        dateFrom: activityFilters.dateFrom || undefined,
-        dateTo: activityFilters.dateTo || undefined,
+        dateFrom: runType === 'adhoc' ? (activityFilters.dateFrom || undefined) : undefined,
+        dateTo: runType === 'adhoc' ? (activityFilters.dateTo || undefined) : undefined,
       });
       toast.showSuccess(
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
@@ -712,13 +729,12 @@ const SamplingControlView: React.FC = () => {
               disabled={
                 isLoading ||
                 isSamplingRunning ||
-                totalMatchingByLifecycle === 0 ||
-                activityFilters.lifecycleStatus !== 'active'
+                (runType === 'adhoc' && (!activityFilters.dateFrom || !activityFilters.dateTo))
               }
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black disabled:opacity-50"
             >
               <Play size={16} />
-              Run Sampling (All {totalMatchingByLifecycle})
+              {runType === 'first_sample' ? 'Run first sample (auto range)' : `Run ad-hoc sampling (${totalMatchingByLifecycle} in range)`}
             </button>
             <button
               onClick={handleReactivateSelected}
@@ -790,8 +806,20 @@ const SamplingControlView: React.FC = () => {
           )}
         </div>
 
-        {/* Filters (move here; no per-activity sampling selection needed) */}
+        {/* Run type + Filters */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run type</label>
+            <StyledSelect
+              value={runType}
+              onChange={(value) => setRunType(value as 'first_sample' | 'adhoc')}
+              options={[
+                { value: 'first_sample', label: 'First sample (auto date range)' },
+                { value: 'adhoc', label: 'Ad-hoc (pick date range)' },
+              ]}
+              placeholder="Run type"
+            />
+          </div>
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
             <StyledSelect
@@ -806,8 +834,15 @@ const SamplingControlView: React.FC = () => {
               placeholder="Select lifecycle"
             />
           </div>
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+            {runType === 'first_sample' ? (
+              <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700">
+                {firstSampleRange
+                  ? `Auto: ${formatPretty(firstSampleRange.dateFrom)} – ${formatPretty(firstSampleRange.dateTo)}`
+                  : 'Auto (from last first-sample run to today)'}
+              </div>
+            ) : (
             <div className="relative" ref={datePickerRef}>
               <button
                 type="button"
@@ -929,6 +964,7 @@ const SamplingControlView: React.FC = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 

@@ -1,9 +1,11 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export type SamplingRunStatus = 'running' | 'completed' | 'failed';
+export type SamplingRunType = 'first_sample' | 'adhoc';
 
 export interface ISamplingRun extends Document {
   createdByUserId?: mongoose.Types.ObjectId | null;
+  runType: SamplingRunType; // first_sample = auto date range; adhoc = user date range
   status: SamplingRunStatus;
   startedAt: Date;
   finishedAt?: Date | null;
@@ -32,6 +34,13 @@ const SamplingRunSchema = new Schema<ISamplingRun>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,
+      index: true,
+    },
+    runType: {
+      type: String,
+      enum: ['first_sample', 'adhoc'],
+      required: true,
+      default: 'adhoc',
       index: true,
     },
     status: {
@@ -73,6 +82,7 @@ const SamplingRunSchema = new Schema<ISamplingRun>(
 );
 
 SamplingRunSchema.index({ createdByUserId: 1, startedAt: -1 });
+SamplingRunSchema.index({ createdByUserId: 1, runType: 1, startedAt: -1 }); // Last first_sample run per user
 
 export const SamplingRun = mongoose.model<ISamplingRun>('SamplingRun', SamplingRunSchema);
 
