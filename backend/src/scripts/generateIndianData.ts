@@ -37,77 +37,48 @@ dotenv.config();
 const FALLBACK_CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
 const FALLBACK_PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
 
-// Indian District Names (Territories) - Organized by BU
-const INDIAN_DISTRICTS = {
-  North: [
-    'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', // Punjab
-    'Gurgaon', 'Faridabad', 'Karnal', 'Panipat', 'Ambala', // Haryana
-    'Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', // Uttar Pradesh
-    'New Delhi', 'Central Delhi', 'East Delhi', 'West Delhi', 'South Delhi', // Delhi
-  ],
-  East: [
-    'Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', // West Bengal
-    'Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', // Odisha
-    'Patna', 'Gaya', 'Muzaffarpur', 'Bhagalpur', 'Darbhanga', // Bihar
-    'Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', // Jharkhand
-  ],
-  West: [
-    'Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', // Maharashtra
-    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Gandhinagar', // Gujarat
-    'Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Ajmer', // Rajasthan
-  ],
-  South: [
-    'Bangalore', 'Mysore', 'Mangalore', 'Hubli', 'Belgaum', // Karnataka
-    'Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli', // Tamil Nadu
-    'Hyderabad', 'Vijayawada', 'Visakhapatnam', 'Guntur', 'Nellore', // Andhra Pradesh/Telangana
-    'Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Kannur', // Kerala
-  ],
+// Hierarchy: BU (North/South/East/West) → Zone (state combos) → Region (district combos) → Territory (tehsils)
+const BUS = ['North', 'South', 'East', 'West'] as const;
+
+// Zone = combination of states (e.g. Uttarakhand + UP, NE)
+const ZONES_BY_BU: Record<string, string[]> = {
+  North: ['Uttarakhand + Uttar Pradesh', 'Punjab + Haryana', 'Delhi-NCR', 'Himachal Pradesh'],
+  East: ['West Bengal + Odisha', 'Bihar + Jharkhand', 'NE'],
+  West: ['Maharashtra + Gujarat', 'Rajasthan', 'Madhya Pradesh'],
+  South: ['Karnataka', 'Tamil Nadu + Kerala', 'Andhra Pradesh + Telangana'],
 };
 
-// Regions (Group of States / Part of States) - Organized by BU
-const REGIONS = {
-  North: [
-    'Punjab-Haryana Region',
-    'Uttar Pradesh Central Region',
-    'Uttar Pradesh Eastern Region',
-    'Delhi-NCR Region',
-  ],
-  East: [
-    'West Bengal Central Region',
-    'West Bengal Northern Region',
-    'Odisha Coastal Region',
-    'Odisha Inland Region',
-    'Bihar Central Region',
-    'Bihar Eastern Region',
-    'Jharkhand Region',
-  ],
-  West: [
-    'Maharashtra Western Region',
-    'Maharashtra Central Region',
-    'Gujarat Northern Region',
-    'Gujarat Southern Region',
-    'Rajasthan Northern Region',
-    'Rajasthan Southern Region',
-  ],
-  South: [
-    'Karnataka Northern Region',
-    'Karnataka Southern Region',
-    'Tamil Nadu Northern Region',
-    'Tamil Nadu Southern Region',
-    'Andhra Pradesh Coastal Region',
-    'Andhra Pradesh Rayalaseema Region',
-    'Telangana Region',
-    'Kerala Northern Region',
-    'Kerala Southern Region',
-  ],
+// Region = combination of districts or single large district (next to BU)
+const REGIONS_BY_BU: Record<string, string[]> = {
+  North: ['Dehradun + Haridwar', 'Lucknow', 'Ludhiana + Amritsar', 'Gurgaon + Faridabad', 'Shimla'],
+  East: ['Kolkata + Howrah', 'Patna', 'Bhubaneswar + Cuttack', 'Guwahati + Kamrup', 'Ranchi + Dhanbad'],
+  West: ['Mumbai + Thane', 'Ahmedabad', 'Pune + Nashik', 'Jaipur', 'Indore'],
+  South: ['Bangalore Urban', 'Chennai + Kanchipuram', 'Hyderabad + Ranga Reddy', 'Mysore', 'Kochi'],
 };
 
-// Zones (States / Group of States)
-const ZONES = {
-  North: ['Punjab', 'Haryana', 'Uttar Pradesh', 'Delhi', 'Himachal Pradesh'],
-  East: ['West Bengal', 'Odisha', 'Bihar', 'Jharkhand', 'Assam'],
-  West: ['Maharashtra', 'Gujarat', 'Rajasthan', 'Madhya Pradesh'],
-  South: ['Karnataka', 'Tamil Nadu', 'Andhra Pradesh', 'Telangana', 'Kerala'],
+// Territory = Tehsil or combination of tehsils
+const TERRITORIES_BY_BU: Record<string, string[]> = {
+  North: ['Dehradun Tehsil', 'Mussoorie Tehsil', 'Lucknow Tehsil', 'Sitapur + Raebareli Tehsils', 'Ludhiana Tehsil', 'Amritsar Tehsil', 'Gurgaon Tehsil', 'Faridabad Tehsil', 'Shimla Tehsil', 'Nainital Tehsil', 'Meerut Tehsil', 'Varanasi Tehsil'],
+  East: ['Kolkata North Tehsil', 'Howrah Tehsil', 'Patna Tehsil', 'Gaya Tehsil', 'Bhubaneswar Tehsil', 'Guwahati Tehsil', 'Ranchi Tehsil', 'Durgapur + Asansol Tehsils', 'Siliguri Tehsil'],
+  West: ['Mumbai City Tehsil', 'Thane Tehsil', 'Ahmedabad Tehsil', 'Surat Tehsil', 'Pune Tehsil', 'Jaipur Tehsil', 'Udaipur Tehsil', 'Indore Tehsil', 'Nagpur Tehsil'],
+  South: ['Bangalore North Tehsil', 'Bangalore South Tehsil', 'Chennai Tehsil', 'Hyderabad Tehsil', 'Mysore Tehsil', 'Vijayawada + Guntur Tehsils', 'Kochi Tehsil', 'Coimbatore Tehsil', 'Madurai Tehsil'],
+};
+
+// Primary state per zone (for language derivation)
+const ZONE_TO_STATE: Record<string, string> = {
+  'Uttarakhand + Uttar Pradesh': 'Uttar Pradesh',
+  'Punjab + Haryana': 'Punjab',
+  'Delhi-NCR': 'Delhi',
+  'Himachal Pradesh': 'Himachal Pradesh',
+  'West Bengal + Odisha': 'West Bengal',
+  'Bihar + Jharkhand': 'Bihar',
+  'NE': 'Assam',
+  'Maharashtra + Gujarat': 'Maharashtra',
+  'Rajasthan': 'Rajasthan',
+  'Madhya Pradesh': 'Madhya Pradesh',
+  'Karnataka': 'Karnataka',
+  'Tamil Nadu + Kerala': 'Tamil Nadu',
+  'Andhra Pradesh + Telangana': 'Andhra Pradesh',
 };
 
 // State to Language Mapping
@@ -186,39 +157,15 @@ function generateIndianName(): string {
   return `${firstName} ${lastName}`;
 }
 
-// Get language for territory based on state/zone
-function getLanguageForTerritory(district: string, bu: string): string {
-  const zones = ZONES[bu as keyof typeof ZONES] || [];
-  for (const zone of zones) {
-    const languages = STATE_TO_LANGUAGE[zone] || ['Hindi'];
-    // Return primary language (first one)
-    return languages[0];
-  }
-  return 'Hindi'; // Default
+// Get primary state for a zone (for language)
+function getStateForZone(zoneName: string): string {
+  return ZONE_TO_STATE[zoneName] || 'Uttar Pradesh';
 }
 
-// Get state for territory
-function getStateForTerritory(district: string, bu: string): string {
-  const zones = ZONES[bu as keyof typeof ZONES] || [];
-  // Find which zone/state this district belongs to
-  for (const zone of zones) {
-    if (STATE_TO_LANGUAGE[zone]) {
-      return zone;
-    }
-  }
-  return zones[0] || 'Unknown';
-}
-
-// Get region for territory
-function getRegionForTerritory(district: string, bu: string): string {
-  const regions = REGIONS[bu as keyof typeof REGIONS] || [];
-  return regions[Math.floor(Math.random() * regions.length)] || `${bu} Region`;
-}
-
-// Get zone for territory
-function getZoneForTerritory(district: string, bu: string): string {
-  const zones = ZONES[bu as keyof typeof ZONES] || [];
-  return zones[Math.floor(Math.random() * zones.length)] || bu;
+// Get language for a zone (via primary state)
+function getLanguageForZone(zoneName: string): string {
+  const state = getStateForZone(zoneName);
+  return STATE_TO_LANGUAGE[state]?.[0] || 'Hindi';
 }
 
 async function loadMasterCropsProducts() {
@@ -258,16 +205,18 @@ async function generateFarmers(count: number = 500) {
   
   const farmers = [];
   const mobileNumbers = new Set<string>();
-  const allDistricts = Object.values(INDIAN_DISTRICTS).flat();
   
   for (let i = 0; i < count; i++) {
-    // Select random BU
-    const bus = Object.keys(INDIAN_DISTRICTS);
-    const bu = bus[Math.floor(Math.random() * bus.length)];
-    const districts = INDIAN_DISTRICTS[bu as keyof typeof INDIAN_DISTRICTS];
-    const district = districts[Math.floor(Math.random() * districts.length)];
+    // BU → Zone (state combo) → Region (district combo) → Territory (tehsil)
+    const bu = BUS[Math.floor(Math.random() * BUS.length)];
+    const zones = ZONES_BY_BU[bu] || [];
+    const regions = REGIONS_BY_BU[bu] || [];
+    const territories = TERRITORIES_BY_BU[bu] || [];
+    const zone = zones[Math.floor(Math.random() * zones.length)];
+    const region = regions[Math.floor(Math.random() * regions.length)];
+    const territory = territories[Math.floor(Math.random() * territories.length)];
+    const state = getStateForZone(zone);
     
-    // Generate unique mobile number
     let mobileNumber = generateMobileNumber();
     while (mobileNumbers.has(mobileNumber)) {
       mobileNumber = generateMobileNumber();
@@ -275,15 +224,15 @@ async function generateFarmers(count: number = 500) {
     mobileNumbers.add(mobileNumber);
     
     const name = generateIndianName();
-    const language = getLanguageForTerritory(district, bu);
-    const location = `${district}, ${getStateForTerritory(district, bu)}`;
+    const language = getLanguageForZone(zone);
+    const location = `${territory}, ${region}, ${state}`;
     
     farmers.push({
       name,
       mobileNumber,
       location,
       preferredLanguage: language,
-      territory: district,
+      territory,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -299,10 +248,8 @@ async function generateActivities(count: number = 100) {
   logger.info(`Generating ${count} activities...`);
   
   const activities = [];
-  const allDistricts = Object.values(INDIAN_DISTRICTS).flat();
   const farmers = await Farmer.find({}).select('_id territory');
   
-  // Group farmers by territory
   const farmersByTerritory = new Map<string, mongoose.Types.ObjectId[]>();
   farmers.forEach(f => {
     if (!farmersByTerritory.has(f.territory)) {
@@ -315,34 +262,31 @@ async function generateActivities(count: number = 100) {
   startDate.setDate(startDate.getDate() - 90); // Last 90 days
   
   for (let i = 0; i < count; i++) {
-    // Select random BU and district
-    const bus = Object.keys(INDIAN_DISTRICTS);
-    const bu = bus[Math.floor(Math.random() * bus.length)];
-    const districts = INDIAN_DISTRICTS[bu as keyof typeof INDIAN_DISTRICTS];
-    const district = districts[Math.floor(Math.random() * districts.length)];
+    // BU → Zone (state combo) → Region (district combo) → Territory (tehsil)
+    const bu = BUS[Math.floor(Math.random() * BUS.length)];
+    const zones = ZONES_BY_BU[bu] || [];
+    const regions = REGIONS_BY_BU[bu] || [];
+    const territories = TERRITORIES_BY_BU[bu] || [];
+    const zone = zones[Math.floor(Math.random() * zones.length)];
+    const region = regions[Math.floor(Math.random() * regions.length)];
+    const territory = territories[Math.floor(Math.random() * territories.length)];
+    const state = getStateForZone(zone);
     
     const activityType = ACTIVITY_TYPES[Math.floor(Math.random() * ACTIVITY_TYPES.length)];
     const officerName = OFFICER_NAMES[Math.floor(Math.random() * OFFICER_NAMES.length)];
     const officerId = `FDA${String(Math.floor(Math.random() * 10000)).padStart(5, '0')}`;
     const activityId = `ACT${String(i + 1).padStart(8, '0')}`;
     
-    // Random date in last 90 days
     const daysAgo = Math.floor(Math.random() * 90);
     const activityDate = new Date(startDate);
     activityDate.setDate(activityDate.getDate() + daysAgo);
     
-    // Get farmers for this territory
-    const territoryFarmers = farmersByTerritory.get(district) || [];
-    const numFarmers = Math.min(Math.floor(Math.random() * 10) + 5, territoryFarmers.length); // 5-15 farmers
+    const territoryFarmers = farmersByTerritory.get(territory) || [];
+    const numFarmers = Math.min(Math.floor(Math.random() * 10) + 5, territoryFarmers.length);
     const selectedFarmers = territoryFarmers
       .sort(() => Math.random() - 0.5)
       .slice(0, numFarmers);
     
-    const state = getStateForTerritory(district, bu);
-    const region = getRegionForTerritory(district, bu);
-    const zone = getZoneForTerritory(district, bu);
-    
-    // Random crops and products
     const numCrops = Math.floor(Math.random() * 3) + 1;
     const numProducts = Math.floor(Math.random() * 2) + 1;
     const crops = CROPS.sort(() => Math.random() - 0.5).slice(0, numCrops);
@@ -357,9 +301,9 @@ async function generateActivities(count: number = 100) {
       firstSampleRun: false,
       officerId,
       officerName,
-      location: `${district}, ${state}`,
-      territory: district,
-      territoryName: district,
+      location: `${territory}, ${region}, ${state}`,
+      territory,
+      territoryName: territory,
       zoneName: zone,
       buName: bu,
       state,

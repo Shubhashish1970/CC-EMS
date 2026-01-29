@@ -957,6 +957,10 @@ export const ffaAPI = {
     return apiRequest('/ffa/status');
   },
 
+  getFFASyncProgress: async () => {
+    return apiRequest('/ffa/sync-progress');
+  },
+
   importExcel: async (file: File) => {
     const token = getAuthToken();
 

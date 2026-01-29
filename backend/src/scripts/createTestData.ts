@@ -23,32 +23,26 @@ const INDIAN_STATES = [
   'Odisha', 'Telangana', 'Kerala', 'Jharkhand', 'Assam', 'Punjab', 'Haryana'
 ];
 
-const INDIAN_DISTRICTS: Record<string, string[]> = {
-  'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', 'Meerut', 'Ghaziabad'],
-  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Thane'],
-  'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga', 'Arrah'],
-  'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Bardhaman', 'Malda'],
-  'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Raipur', 'Sagar'],
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Erode'],
-  'Rajasthan': ['Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Bhilwara'],
-  'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum', 'Gulbarga', 'Davangere'],
-  'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
-  'Andhra Pradesh': ['Hyderabad', 'Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati'],
-  'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore'],
-  'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Mahbubnagar', 'Adilabad'],
-  'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Alappuzha', 'Kannur'],
-  'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar', 'Giridih'],
-  'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia', 'Tezpur'],
-  'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Pathankot', 'Hoshiarpur'],
-  'Haryana': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Karnal', 'Rohtak']
+// Hierarchy: BU (North/South/East/West) → Zone (state combos) → Territory (tehsils)
+const BUS = ['North', 'South', 'East', 'West'] as const;
+const ZONES_BY_BU: Record<string, string[]> = {
+  North: ['Uttarakhand + Uttar Pradesh', 'Punjab + Haryana', 'Delhi-NCR', 'Himachal Pradesh'],
+  East: ['West Bengal + Odisha', 'Bihar + Jharkhand', 'NE'],
+  West: ['Maharashtra + Gujarat', 'Rajasthan', 'Madhya Pradesh'],
+  South: ['Karnataka', 'Tamil Nadu + Kerala', 'Andhra Pradesh + Telangana'],
 };
-
-// Indian territories (state-based zones)
-const TERRITORIES = [
-  'Uttar Pradesh Zone', 'Maharashtra Zone', 'Bihar Zone', 'West Bengal Zone', 'Madhya Pradesh Zone',
-  'Tamil Nadu Zone', 'Rajasthan Zone', 'Karnataka Zone', 'Gujarat Zone', 'Andhra Pradesh Zone',
-  'Odisha Zone', 'Telangana Zone', 'Kerala Zone', 'Punjab Zone', 'Haryana Zone'
-];
+const TERRITORIES_BY_BU: Record<string, string[]> = {
+  North: ['Dehradun Tehsil', 'Lucknow Tehsil', 'Ludhiana Tehsil', 'Gurgaon Tehsil', 'Shimla Tehsil', 'Varanasi Tehsil'],
+  East: ['Kolkata North Tehsil', 'Patna Tehsil', 'Bhubaneswar Tehsil', 'Guwahati Tehsil', 'Ranchi Tehsil'],
+  West: ['Mumbai City Tehsil', 'Ahmedabad Tehsil', 'Pune Tehsil', 'Jaipur Tehsil', 'Indore Tehsil'],
+  South: ['Bangalore North Tehsil', 'Chennai Tehsil', 'Hyderabad Tehsil', 'Mysore Tehsil', 'Kochi Tehsil'],
+};
+const ZONE_TO_STATE: Record<string, string> = {
+  'Uttarakhand + Uttar Pradesh': 'Uttar Pradesh', 'Punjab + Haryana': 'Punjab', 'Delhi-NCR': 'Delhi', 'Himachal Pradesh': 'Himachal Pradesh',
+  'West Bengal + Odisha': 'West Bengal', 'Bihar + Jharkhand': 'Bihar', 'NE': 'Assam',
+  'Maharashtra + Gujarat': 'Maharashtra', 'Rajasthan': 'Rajasthan', 'Madhya Pradesh': 'Madhya Pradesh',
+  'Karnataka': 'Karnataka', 'Tamil Nadu + Kerala': 'Tamil Nadu', 'Andhra Pradesh + Telangana': 'Andhra Pradesh',
+};
 
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
@@ -173,25 +167,16 @@ const generateFarmerName = (index: number, language: string): string => {
   return names[index % names.length];
 };
 
-const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string } => {
-  // Map languages to states
-  const languageStateMap: Record<string, string[]> = {
-    'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
-    'Telugu': ['Andhra Pradesh', 'Telangana'],
-    'Marathi': ['Maharashtra'],
-    'Kannada': ['Karnataka'],
-    'Tamil': ['Tamil Nadu'],
-    'English': ['Karnataka', 'Kerala', 'Tamil Nadu']
-  };
-  
-  const possibleStates = languageStateMap[language] || ['Uttar Pradesh'];
-  const state = possibleStates[index % possibleStates.length];
-  const districts = INDIAN_DISTRICTS[state] || ['District 1'];
-  const district = districts[index % districts.length];
+// BU → Zone (state combo) → Territory (tehsil); state for language from zone
+const generateIndianLocation = (index: number, _language: string): { state: string; village: string; territory: string; zone: string; bu: string } => {
+  const bu = BUS[index % BUS.length];
+  const zones = ZONES_BY_BU[bu] || [];
+  const territories = TERRITORIES_BY_BU[bu] || [];
+  const zone = zones[Math.floor((index / BUS.length) % zones.length)];
+  const territory = territories[Math.floor((index / (BUS.length * zones.length)) % territories.length)];
+  const state = ZONE_TO_STATE[zone] || 'Uttar Pradesh';
   const village = INDIAN_VILLAGES[index % INDIAN_VILLAGES.length];
-  const territory = `${state} Zone`;
-  
-  return { state, district, village, territory };
+  return { state, village, territory, zone, bu };
 };
 
 const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> => {
@@ -214,15 +199,15 @@ const createFarmers = async (count: number): Promise<mongoose.Types.ObjectId[]> 
     }
     
     const language = LANGUAGES[i % LANGUAGES.length];
-    const { state, district, village, territory } = generateIndianLocation(existingCount + i, language);
+    const { state, village, territory } = generateIndianLocation(existingCount + i, language);
     const farmerName = generateFarmerName(existingCount + i, language);
     
     const farmer = new Farmer({
       name: farmerName,
       mobileNumber,
-      location: `${village}, ${district}, ${state}`,
+      location: `${village}, ${territory}, ${state}`,
       preferredLanguage: language,
-      territory: territory,
+      territory,
     });
     
     await farmer.save();
@@ -263,15 +248,17 @@ const createActivities = async (
     const shuffled = [...farmerIds].sort(() => 0.5 - Math.random());
     const selectedFarmers = shuffled.slice(0, Math.min(farmersPerActivity, farmerIds.length));
     
-    // Get location, officer name and territory from first farmer
     const firstFarmer = await Farmer.findById(selectedFarmers[0]);
     const activityLocation = firstFarmer ? firstFarmer.location.split(',')[0] : INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
     const officerName = INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length];
     const officerId = `OFF-${String.fromCharCode(65 + (i % 26))}${(i % 1000).toString().padStart(3, '0')}`;
-    const activityTerritory = firstFarmer ? firstFarmer.territory : TERRITORIES[i % TERRITORIES.length];
-    const activityState = firstFarmer ? (firstFarmer.territory || '').replace(/\s+Zone$/i, '').trim() : (activityTerritory || '').replace(/\s+Zone$/i, '').trim();
-    const zoneName = ['North Zone', 'South Zone', 'East Zone', 'West Zone'][i % 4];
-    const buName = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'][i % 3];
+    const bu = BUS[i % BUS.length];
+    const zones = ZONES_BY_BU[bu] || [];
+    const territories = TERRITORIES_BY_BU[bu] || [];
+    const activityTerritory = firstFarmer ? firstFarmer.territory : territories[i % territories.length];
+    const zoneName = firstFarmer ? (zones[0] || bu) : (zones[i % zones.length] || bu);
+    const activityState = firstFarmer ? (firstFarmer.location.split(',').pop()?.trim() || 'Uttar Pradesh') : (ZONE_TO_STATE[zoneName] || 'Uttar Pradesh');
+    const buName = bu;
     
     // Create activity
     const activity = new Activity({

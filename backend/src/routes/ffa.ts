@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
-import { syncFFAData, getSyncStatus } from '../services/ffaSync.js';
+import { syncFFAData, getSyncStatus, getSyncProgress } from '../services/ffaSync.js';
 import { Activity } from '../models/Activity.js';
 import { Farmer } from '../models/Farmer.js';
 import { CallTask } from '../models/CallTask.js';
@@ -101,8 +101,27 @@ const formatDDMMYYYY = (d: Date): string => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+// @route   GET /api/ffa/sync-progress
+// @desc    Get current FFA sync progress (for progress bar / polling)
+// @access  Private (MIS Admin)
+router.get(
+  '/sync-progress',
+  requirePermission('config.ffa'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const progress = getSyncProgress();
+      res.json({
+        success: true,
+        data: progress,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   POST /api/ffa/sync
-// @desc    Manually trigger FFA sync (MIS Admin only)
+// @desc    Manually trigger FFA sync (MIS Admin only). Runs in background; client should poll GET /sync-progress.
 // @access  Private (MIS Admin)
 router.post(
   '/sync',
@@ -110,9 +129,8 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
-      // Check if fullSync flag is set in query params or body
       const fullSync = req.query.fullSync === 'true' || req.body?.fullSync === true;
-      
+
       logger.info(`[FFA SYNC] Manual FFA sync triggered (${fullSync ? 'full' : 'incremental'})`, {
         userId: (req as any).user?.id,
         userEmail: (req as any).user?.email,
@@ -120,66 +138,34 @@ router.post(
         hasEnvVar: !!process.env.FFA_API_URL,
         fullSync,
       });
-      
-      const result = await syncFFAData(fullSync);
 
-      // Convert Date objects to ISO strings for JSON serialization
-      const responseData = {
-        ...result,
-        lastSyncDate: result.lastSyncDate ? result.lastSyncDate.toISOString() : undefined,
-      };
-
-      // Handle skipped syncs (no new data or too soon)
-      if (result.skipped) {
-        res.json({
-          success: true,
-          message: result.skipReason || 'Sync skipped',
-          data: {
-            ...responseData,
-            skipped: true,
-            skipReason: result.skipReason,
-          },
-        });
-        return;
-      }
+      // Run sync in background so client can poll progress
+      syncFFAData(fullSync).catch((err) => {
+        logger.error('[FFA SYNC] Background sync error:', err);
+      });
 
       res.json({
         success: true,
-        message: `FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}`,
-        data: responseData,
+        started: true,
+        message: 'FFA sync started. Poll /api/ffa/sync-progress for progress.',
+        data: { fullSync },
       });
     } catch (error) {
       const ffaApiUrl = process.env.FFA_API_URL || 'http://localhost:4000/api';
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      
-      // Log detailed error information
+
       logger.error('FFA sync endpoint error:', {
         error: errorMessage,
-        stack: errorStack,
         ffaApiUrl: ffaApiUrl,
         hasEnvVar: !!process.env.FFA_API_URL,
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        fullError: error,
       });
-      
-      // Also log as a separate error message for better visibility in Cloud Run logs
-      logger.error(`FFA sync failed: ${errorMessage}`, {
-        ffaApiUrl,
-        hasEnvVar: !!process.env.FFA_API_URL,
-      });
-      
-      // Provide more detailed error information
+
       const statusCode = errorMessage.includes('Cannot connect') || errorMessage.includes('timeout') ? 503 : 500;
-      
       res.status(statusCode).json({
         success: false,
-        message: `FFA sync failed: ${errorMessage}`,
+        message: `FFA sync failed to start: ${errorMessage}`,
         error: errorMessage,
-        details: {
-          ffaApiUrl: ffaApiUrl,
-          hasEnvVar: !!process.env.FFA_API_URL,
-        },
+        details: { ffaApiUrl: ffaApiUrl, hasEnvVar: !!process.env.FFA_API_URL },
       });
     }
   }

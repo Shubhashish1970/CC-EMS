@@ -31,10 +31,10 @@ const AdminDashboardContainer: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       {/* Header - Dark Slate Theme */}
       <div className="bg-slate-900 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center">
@@ -68,7 +68,7 @@ const AdminDashboardContainer: React.FC = () => {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-slate-700">
+          <div className="flex flex-wrap items-center gap-1 border-b border-slate-700">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -93,8 +93,8 @@ const AdminDashboardContainer: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto p-6">
+      {/* Content - prevent horizontal overflow at 100% zoom */}
+      <div className="max-w-7xl mx-auto w-full min-w-0 px-4 sm:px-6 py-6 overflow-x-hidden">
         {activeTab === 'dashboard' && <ActivityEmsProgressView />}
         {activeTab === 'activities' && <ActivitySamplingView />}
         {activeTab === 'queues' && <AgentQueueView />}

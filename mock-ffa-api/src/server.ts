@@ -22,35 +22,38 @@ const INDIAN_STATES = [
   'Odisha', 'Telangana', 'Kerala', 'Jharkhand', 'Assam', 'Punjab', 'Haryana'
 ];
 
-// Simple synthetic mapping for BU/Zone/Territory to support Activity API v2 fields in mock
-const BUSINESS_UNITS = ['BU - Seeds', 'BU - Crop Protection', 'BU - Fertilizers'];
-const ZONES = ['North Zone', 'South Zone', 'East Zone', 'West Zone'];
+// Hierarchy: BU (North/South/East/West) → Zone (state combos) → Region (district combos) → Territory (tehsils)
+const BUS = ['North', 'South', 'East', 'West'] as const;
 
-const INDIAN_DISTRICTS: Record<string, string[]> = {
-  'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', 'Meerut', 'Ghaziabad'],
-  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Thane'],
-  'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga', 'Arrah'],
-  'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Bardhaman', 'Malda'],
-  'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Raipur', 'Sagar'],
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Erode'],
-  'Rajasthan': ['Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Bhilwara'],
-  'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum', 'Gulbarga', 'Davangere'],
-  'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar'],
-  'Andhra Pradesh': ['Hyderabad', 'Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati'],
-  'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore'],
-  'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Mahbubnagar', 'Adilabad'],
-  'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Alappuzha', 'Kannur'],
-  'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar', 'Giridih'],
-  'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia', 'Tezpur'],
-  'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Pathankot', 'Hoshiarpur'],
-  'Haryana': ['Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Karnal', 'Rohtak']
+const ZONES_BY_BU: Record<string, string[]> = {
+  North: ['Uttarakhand + Uttar Pradesh', 'Punjab + Haryana', 'Delhi-NCR', 'Himachal Pradesh'],
+  East: ['West Bengal + Odisha', 'Bihar + Jharkhand', 'NE'],
+  West: ['Maharashtra + Gujarat', 'Rajasthan', 'Madhya Pradesh'],
+  South: ['Karnataka', 'Tamil Nadu + Kerala', 'Andhra Pradesh + Telangana'],
 };
 
-const TERRITORIES = [
-  'Uttar Pradesh Zone', 'Maharashtra Zone', 'Bihar Zone', 'West Bengal Zone', 'Madhya Pradesh Zone',
-  'Tamil Nadu Zone', 'Rajasthan Zone', 'Karnataka Zone', 'Gujarat Zone', 'Andhra Pradesh Zone',
-  'Odisha Zone', 'Telangana Zone', 'Kerala Zone', 'Punjab Zone', 'Haryana Zone'
-];
+const TERRITORIES_BY_BU: Record<string, string[]> = {
+  North: ['Dehradun Tehsil', 'Mussoorie Tehsil', 'Lucknow Tehsil', 'Sitapur + Raebareli Tehsils', 'Ludhiana Tehsil', 'Amritsar Tehsil', 'Gurgaon Tehsil', 'Faridabad Tehsil', 'Shimla Tehsil', 'Nainital Tehsil', 'Meerut Tehsil', 'Varanasi Tehsil'],
+  East: ['Kolkata North Tehsil', 'Howrah Tehsil', 'Patna Tehsil', 'Gaya Tehsil', 'Bhubaneswar Tehsil', 'Guwahati Tehsil', 'Ranchi Tehsil', 'Durgapur + Asansol Tehsils', 'Siliguri Tehsil'],
+  West: ['Mumbai City Tehsil', 'Thane Tehsil', 'Ahmedabad Tehsil', 'Surat Tehsil', 'Pune Tehsil', 'Jaipur Tehsil', 'Udaipur Tehsil', 'Indore Tehsil', 'Nagpur Tehsil'],
+  South: ['Bangalore North Tehsil', 'Bangalore South Tehsil', 'Chennai Tehsil', 'Hyderabad Tehsil', 'Mysore Tehsil', 'Vijayawada + Guntur Tehsils', 'Kochi Tehsil', 'Coimbatore Tehsil', 'Madurai Tehsil'],
+};
+
+const ZONE_TO_STATE: Record<string, string> = {
+  'Uttarakhand + Uttar Pradesh': 'Uttar Pradesh',
+  'Punjab + Haryana': 'Punjab',
+  'Delhi-NCR': 'Delhi',
+  'Himachal Pradesh': 'Himachal Pradesh',
+  'West Bengal + Odisha': 'West Bengal',
+  'Bihar + Jharkhand': 'Bihar',
+  'NE': 'Assam',
+  'Maharashtra + Gujarat': 'Maharashtra',
+  'Rajasthan': 'Rajasthan',
+  'Madhya Pradesh': 'Madhya Pradesh',
+  'Karnataka': 'Karnataka',
+  'Tamil Nadu + Kerala': 'Tamil Nadu',
+  'Andhra Pradesh + Telangana': 'Andhra Pradesh',
+};
 
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
@@ -199,35 +202,15 @@ const generateMobileNumber = (index: number): string => {
   return String(base + (index % 100000000)).padStart(10, '0');
 };
 
-const generateIndianLocation = (index: number, language: string): { state: string; district: string; village: string; territory: string } => {
-  const languageStateMap: Record<string, string[]> = {
-    'Hindi': ['Uttar Pradesh', 'Bihar', 'Madhya Pradesh', 'Rajasthan', 'Haryana'],
-    'Telugu': ['Andhra Pradesh', 'Telangana'],
-    'Marathi': ['Maharashtra'],
-    'Kannada': ['Karnataka'],
-    'Tamil': ['Tamil Nadu'],
-    'English': ['Karnataka', 'Kerala', 'Tamil Nadu']
-  };
-  
-  const possibleStates = languageStateMap[language] || ['Uttar Pradesh'];
-  const state = possibleStates[index % possibleStates.length];
-  const districts = INDIAN_DISTRICTS[state] || ['District 1'];
-  const district = districts[index % districts.length];
-  const village = INDIAN_VILLAGES[index % INDIAN_VILLAGES.length];
-  const territory = `${state} Zone`;
-  
-  return { state, district, village, territory };
-};
-
-const getBUForState = (state: string): string => {
-  // Synthetic but stable mapping to keep data consistent
-  const hash = state.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return BUSINESS_UNITS[hash % BUSINESS_UNITS.length];
-};
-
-const getZoneForState = (state: string): string => {
-  const hash = state.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return ZONES[hash % ZONES.length];
+// Pick BU → Zone (state combo) → Territory (tehsil); state for language from zone
+const pickHierarchy = (index: number): { bu: string; zone: string; territory: string; state: string } => {
+  const bu = BUS[index % BUS.length];
+  const zones = ZONES_BY_BU[bu] || [];
+  const territories = TERRITORIES_BY_BU[bu] || [];
+  const zone = zones[Math.floor((index / BUS.length) % zones.length)];
+  const territory = territories[Math.floor((index / (BUS.length * zones.length)) % territories.length)];
+  const state = ZONE_TO_STATE[zone] || 'Uttar Pradesh';
+  return { bu, zone, territory, state };
 };
 
 const generateFieldSalesHierarchy = (index: number) => {
@@ -281,11 +264,11 @@ const generateSampleData = () => {
     const activityDate = new Date();
     activityDate.setDate(activityDate.getDate() - (i * 2)); // Activities spread over last 100 days
 
-    // Select language for this activity (determines state/territory)
+    // BU → Zone (state combo) → Territory (tehsil)
+    const { bu, zone, territory, state } = pickHierarchy(i);
     const language = LANGUAGES[i % LANGUAGES.length];
-    const { state, district, village, territory } = generateIndianLocation(i, language);
+    const village = INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
     
-    // Generate crops and products for this activity (2-5 crops, 1-3 products)
     const activityCrops = CROPS
       .sort(() => Math.random() - 0.5)
       .slice(0, 2 + Math.floor(Math.random() * 4));
@@ -293,26 +276,22 @@ const generateSampleData = () => {
       .sort(() => Math.random() - 0.5)
       .slice(0, 1 + Math.floor(Math.random() * 3));
 
-    // Generate field sales hierarchy (FDA is the activity officer in our backend)
     const hierarchy = generateFieldSalesHierarchy(i);
     const officerName = hierarchy.fda.name;
     const officerId = hierarchy.fda.empCode;
-    const buName = getBUForState(state);
-    const zoneName = getZoneForState(state);
 
     const activity = {
       activityId: `FFA-ACT-${1000 + i}`,
       type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
-      // NEW contract: DD/MM/YYYY
       date: formatDDMMYYYY(activityDate),
       officerId: officerId,
       officerName: officerName,
-      location: village, // Use village name as location
-      territory: territory, // State-based territory
-      state: state, // NEW: Add state field directly
+      location: `${village}, ${territory}`,
+      territory: territory,
+      state: state,
       territoryName: territory,
-      zoneName: zoneName,
-      buName: buName,
+      zoneName: zone,
+      buName: bu,
       tmEmpCode: hierarchy.tm.empCode,
       tmName: hierarchy.tm.name,
       fieldSalesHierarchy: hierarchy,
@@ -338,7 +317,7 @@ const generateSampleData = () => {
         farmerId: `FFA-FARM-${i}-${j}`,
         name: farmerName,
         mobileNumber: mobileNumber,
-        location: `${village}, ${district}, ${state}`, // Full location string
+        location: `${village}, ${territory}, ${state}`,
         // preferredLanguage: language, // REMOVED - will be derived from state in backend
         crops: [activityCrops[Math.floor(Math.random() * activityCrops.length)]],
         photoUrl: photoUrl,

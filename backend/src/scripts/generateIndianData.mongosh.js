@@ -3,38 +3,44 @@
  * Run with: mongosh "mongodb+srv://..." < generateIndianData.mongosh.js
  */
 
-// Indian District Names (Territories) - Organized by BU
-const INDIAN_DISTRICTS = {
-  North: [
-    'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', // Punjab
-    'Gurgaon', 'Faridabad', 'Karnal', 'Panipat', 'Ambala', // Haryana
-    'Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Allahabad', // Uttar Pradesh
-    'New Delhi', 'Central Delhi', 'East Delhi', 'West Delhi', 'South Delhi', // Delhi
-  ],
-  East: [
-    'Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', // West Bengal
-    'Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', // Odisha
-    'Patna', 'Gaya', 'Muzaffarpur', 'Bhagalpur', 'Darbhanga', // Bihar
-    'Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', // Jharkhand
-  ],
-  West: [
-    'Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', // Maharashtra
-    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Gandhinagar', // Gujarat
-    'Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Ajmer', // Rajasthan
-  ],
-  South: [
-    'Bangalore', 'Mysore', 'Mangalore', 'Hubli', 'Belgaum', // Karnataka
-    'Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli', // Tamil Nadu
-    'Hyderabad', 'Vijayawada', 'Visakhapatnam', 'Guntur', 'Nellore', // Andhra Pradesh/Telangana
-    'Kochi', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Kannur', // Kerala
-  ],
+// Hierarchy: BU (North/South/East/West) → Zone (state combos) → Region (district combos) → Territory (tehsils)
+const BUS = ['North', 'South', 'East', 'West'];
+
+const ZONES_BY_BU = {
+  North: ['Uttarakhand + Uttar Pradesh', 'Punjab + Haryana', 'Delhi-NCR', 'Himachal Pradesh'],
+  East: ['West Bengal + Odisha', 'Bihar + Jharkhand', 'NE'],
+  West: ['Maharashtra + Gujarat', 'Rajasthan', 'Madhya Pradesh'],
+  South: ['Karnataka', 'Tamil Nadu + Kerala', 'Andhra Pradesh + Telangana'],
 };
 
-const ZONES = {
-  North: ['Punjab', 'Haryana', 'Uttar Pradesh', 'Delhi', 'Himachal Pradesh'],
-  East: ['West Bengal', 'Odisha', 'Bihar', 'Jharkhand', 'Assam'],
-  West: ['Maharashtra', 'Gujarat', 'Rajasthan', 'Madhya Pradesh'],
-  South: ['Karnataka', 'Tamil Nadu', 'Andhra Pradesh', 'Telangana', 'Kerala'],
+const REGIONS_BY_BU = {
+  North: ['Dehradun + Haridwar', 'Lucknow', 'Ludhiana + Amritsar', 'Gurgaon + Faridabad', 'Shimla'],
+  East: ['Kolkata + Howrah', 'Patna', 'Bhubaneswar + Cuttack', 'Guwahati + Kamrup', 'Ranchi + Dhanbad'],
+  West: ['Mumbai + Thane', 'Ahmedabad', 'Pune + Nashik', 'Jaipur', 'Indore'],
+  South: ['Bangalore Urban', 'Chennai + Kanchipuram', 'Hyderabad + Ranga Reddy', 'Mysore', 'Kochi'],
+};
+
+const TERRITORIES_BY_BU = {
+  North: ['Dehradun Tehsil', 'Mussoorie Tehsil', 'Lucknow Tehsil', 'Sitapur + Raebareli Tehsils', 'Ludhiana Tehsil', 'Amritsar Tehsil', 'Gurgaon Tehsil', 'Faridabad Tehsil', 'Shimla Tehsil', 'Nainital Tehsil', 'Meerut Tehsil', 'Varanasi Tehsil'],
+  East: ['Kolkata North Tehsil', 'Howrah Tehsil', 'Patna Tehsil', 'Gaya Tehsil', 'Bhubaneswar Tehsil', 'Guwahati Tehsil', 'Ranchi Tehsil', 'Durgapur + Asansol Tehsils', 'Siliguri Tehsil'],
+  West: ['Mumbai City Tehsil', 'Thane Tehsil', 'Ahmedabad Tehsil', 'Surat Tehsil', 'Pune Tehsil', 'Jaipur Tehsil', 'Udaipur Tehsil', 'Indore Tehsil', 'Nagpur Tehsil'],
+  South: ['Bangalore North Tehsil', 'Bangalore South Tehsil', 'Chennai Tehsil', 'Hyderabad Tehsil', 'Mysore Tehsil', 'Vijayawada + Guntur Tehsils', 'Kochi Tehsil', 'Coimbatore Tehsil', 'Madurai Tehsil'],
+};
+
+const ZONE_TO_STATE = {
+  'Uttarakhand + Uttar Pradesh': 'Uttar Pradesh',
+  'Punjab + Haryana': 'Punjab',
+  'Delhi-NCR': 'Delhi',
+  'Himachal Pradesh': 'Himachal Pradesh',
+  'West Bengal + Odisha': 'West Bengal',
+  'Bihar + Jharkhand': 'Bihar',
+  'NE': 'Assam',
+  'Maharashtra + Gujarat': 'Maharashtra',
+  'Rajasthan': 'Rajasthan',
+  'Madhya Pradesh': 'Madhya Pradesh',
+  'Karnataka': 'Karnataka',
+  'Tamil Nadu + Kerala': 'Tamil Nadu',
+  'Andhra Pradesh + Telangana': 'Andhra Pradesh',
 };
 
 const STATE_TO_LANGUAGE = {
@@ -47,7 +53,7 @@ const STATE_TO_LANGUAGE = {
   'Odisha': 'Oriya',
   'Bihar': 'Hindi',
   'Jharkhand': 'Hindi',
-  'Assam': 'Bengali',
+  'Assam': 'Assamese',
   'Maharashtra': 'Marathi',
   'Gujarat': 'Hindi',
   'Rajasthan': 'Hindi',
@@ -83,35 +89,13 @@ function generateIndianName() {
   return `${firstName} ${lastName}`;
 }
 
-function getLanguageForTerritory(district, bu) {
-  const zones = ZONES[bu] || [];
-  for (const zone of zones) {
-    if (STATE_TO_LANGUAGE[zone]) {
-      return STATE_TO_LANGUAGE[zone];
-    }
-  }
-  return 'Hindi';
+function getStateForZone(zoneName) {
+  return ZONE_TO_STATE[zoneName] || 'Uttar Pradesh';
 }
 
-function getStateForTerritory(district, bu) {
-  const zones = ZONES[bu] || [];
-  return zones[0] || 'Unknown';
-}
-
-function getRegionForTerritory(district, bu) {
-  const regions = {
-    North: ['Punjab-Haryana Region', 'Uttar Pradesh Central Region', 'Uttar Pradesh Eastern Region', 'Delhi-NCR Region'],
-    East: ['West Bengal Central Region', 'West Bengal Northern Region', 'Odisha Coastal Region', 'Odisha Inland Region', 'Bihar Central Region', 'Bihar Eastern Region', 'Jharkhand Region'],
-    West: ['Maharashtra Western Region', 'Maharashtra Central Region', 'Gujarat Northern Region', 'Gujarat Southern Region', 'Rajasthan Northern Region', 'Rajasthan Southern Region'],
-    South: ['Karnataka Northern Region', 'Karnataka Southern Region', 'Tamil Nadu Northern Region', 'Tamil Nadu Southern Region', 'Andhra Pradesh Coastal Region', 'Andhra Pradesh Rayalaseema Region', 'Telangana Region', 'Kerala Northern Region', 'Kerala Southern Region'],
-  };
-  const regs = regions[bu] || [];
-  return randomElement(regs);
-}
-
-function getZoneForTerritory(district, bu) {
-  const zones = ZONES[bu] || [];
-  return randomElement(zones);
+function getLanguageForZone(zoneName) {
+  const state = getStateForZone(zoneName);
+  return STATE_TO_LANGUAGE[state] || 'Hindi';
 }
 
 // Main execution
@@ -131,17 +115,17 @@ db.inboundqueries.deleteMany({});
 print('✅ Operational data cleared');
 print('');
 
-// Generate 500 farmers
+// Generate 500 farmers (BU → Zone → Region → Territory tehsil)
 print('👨‍🌾 Generating 500 farmers...');
 const farmers = [];
 const mobileNumbers = new Set();
-const allDistricts = [].concat(...Object.values(INDIAN_DISTRICTS));
 
 for (let i = 0; i < 500; i++) {
-  const bus = Object.keys(INDIAN_DISTRICTS);
-  const bu = randomElement(bus);
-  const districts = INDIAN_DISTRICTS[bu];
-  const district = randomElement(districts);
+  const bu = randomElement(BUS);
+  const zone = randomElement(ZONES_BY_BU[bu]);
+  const region = randomElement(REGIONS_BY_BU[bu]);
+  const territory = randomElement(TERRITORIES_BY_BU[bu]);
+  const state = getStateForZone(zone);
   
   let mobileNumber = generateMobileNumber();
   while (mobileNumbers.has(mobileNumber)) {
@@ -150,16 +134,15 @@ for (let i = 0; i < 500; i++) {
   mobileNumbers.add(mobileNumber);
   
   const name = generateIndianName();
-  const language = getLanguageForTerritory(district, bu);
-  const state = getStateForTerritory(district, bu);
-  const location = `${district}, ${state}`;
+  const language = getLanguageForZone(zone);
+  const location = `${territory}, ${region}, ${state}`;
   
   farmers.push({
     name,
     mobileNumber,
     location,
     preferredLanguage: language,
-    territory: district,
+    territory,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -188,10 +171,11 @@ farmers.forEach(f => {
 });
 
 for (let i = 0; i < 100; i++) {
-  const bus = Object.keys(INDIAN_DISTRICTS);
-  const bu = randomElement(bus);
-  const districts = INDIAN_DISTRICTS[bu];
-  const district = randomElement(districts);
+  const bu = randomElement(BUS);
+  const zone = randomElement(ZONES_BY_BU[bu]);
+  const region = randomElement(REGIONS_BY_BU[bu]);
+  const territory = randomElement(TERRITORIES_BY_BU[bu]);
+  const state = getStateForZone(zone);
   
   const activityType = randomElement(ACTIVITY_TYPES);
   const officerName = randomElement(OFFICER_NAMES);
@@ -202,13 +186,9 @@ for (let i = 0; i < 100; i++) {
   const activityDate = new Date(startDate);
   activityDate.setDate(activityDate.getDate() + daysAgo);
   
-  const territoryFarmers = farmersByTerritory[district] || [];
+  const territoryFarmers = farmersByTerritory[territory] || [];
   const numFarmers = Math.min(Math.floor(Math.random() * 10) + 5, territoryFarmers.length);
   const selectedFarmers = territoryFarmers.slice(0, numFarmers);
-  
-  const state = getStateForTerritory(district, bu);
-  const region = getRegionForTerritory(district, bu);
-  const zone = getZoneForTerritory(district, bu);
   
   const numCrops = Math.floor(Math.random() * 3) + 1;
   const numProducts = Math.floor(Math.random() * 2) + 1;
@@ -224,9 +204,9 @@ for (let i = 0; i < 100; i++) {
     firstSampleRun: false,
     officerId,
     officerName,
-    location: `${district}, ${state}`,
-    territory: district,
-    territoryName: district,
+    location: `${territory}, ${region}, ${state}`,
+    territory,
+    territoryName: territory,
     zoneName: zone,
     buName: bu,
     state,

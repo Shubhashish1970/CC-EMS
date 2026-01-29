@@ -102,6 +102,24 @@ const ActivitySamplingView: React.FC = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
   const [isIncrementalSyncing, setIsIncrementalSyncing] = useState(false);
   const [isFullSyncing, setIsFullSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    running: boolean;
+    activitiesSynced: number;
+    totalActivities: number;
+    farmersSynced: number;
+    errorCount: number;
+    syncType: 'full' | 'incremental' | null;
+    message: string;
+    lastResult?: {
+      activitiesSynced: number;
+      farmersSynced: number;
+      errors: string[];
+      syncType: 'full' | 'incremental';
+      skipped?: boolean;
+      skipReason?: string;
+    };
+  } | null>(null);
+  const syncProgressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [syncStatus, setSyncStatus] = useState<{ lastSyncAt: string | null; totalActivities: number; totalFarmers: number } | null>(null);
   const [dataSource, setDataSource] = useState<'api' | 'excel'>(() => {
     const v = localStorage.getItem('admin.activitySampling.dataSource');
@@ -370,6 +388,15 @@ const ActivitySamplingView: React.FC = () => {
     localStorage.setItem('admin.activitySampling.tableColumnWidths', JSON.stringify(tableColumnWidths));
   }, [tableColumnWidths]);
 
+  useEffect(() => {
+    return () => {
+      if (syncProgressPollRef.current) {
+        clearInterval(syncProgressPollRef.current);
+        syncProgressPollRef.current = null;
+      }
+    };
+  }, []);
+
   const fetchSyncStatus = async () => {
     try {
       const response = await ffaAPI.getFFASyncStatus() as any;
@@ -387,33 +414,76 @@ const ActivitySamplingView: React.FC = () => {
       showError('Data source is Excel. Switch to API to use Sync options.');
       return;
     }
-    // Set appropriate loading state based on sync type
     if (fullSync) {
       setIsFullSyncing(true);
     } else {
       setIsIncrementalSyncing(true);
     }
-    
+    setSyncProgress({ running: true, activitiesSynced: 0, totalActivities: 0, farmersSynced: 0, errorCount: 0, syncType: fullSync ? 'full' : 'incremental', message: 'Starting sync...' });
+
     try {
-      const response = await ffaAPI.syncFFAData(fullSync) as any;
-      if (response.success) {
-        const syncType = response.data.syncType || 'incremental';
-        showSuccess(`FFA sync completed (${syncType}): ${response.data.activitiesSynced} activities, ${response.data.farmersSynced} farmers synced`);
-        // Refresh activities and sync status
+      const response = (await ffaAPI.syncFFAData(fullSync)) as any;
+      if (!response?.success) {
+        showError(response?.message || 'FFA sync failed to start');
+        setSyncProgress(null);
+        if (fullSync) setIsFullSyncing(false);
+        else setIsIncrementalSyncing(false);
+        return;
+      }
+      if (!response.started) {
+        // Legacy path: server returned result inline
+        const d = response.data || {};
+        showSuccess(`FFA sync completed: ${d.activitiesSynced ?? 0} activities, ${d.farmersSynced ?? 0} farmers synced`);
+        setSyncProgress(null);
         await fetchActivities(pagination.page);
         await fetchSyncStatus();
-      } else {
-        showError('FFA sync failed');
+        if (fullSync) setIsFullSyncing(false);
+        else setIsIncrementalSyncing(false);
+        return;
       }
+
+      const poll = async () => {
+        try {
+          const pr = (await ffaAPI.getFFASyncProgress()) as any;
+          const data = pr?.data ?? pr;
+          setSyncProgress({
+            running: data.running ?? false,
+            activitiesSynced: data.activitiesSynced ?? 0,
+            totalActivities: data.totalActivities ?? 0,
+            farmersSynced: data.farmersSynced ?? 0,
+            errorCount: data.errorCount ?? 0,
+            syncType: data.syncType ?? null,
+            message: data.message ?? '',
+            lastResult: data.lastResult,
+          });
+          if (!data.running) {
+            if (syncProgressPollRef.current) {
+              clearInterval(syncProgressPollRef.current);
+              syncProgressPollRef.current = null;
+            }
+            const result = data.lastResult;
+            if (result?.skipped) {
+              showSuccess(result.skipReason || 'Sync skipped');
+            } else if (result) {
+              showSuccess(`FFA sync completed (${result.syncType}): ${result.activitiesSynced} activities, ${result.farmersSynced} farmers synced${(result.errors?.length ?? 0) > 0 ? `, ${result.errors.length} errors` : ''}`);
+            }
+            await fetchActivities(pagination.page);
+            await fetchSyncStatus();
+            if (fullSync) setIsFullSyncing(false);
+            else setIsIncrementalSyncing(false);
+          }
+        } catch (e) {
+          console.error('FFA sync progress poll error:', e);
+        }
+      };
+
+      syncProgressPollRef.current = setInterval(poll, 1500);
+      await poll();
     } catch (err: any) {
-      showError(err.message || 'Failed to sync FFA data');
-    } finally {
-      // Clear appropriate loading state
-      if (fullSync) {
-        setIsFullSyncing(false);
-      } else {
-        setIsIncrementalSyncing(false);
-      }
+      showError(err?.message || 'Failed to sync FFA data');
+      setSyncProgress(null);
+      if (fullSync) setIsFullSyncing(false);
+      else setIsIncrementalSyncing(false);
     }
   };
 
@@ -646,11 +716,11 @@ const ActivitySamplingView: React.FC = () => {
   const statistics = statsData || calculateStatistics();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Header with Filters */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm min-w-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div className="min-w-0">
             <h2 className="text-xl font-black text-slate-900 mb-1">Activity Monitoring</h2>
             <p className="text-sm text-slate-600">Monitor FFA activities and their status</p>
             {syncStatus && (
@@ -660,9 +730,9 @@ const ActivitySamplingView: React.FC = () => {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             {/* iPhone-style toggle */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 shrink-0">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Source</span>
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-black ${dataSource === 'api' ? 'text-slate-900' : 'text-slate-400'}`}>API</span>
@@ -724,6 +794,75 @@ const ActivitySamplingView: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {syncProgress && (
+          <div className="mt-3 pt-3 border-t border-slate-200">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              {syncProgress.running ? (
+                <>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-black text-slate-700 uppercase tracking-widest">
+                      FFA Sync in progress ({syncProgress.syncType ?? 'incremental'})
+                    </span>
+                    <span className="text-sm font-medium text-slate-600">
+                      {syncProgress.activitiesSynced} / {syncProgress.totalActivities} activities • {syncProgress.farmersSynced} farmers
+                      {syncProgress.errorCount > 0 && ` • ${syncProgress.errorCount} errors`}
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 transition-all duration-300 rounded-full"
+                      style={{
+                        width: syncProgress.totalActivities > 0
+                          ? `${Math.min(100, (100 * syncProgress.activitiesSynced) / syncProgress.totalActivities)}%`
+                          : '0%',
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">{syncProgress.message}</p>
+                </>
+              ) : syncProgress.lastResult ? (
+                <>
+                  <div className="font-black text-slate-900 mb-1">Sync Summary</div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Activities synced</div>
+                      <div className="text-lg font-black text-slate-900">{syncProgress.lastResult.activitiesSynced ?? 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Farmers synced</div>
+                      <div className="text-lg font-black text-slate-900">{syncProgress.lastResult.farmersSynced ?? 0}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Errors</div>
+                      <div className="text-lg font-black text-slate-900">{(syncProgress.lastResult.errors?.length ?? 0)}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-3">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</div>
+                      <div className="text-sm font-bold text-slate-800">{syncProgress.lastResult.syncType ?? '—'}</div>
+                      {syncProgress.lastResult.skipped && syncProgress.lastResult.skipReason && (
+                        <div className="text-xs text-slate-600 mt-1">{syncProgress.lastResult.skipReason}</div>
+                      )}
+                    </div>
+                  </div>
+                  {(syncProgress.lastResult.errors?.length ?? 0) > 0 && (
+                    <div className="mt-3 text-xs text-slate-700">
+                      <div className="font-black text-slate-900 mb-1">Errors (first 20)</div>
+                      <div className="max-h-32 overflow-auto rounded-xl border border-slate-200 bg-white p-2">
+                        {(syncProgress.lastResult.errors ?? []).slice(0, 20).map((e: string, idx: number) => (
+                          <div key={idx} className="py-0.5 text-red-700">{e}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <Button variant="secondary" size="sm" className="mt-3" onClick={() => setSyncProgress(null)}>
+                    Dismiss
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {dataSource === 'excel' && (
           <div className="mt-3 pt-3 border-t border-slate-200">
@@ -942,10 +1081,10 @@ const ActivitySamplingView: React.FC = () => {
                   </button>
 
                   {isDatePickerOpen && (
-                    <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
-                      <div className="flex">
+                    <div className="absolute z-50 mt-2 right-0 left-auto w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                      <div className="flex flex-col sm:flex-row">
                         {/* Presets */}
-                        <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                        <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
                           {([
                             'Custom',
                             'Today',
