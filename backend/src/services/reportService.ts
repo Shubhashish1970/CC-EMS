@@ -5,36 +5,73 @@ import mongoose from 'mongoose';
 import type { EmsProgressFilters } from './kpiService.js';
 import { buildActivityMatch } from './kpiService.js';
 
-/** One row per task for Excel task-detail export */
+/**
+ * One row per task for Excel task-detail export.
+ * Sections: 1) Activity details 2) Sampling details 3) Task details 4) Agent/Calling details 5) Final outcome and comments.
+ */
 export interface TaskDetailExportRow {
-  officerName: string;
-  fda: string; // officerId or same as officerName
-  farmerName: string;
-  territory: string;
+  // ---- 1. Activity details ----
+  activityId: string;
   activityType: string;
   activityDate: string;
+  officerName: string;       // FDA name
+  officerId: string;         // FDA ID
+  tmName: string;
+  tmEmpCode: string;
   activityLocation: string;
+  territory: string;
+  territoryName: string;
+  zoneName: string;
+  buName: string;
+  state: string;
   activityCrops: string;
   activityProducts: string;
+  lifecycleStatus: string;
+  activitySyncedAt: string;
+  // ---- 2. Sampling details ----
+  samplingPercentage: number;
+  samplingTotalFarmers: number;
+  samplingSampledCount: number;
+  samplingAlgorithm: string;
+  samplingCreatedAt: string;
+  // ---- 3. Task details (task + farmer) ----
+  taskId: string;
+  farmerName: string;
+  farmerMobile: string;
+  farmerLocation: string;
+  farmerPreferredLanguage: string;
+  farmerTerritory: string;
   taskScheduledDate: string;
   taskStatus: string;
+  taskOutcome: string;
+  retryCount: number;
+  isCallback: string;
+  callbackNumber: number;
   taskCreatedAt: string;
   taskUpdatedAt: string;
+  callStartedAt: string;
+  // ---- 4. Agent / Calling details ----
   agentName: string;
   agentEmail: string;
+  agentEmployeeId: string;
+  callTimestamp: string;
   callStatus: string;
+  callDurationSeconds: number;
   didAttend: string;
+  didRecall: string;
   cropsDiscussed: string;
   productsDiscussed: string;
   hasPurchased: string;
   willingToPurchase: string;
   likelyPurchaseDate: string;
-  farmerComments: string;
-  sentiment: string;
   nonPurchaseReason: string;
   purchasedProducts: string;
+  // ---- 5. Final outcome and comments ----
   outcome: string;
   finalStatus: string;
+  farmerComments: string;
+  sentiment: string;
+  lastStatusNote: string;    // last interaction history note if any
 }
 
 export interface ReportFilters extends EmsProgressFilters {
@@ -267,18 +304,26 @@ const fmtDate = (d: Date | undefined | null): string => {
 };
 
 /**
- * Task-level detail rows for Excel: Officer Name, FDA, farmer name, territory,
- * Activity details, Task details, dates, agent, responses, final status.
+ * Task-level detail rows for Excel. Sections: Activity details, Sampling details,
+ * Task details, Agent/Calling details, Final outcome and comments. No field omitted.
  */
 export async function getTaskDetailExportRows(filters?: ReportFilters): Promise<TaskDetailExportRow[]> {
   const activityMatch = buildActivityMatch(filters);
-  const activities = await Activity.find(activityMatch as any).select('_id').lean();
+  const activities = await Activity.find(activityMatch as any)
+    .select('_id activityId type date officerId officerName tmName tmEmpCode location territory territoryName zoneName buName state crops products lifecycleStatus syncedAt')
+    .lean();
   const activityIds = activities.map((a: any) => a._id);
   if (activityIds.length === 0) return [];
 
+  const audits = await SamplingAudit.find({ activityId: { $in: activityIds } }).lean();
+  const auditByActivity = new Map<string, any>();
+  for (const a of audits as any[]) {
+    auditByActivity.set(String(a.activityId), a);
+  }
+
   const tasks = await CallTask.find({ activityId: { $in: activityIds } })
-    .populate('farmerId', 'name mobileNumber preferredLanguage location')
-    .populate('activityId', 'activityId type date officerId officerName tmName location territory territoryName zoneName buName state crops products')
+    .populate('farmerId', 'name mobileNumber preferredLanguage location territory')
+    .populate('activityId', 'activityId type date officerId officerName tmName tmEmpCode location territory territoryName zoneName buName state crops products lifecycleStatus syncedAt')
     .populate('assignedAgentId', 'name email employeeId')
     .sort({ scheduledDate: -1, createdAt: -1 })
     .lean();
@@ -289,9 +334,10 @@ export async function getTaskDetailExportRows(filters?: ReportFilters): Promise<
     const farmer = t.farmerId;
     const agent = t.assignedAgentId;
     const log = t.callLog || {};
-    const farmerName = farmer?.name ?? '';
-    const officerName = act?.officerName ?? '';
-    const territory = [act?.territoryName, act?.territory].filter(Boolean).join(' ') || '';
+    const audit = act ? auditByActivity.get(String(act._id)) : null;
+    const hist = Array.isArray(t.interactionHistory) ? t.interactionHistory : [];
+    const lastNote = hist.length > 0 ? (hist[hist.length - 1] as any)?.notes ?? '' : '';
+
     const crops = Array.isArray(act?.crops) ? act.crops.join(', ') : String(act?.crops ?? '');
     const products = Array.isArray(act?.products) ? act.products.join(', ') : String(act?.products ?? '');
     const cropsDiscussed = Array.isArray(log.cropsDiscussed) ? log.cropsDiscussed.join(', ') : String(log.cropsDiscussed ?? '');
@@ -301,34 +347,68 @@ export async function getTaskDetailExportRows(filters?: ReportFilters): Promise<
       : '';
 
     rows.push({
-      officerName,
-      fda: act?.officerId ?? officerName,
-      farmerName,
-      territory,
+      // 1. Activity details
+      activityId: act?.activityId ?? '',
       activityType: act?.type ?? '',
       activityDate: fmtDate(act?.date),
+      officerName: act?.officerName ?? '',
+      officerId: act?.officerId ?? '',
+      tmName: act?.tmName ?? '',
+      tmEmpCode: act?.tmEmpCode ?? '',
       activityLocation: act?.location ?? '',
+      territory: act?.territory ?? '',
+      territoryName: act?.territoryName ?? '',
+      zoneName: act?.zoneName ?? '',
+      buName: act?.buName ?? '',
+      state: act?.state ?? '',
       activityCrops: crops,
       activityProducts: products,
+      lifecycleStatus: act?.lifecycleStatus ?? '',
+      activitySyncedAt: fmtDate(act?.syncedAt),
+      // 2. Sampling details
+      samplingPercentage: audit?.samplingPercentage ?? 0,
+      samplingTotalFarmers: audit?.totalFarmers ?? 0,
+      samplingSampledCount: audit?.sampledCount ?? 0,
+      samplingAlgorithm: audit?.algorithm ?? '',
+      samplingCreatedAt: fmtDate(audit?.createdAt),
+      // 3. Task details
+      taskId: t._id?.toString() ?? '',
+      farmerName: farmer?.name ?? '',
+      farmerMobile: farmer?.mobileNumber ?? '',
+      farmerLocation: farmer?.location ?? '',
+      farmerPreferredLanguage: farmer?.preferredLanguage ?? '',
+      farmerTerritory: farmer?.territory ?? '',
       taskScheduledDate: fmtDate(t.scheduledDate),
       taskStatus: t.status ?? '',
+      taskOutcome: t.outcome ?? '',
+      retryCount: t.retryCount ?? 0,
+      isCallback: t.isCallback ? 'Yes' : 'No',
+      callbackNumber: t.callbackNumber ?? 0,
       taskCreatedAt: fmtDate(t.createdAt),
       taskUpdatedAt: fmtDate(t.updatedAt),
+      callStartedAt: fmtDate(t.callStartedAt),
+      // 4. Agent / Calling details
       agentName: agent?.name ?? '',
       agentEmail: agent?.email ?? '',
+      agentEmployeeId: agent?.employeeId ?? '',
+      callTimestamp: fmtDate(log.timestamp),
       callStatus: log.callStatus ?? '',
+      callDurationSeconds: log.callDurationSeconds ?? 0,
       didAttend: log.didAttend != null ? String(log.didAttend) : '',
+      didRecall: log.didRecall != null ? String(log.didRecall) : '',
       cropsDiscussed,
       productsDiscussed,
       hasPurchased: log.hasPurchased != null ? String(log.hasPurchased) : '',
       willingToPurchase: log.willingToPurchase != null ? String(log.willingToPurchase) : '',
       likelyPurchaseDate: log.likelyPurchaseDate ?? '',
-      farmerComments: log.farmerComments ?? '',
-      sentiment: log.sentiment ?? '',
       nonPurchaseReason: log.nonPurchaseReason ?? '',
       purchasedProducts,
+      // 5. Final outcome and comments
       outcome: t.outcome ?? '',
       finalStatus: t.outcome ?? t.status ?? '',
+      farmerComments: log.farmerComments ?? '',
+      sentiment: log.sentiment ?? '',
+      lastStatusNote: lastNote,
     });
   }
   return rows;
