@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, Database, Leaf } from 'lucide-react';
+import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, Database, Leaf, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ActivitySamplingView from './ActivitySamplingView';
 import AgentQueueView from './AgentQueueView';
 import TaskList from '../TaskList';
 import MasterManagementView from './MasterManagement/MasterManagementView';
+import ActivityEmsProgressView from './ActivityEmsProgressView';
 
 const AdminDashboardContainer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'activities' | 'queues' | 'tasks' | 'masters'>('activities');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'activities' | 'queues' | 'tasks' | 'masters'>('dashboard');
   const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +23,7 @@ const AdminDashboardContainer: React.FC = () => {
   };
 
   const tabs = [
+    { id: 'dashboard' as const, label: 'Activity EMS Progress', icon: TrendingUp },
     { id: 'activities' as const, label: 'Activity Monitoring', icon: ActivityIcon },
     { id: 'queues' as const, label: 'Agent Queues', icon: Users },
     { id: 'tasks' as const, label: 'Task Management', icon: List },
@@ -93,6 +95,7 @@ const AdminDashboardContainer: React.FC = () => {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto p-6">
+        {activeTab === 'dashboard' && <ActivityEmsProgressView />}
         {activeTab === 'activities' && <ActivitySamplingView />}
         {activeTab === 'queues' && <AgentQueueView />}
         {activeTab === 'tasks' && <TaskList />}

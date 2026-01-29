@@ -743,6 +743,170 @@ export const adminAPI = {
   },
 };
 
+// KPI / EMS Progress API (MIS Admin)
+export type EmsDrilldownGroupBy = 'state' | 'territory' | 'zone' | 'bu' | 'activityType';
+
+export interface EmsProgressFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  state?: string;
+  territory?: string;
+  zone?: string;
+  bu?: string;
+  activityType?: string;
+}
+
+export interface EmsProgressSummary {
+  activities: {
+    total: number;
+    byLifecycle: { active: number; sampled: number; inactive: number; not_eligible: number };
+    sampledCount: number;
+    notSampledCount: number;
+    partialCount: number;
+  };
+  tasks: {
+    total: number;
+    unassigned: number;
+    sampled_in_queue: number;
+    in_progress: number;
+    completed: number;
+    not_reachable: number;
+    invalid_number: number;
+    completionRatePct: number;
+  };
+  farmers: { totalInActivities: number; sampled: number };
+}
+
+export interface EmsDrilldownRow {
+  key: string;
+  label: string;
+  activitiesTotal: number;
+  activitiesSampled: number;
+  activitiesNotSampled: number;
+  activitiesPartial: number;
+  tasksTotal: number;
+  tasksCompleted: number;
+  tasksInQueue: number;
+  tasksInProgress: number;
+  farmersTotal: number;
+  farmersSampled: number;
+  completionRatePct: number;
+}
+
+export const kpiAPI = {
+  getEmsProgress: async (filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: EmsProgressSummary }>(`/kpi/ems${query ? `?${query}` : ''}`);
+  },
+
+  getEmsDrilldown: async (groupBy: EmsDrilldownGroupBy, filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    params.append('groupBy', groupBy);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: EmsDrilldownRow[] }>(`/kpi/ems/drilldown?${query}`);
+  },
+
+  getEmsFilterOptions: async (filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: { stateOptions: string[]; territoryOptions: string[]; zoneOptions: string[]; buOptions: string[]; activityTypeOptions: string[] } }>(`/kpi/ems/filter-options${query ? `?${query}` : ''}`);
+  },
+};
+
+// Reports API (MIS Admin)
+export const reportsAPI = {
+  getDaily: async (filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: any[] }>(`/reports/daily${query ? `?${query}` : ''}`);
+  },
+  getWeekly: async (filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: any[] }>(`/reports/weekly${query ? `?${query}` : ''}`);
+  },
+  getMonthly: async (filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: any[] }>(`/reports/monthly${query ? `?${query}` : ''}`);
+  },
+  downloadExport: async (filters?: EmsProgressFilters) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    const res = await fetch(`${API_BASE_URL}/reports/export${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(json?.error?.message || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'ems-progress-report.xlsx';
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+};
+
 // FFA Sync API
 export const ffaAPI = {
   syncFFAData: async (fullSync: boolean = false) => {

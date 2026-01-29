@@ -807,6 +807,8 @@ import samplingRoutes from './routes/sampling.js';
 import masterDataRoutes from './routes/masterData.js';
 import adminRoutes from './routes/admin.js';
 import aiRoutes from './routes/ai.js';
+import dashboardRoutes from './routes/dashboard.js';
+import reportRoutes from './routes/reports.js';
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
@@ -815,6 +817,8 @@ app.use('/api/sampling', samplingRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/kpi', dashboardRoutes);
+app.use('/api/reports', reportRoutes);
 
 // 404 handler
 app.use(notFound);
