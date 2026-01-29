@@ -9,7 +9,7 @@ import MasterManagementView from './MasterManagement/MasterManagementView';
 import ActivityEmsProgressView from './ActivityEmsProgressView';
 
 const AdminDashboardContainer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'activities' | 'queues' | 'tasks' | 'masters'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'activities' | 'queues' | 'tasks' | 'masters' | 'dashboard'>('activities');
   const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
 
@@ -23,11 +23,11 @@ const AdminDashboardContainer: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'dashboard' as const, label: 'Activity EMS Progress', icon: TrendingUp },
     { id: 'activities' as const, label: 'Activity Monitoring', icon: ActivityIcon },
     { id: 'queues' as const, label: 'Agent Queues', icon: Users },
     { id: 'tasks' as const, label: 'Task Management', icon: List },
     { id: 'masters' as const, label: 'Master Management', icon: Database },
+    { id: 'dashboard' as const, label: 'Activity EMS Progress', icon: TrendingUp },
   ];
 
   return (
