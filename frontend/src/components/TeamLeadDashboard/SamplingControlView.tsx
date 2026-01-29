@@ -61,9 +61,10 @@ const SamplingControlView: React.FC = () => {
     dateTo: '',
   });
 
-  /** first_sample = auto date range, no user selection; adhoc = user picks date range */
+  /** first_sample = auto date range (or manual for very first run); adhoc = user picks date range */
   const [runType, setRunType] = useState<'first_sample' | 'adhoc'>('first_sample');
   const [firstSampleRange, setFirstSampleRange] = useState<{ dateFrom: string; dateTo: string } | null>(null);
+  const [isFirstSampleRun, setIsFirstSampleRun] = useState<boolean>(false);
 
   // Date range dropdown (same UX as Admin Activity Sampling)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -250,8 +251,14 @@ const SamplingControlView: React.FC = () => {
     if (runType !== 'first_sample') return;
     samplingAPI.getFirstSampleRange().then((r: any) => {
       const d = r?.data;
-      if (d?.dateFrom && d?.dateTo) setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
-    }).catch(() => setFirstSampleRange(null));
+      setIsFirstSampleRun(d?.isFirstRun === true);
+      if (d?.dateFrom && d?.dateTo) {
+        setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
+        if (d.isFirstRun) {
+          setActivityFilters((prev) => ({ ...prev, dateFrom: d.dateFrom, dateTo: d.dateTo }));
+        }
+      }
+    }).catch(() => { setFirstSampleRange(null); setIsFirstSampleRun(false); });
   }, [runType]);
 
   const isSamplingRunning = latestRun?.status === 'running';
@@ -373,12 +380,12 @@ const SamplingControlView: React.FC = () => {
   // Note: Save & Apply is the single action (save config + apply eligibility).
 
   const handleRunSampling = async () => {
-    if (runType === 'adhoc') {
+    if (runType === 'adhoc' || (runType === 'first_sample' && isFirstSampleRun)) {
       if (!activityFilters.dateFrom || !activityFilters.dateTo) {
-        toast.showError('Select date range for ad-hoc run');
+        toast.showError(runType === 'first_sample' ? 'Select date range for first sample run' : 'Select date range for ad-hoc run');
         return;
       }
-      if (totalMatchingByLifecycle === 0) {
+      if (runType === 'adhoc' && totalMatchingByLifecycle === 0) {
         toast.showError('No activities match the current filters');
         return;
       }
@@ -388,7 +395,7 @@ const SamplingControlView: React.FC = () => {
       setLatestRun({
         _id: 'optimistic',
         status: 'running',
-        matched: runType === 'first_sample' ? 0 : totalMatchingByLifecycle,
+        matched: runType === 'first_sample' && !isFirstSampleRun ? 0 : totalMatchingByLifecycle,
         processed: 0,
         tasksCreatedTotal: 0,
         errorCount: 0,
@@ -397,8 +404,8 @@ const SamplingControlView: React.FC = () => {
       const res: any = await samplingAPI.runSampling({
         runType,
         lifecycleStatus: activityFilters.lifecycleStatus,
-        dateFrom: runType === 'adhoc' ? (activityFilters.dateFrom || undefined) : undefined,
-        dateTo: runType === 'adhoc' ? (activityFilters.dateTo || undefined) : undefined,
+        dateFrom: (runType === 'adhoc' || (runType === 'first_sample' && isFirstSampleRun)) ? (activityFilters.dateFrom || undefined) : undefined,
+        dateTo: (runType === 'adhoc' || (runType === 'first_sample' && isFirstSampleRun)) ? (activityFilters.dateTo || undefined) : undefined,
       });
       toast.showSuccess(
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
@@ -836,7 +843,7 @@ const SamplingControlView: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
-            {runType === 'first_sample' ? (
+            {runType === 'first_sample' && !isFirstSampleRun ? (
               <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700">
                 {firstSampleRange
                   ? `Auto: ${formatPretty(firstSampleRange.dateFrom)} – ${formatPretty(firstSampleRange.dateTo)}`

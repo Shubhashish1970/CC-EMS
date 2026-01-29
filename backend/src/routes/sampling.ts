@@ -16,8 +16,8 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-/** Compute auto date range for next first-sample run: (day after last first_sample run's dateTo) to today. If no previous first_sample run, use (today - 30 days) to today. */
-const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise<{ dateFrom: Date; dateTo: Date }> => {
+/** Compute auto date range for next first-sample run: (day after last first_sample run's dateTo) to today. If no previous first_sample run, returns null (caller should use manual range). */
+const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise<{ dateFrom: Date; dateTo: Date } | null> => {
   const lastFirst = await SamplingRun.findOne({
     createdByUserId: userId,
     runType: 'first_sample',
@@ -33,6 +33,13 @@ const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise
     dayAfter.setHours(0, 0, 0, 0);
     return { dateFrom: dayAfter, dateTo: today };
   }
+  return null; // no previous first-sample run → user must select date range manually
+};
+
+/** Suggested default range for the very first first-sample run (e.g. last 30 days). */
+const getFirstSampleSuggestedRange = (): { dateFrom: Date; dateTo: Date } => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
   const dateFrom = new Date(today);
   dateFrom.setDate(dateFrom.getDate() - 30);
   dateFrom.setHours(0, 0, 0, 0);
@@ -438,7 +445,7 @@ router.post(
 );
 
 // @route   GET /api/sampling/first-sample-range
-// @desc    Get auto date range for next first-sample run (for UI display)
+// @desc    Get range for first-sample run: if previous first_sample run exists, auto range; else isFirstRun=true and suggested range for manual selection.
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/first-sample-range',
@@ -449,12 +456,24 @@ router.get(
       if (!authUserId) {
         return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
       }
-      const { dateFrom, dateTo } = await getFirstSampleAutoRange(authUserId);
-      res.json({
+      const autoRange = await getFirstSampleAutoRange(authUserId);
+      if (autoRange) {
+        return res.json({
+          success: true,
+          data: {
+            isFirstRun: false,
+            dateFrom: autoRange.dateFrom.toISOString().split('T')[0],
+            dateTo: autoRange.dateTo.toISOString().split('T')[0],
+          },
+        });
+      }
+      const suggested = getFirstSampleSuggestedRange();
+      return res.json({
         success: true,
         data: {
-          dateFrom: dateFrom.toISOString().split('T')[0],
-          dateTo: dateTo.toISOString().split('T')[0],
+          isFirstRun: true,
+          dateFrom: suggested.dateFrom.toISOString().split('T')[0],
+          dateTo: suggested.dateTo.toISOString().split('T')[0],
         },
       });
     } catch (error) {
@@ -505,13 +524,28 @@ router.post(
         ids = activityIds;
         matchedCount = activityIds.length;
       } else if (effectiveRunType === 'first_sample') {
-        const { dateFrom: autoFrom, dateTo: autoTo } = await getFirstSampleAutoRange(authUserObjId);
-        resolvedDateFrom = autoFrom.toISOString().split('T')[0];
-        resolvedDateTo = autoTo.toISOString().split('T')[0];
+        const autoRange = await getFirstSampleAutoRange(authUserObjId);
+        let rangeStart: Date;
+        let rangeEnd: Date;
+        if (autoRange) {
+          rangeStart = autoRange.dateFrom;
+          rangeEnd = autoRange.dateTo;
+        } else {
+          if (dateFrom && dateTo) {
+            rangeStart = new Date(dateFrom);
+            rangeEnd = new Date(dateTo);
+          } else {
+            const suggested = getFirstSampleSuggestedRange();
+            rangeStart = suggested.dateFrom;
+            rangeEnd = suggested.dateTo;
+          }
+        }
+        resolvedDateFrom = rangeStart.toISOString().split('T')[0];
+        resolvedDateTo = rangeEnd.toISOString().split('T')[0];
         const q: any = {
           firstSampleRun: { $ne: true },
           lifecycleStatus: lifecycleStatus || 'active',
-          date: { $gte: autoFrom, $lte: autoTo },
+          date: { $gte: rangeStart, $lte: rangeEnd },
         };
         matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
