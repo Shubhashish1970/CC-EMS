@@ -63,8 +63,9 @@ const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Othe
 const INDIAN_FIRST_NAMES = ['Rajesh', 'Amit', 'Suresh', 'Ramesh', 'Kumar', 'Vikash', 'Anil', 'Sunil', 'Manoj', 'Deepak', 'Arjun', 'Rahul', 'Vishal', 'Sachin', 'Rohit', 'Kiran', 'Naveen', 'Pradeep', 'Sandeep', 'Akhil', 'Gopal', 'Aman', 'Dilip', 'Ravi', 'Nikhil', 'Pankaj', 'Vijay', 'Mahesh', 'Naresh', 'Dinesh', 'Priya', 'Anita', 'Sunita', 'Kavita', 'Rekha', 'Meera', 'Sneha', 'Pooja', 'Neha', 'Divya', 'Anjali', 'Swati', 'Ritu', 'Jyoti', 'Shilpa', 'Deepika', 'Manisha', 'Rashmi', 'Sapna', 'Madhu', 'Sarita'];
 const INDIAN_LAST_NAMES = ['Kumar', 'Singh', 'Yadav', 'Sharma', 'Patel', 'Reddy', 'Rao', 'Naik', 'Pawar', 'Desai', 'Mehta', 'Gupta', 'Verma', 'Jain', 'Agarwal', 'Malhotra', 'Chopra', 'Kapoor', 'Shah', 'Joshi', 'Pandey', 'Mishra', 'Tiwari', 'Dubey', 'Srivastava', 'Trivedi', 'Dwivedi', 'Upadhyay', 'Bhatt', 'Nair', 'Iyer', 'Menon', 'Krishnan', 'Raman', 'Subramanian', 'Venkatesh', 'Murthy', 'Naidu'];
 const OFFICER_NAMES = ['Rajesh Kumar', 'Amit Singh', 'Suresh Yadav', 'Ramesh Sharma', 'Kumar Patel', 'Vikash Reddy', 'Anil Rao', 'Sunil Naik', 'Manoj Pawar', 'Deepak Desai', 'Arjun Mehta', 'Rahul Gupta', 'Vishal Verma', 'Sachin Jain', 'Rohit Agarwal', 'Kiran Malhotra', 'Naveen Chopra', 'Pradeep Kapoor', 'Sandeep Shah', 'Akhil Joshi'];
-const CROPS = ['Rice', 'Wheat', 'Maize', 'Sugarcane', 'Cotton', 'Soybean', 'Groundnut', 'Mustard', 'Potato', 'Onion', 'Tomato', 'Chilli', 'Turmeric', 'Ginger', 'Brinjal', 'Okra'];
-const PRODUCTS = ['NACL Seeds Premium', 'NACL Crop Protection', 'NACL Fertilizers', 'NACL Bio Solutions', 'NACL Growth Enhancer', 'NACL Soil Conditioner', 'NACL Micro Nutrients', 'NACL Organic'];
+// Align with backend seedMasterData so activities match crop/product master
+const CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
+const PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
 
 function randomElement(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -220,6 +221,7 @@ for (let i = 0; i < 100; i++) {
     date: activityDate,
     lifecycleStatus: 'active',
     lifecycleUpdatedAt: new Date(),
+    firstSampleRun: false,
     officerId,
     officerName,
     location: `${district}, ${state}`,

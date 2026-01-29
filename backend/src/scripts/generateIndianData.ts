@@ -28,9 +28,14 @@ import { SamplingRun } from '../models/SamplingRun.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
 import { AllocationRun } from '../models/AllocationRun.js';
 import { InboundQuery } from '../models/InboundQuery.js';
+import { MasterCrop, MasterProduct } from '../models/MasterData.js';
 import logger from '../config/logger.js';
 
 dotenv.config();
+
+// Fallback crops/products aligned with seedMasterData (used if master collections are empty)
+const FALLBACK_CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
+const FALLBACK_PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
 
 // Indian District Names (Territories) - Organized by BU
 const INDIAN_DISTRICTS = {
@@ -162,17 +167,9 @@ const OFFICER_NAMES = [
   'Kiran Malhotra', 'Naveen Chopra', 'Pradeep Kapoor', 'Sandeep Shah', 'Akhil Joshi',
 ];
 
-// Crops
-const CROPS = [
-  'Rice', 'Wheat', 'Maize', 'Sugarcane', 'Cotton', 'Soybean', 'Groundnut', 'Mustard',
-  'Potato', 'Onion', 'Tomato', 'Chilli', 'Turmeric', 'Ginger', 'Brinjal', 'Okra',
-];
-
-// Products
-const PRODUCTS = [
-  'NACL Seeds Premium', 'NACL Crop Protection', 'NACL Fertilizers', 'NACL Bio Solutions',
-  'NACL Growth Enhancer', 'NACL Soil Conditioner', 'NACL Micro Nutrients', 'NACL Organic',
-];
+// Crops/Products are loaded from MasterData in main(); fallbacks above
+let CROPS: string[] = FALLBACK_CROPS;
+let PRODUCTS: string[] = FALLBACK_PRODUCTS;
 
 // Generate random Indian mobile number (10 digits, starting with 6-9)
 function generateMobileNumber(): string {
@@ -222,6 +219,23 @@ function getRegionForTerritory(district: string, bu: string): string {
 function getZoneForTerritory(district: string, bu: string): string {
   const zones = ZONES[bu as keyof typeof ZONES] || [];
   return zones[Math.floor(Math.random() * zones.length)] || bu;
+}
+
+async function loadMasterCropsProducts() {
+  const masterCrops = await MasterCrop.find({ isActive: true }).select('name').lean();
+  const masterProducts = await MasterProduct.find({ isActive: true }).select('name').lean();
+  if (masterCrops.length > 0) {
+    CROPS = masterCrops.map((c) => c.name.trim());
+    logger.info(`Using ${CROPS.length} crops from master data`);
+  } else {
+    logger.info(`No master crops found; using fallback list (${FALLBACK_CROPS.length} crops)`);
+  }
+  if (masterProducts.length > 0) {
+    PRODUCTS = masterProducts.map((p) => p.name.trim());
+    logger.info(`Using ${PRODUCTS.length} products from master data`);
+  } else {
+    logger.info(`No master products found; using fallback list (${FALLBACK_PRODUCTS.length} products)`);
+  }
 }
 
 async function clearOperationalData() {
@@ -340,6 +354,7 @@ async function generateActivities(count: number = 100) {
       date: activityDate,
       lifecycleStatus: 'active',
       lifecycleUpdatedAt: new Date(),
+      firstSampleRun: false,
       officerId,
       officerName,
       location: `${district}, ${state}`,
@@ -448,6 +463,9 @@ async function main() {
     };
     await mongoose.connect(mongoUri, options);
     logger.info('✅ Connected to MongoDB');
+    
+    // Load crops/products from master so generated activities satisfy master criteria
+    await loadMasterCropsProducts();
     
     // Clear operational data
     await clearOperationalData();

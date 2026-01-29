@@ -4,12 +4,17 @@ import { Farmer } from '../models/Farmer.js';
 import { Activity } from '../models/Activity.js';
 import { CallTask } from '../models/CallTask.js';
 import { User } from '../models/User.js';
+import { MasterCrop, MasterProduct } from '../models/MasterData.js';
 import { sampleAndCreateTasks } from '../services/samplingService.js';
 import logger from '../config/logger.js';
 
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
+
+// Fallback crops/products aligned with seedMasterData (used if master is empty)
+const FALLBACK_CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
+const FALLBACK_PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
 
 // Indian data for testing
 const INDIAN_STATES = [
@@ -47,8 +52,8 @@ const TERRITORIES = [
 
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
-const CROPS = ['Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Soybean', 'Maize', 'Groundnut', 'Pulses', 'Jowar', 'Bajra', 'Ragi', 'Mustard'];
-const PRODUCTS = ['NACL Pro', 'NACL Gold', 'NACL Premium', 'NACL Base', 'NACL Bio'];
+let CROPS: string[] = FALLBACK_CROPS;
+let PRODUCTS: string[] = FALLBACK_PRODUCTS;
 
 // Indian officer names
 const INDIAN_OFFICER_NAMES = [
@@ -300,6 +305,18 @@ const createTestData = async () => {
     // Connect to MongoDB
     await mongoose.connect(MONGODB_URI);
     logger.info('✅ Connected to MongoDB');
+
+    // Load crops/products from master so activities satisfy master criteria
+    const masterCrops = await MasterCrop.find({ isActive: true }).select('name').lean();
+    const masterProducts = await MasterProduct.find({ isActive: true }).select('name').lean();
+    if (masterCrops.length > 0) {
+      CROPS = masterCrops.map((c) => c.name.trim());
+      logger.info(`Using ${CROPS.length} crops from master data`);
+    }
+    if (masterProducts.length > 0) {
+      PRODUCTS = masterProducts.map((p) => p.name.trim());
+      logger.info(`Using ${PRODUCTS.length} products from master data`);
+    }
 
     // Find or create agent user
     let agent = await User.findOne({ email: 'shubhashish@intelliagri.in' });
