@@ -4,7 +4,7 @@ import { Activity } from '../models/Activity.js';
 import { getLanguageForState, extractStateFromTerritory } from '../utils/stateLanguageMapper.js';
 import logger from '../config/logger.js';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Kweka_Call_Centre';
 
 async function migrateFarmerLanguages() {
   try {

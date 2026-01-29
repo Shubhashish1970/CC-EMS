@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { StateLanguageMapping } from '../models/StateLanguageMapping.js';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Kweka_Call_Centre';
 
 // Comprehensive Indian state and UT to language mapping
 const STATE_LANGUAGE_MAPPINGS = [

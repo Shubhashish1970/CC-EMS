@@ -14,7 +14,7 @@ import logger from '../config/logger.js';
 
 dotenv.config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Kweka_Call_Centre';
 
 async function migrateUserRoles() {
   try {

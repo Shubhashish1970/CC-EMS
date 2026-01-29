@@ -1,10 +1,36 @@
 # Database reset and FFA refill
 
+**Single database:** The app and all backend scripts use only **Kweka_Call_Centre**. Local fallbacks and docs reference this database only (no `ems_call_centre` or `test`).
+
+**Cluster databases:** In Atlas you may see `admin`, `local`, and `test`. Do **not** drop `admin` or `local` (MongoDB system databases). The unused `test` database can be dropped; from backend run `npm run drop:unused-databases` (uses `MONGODB_URI`; only drops `test`).
+
 Use this flow when you want to **clear operational data** (activities, farmers, tasks, sampling runs, etc.) but **keep users and master data** (crops, products, languages, state-language mappings), then refill via FFA Sync so crop/product/activity data aligns with master.
+
+## Important: use the same database as your app
+
+The reset script uses `MONGODB_URI` from your environment. If you run it **locally** with a local `.env` (e.g. `mongodb://localhost:27017/...`), it clears that database only. The **deployed app** (e.g. Cloud Run) uses the MongoDB set in Cloud Run / GitHub Secrets – so the dashboard will still show old data.
+
+To clear the database that the **deployed** app uses:
+
+- Run the script **with the same `MONGODB_URI`** as production. From the **backend** directory:
+
+```bash
+# Replace with the exact URI your deployed backend uses (e.g. from Cloud Run env or GitHub Secrets)
+MONGODB_URI="mongodb+srv://user:pass@cluster.mongodb.net/Kweka_Call_Centre?retryWrites=true&w=majority" npm run reset:dev-operational-data
+```
+
+Or set that URI in `backend/.env` and run:
+
+```bash
+cd backend
+npm run reset:dev-operational-data
+```
+
+Then **reload the deployed app** – the dashboard should show 0 activities/tasks until you run FFA Sync again.
 
 ## 1. Clear operational data (keep users + crop/product master)
 
-From the **backend** directory:
+From the **backend** directory (and with the correct `MONGODB_URI` for the DB you want to clear):
 
 ```bash
 npm run reset:dev-operational-data

@@ -20,7 +20,7 @@ import { SamplingAudit } from '../models/SamplingAudit.js';
  *   MONGODB_URI="..." npm --prefix backend run cleanup:officer-number-activities -- --yes
  */
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ems_call_centre';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Kweka_Call_Centre';
 
 const args = process.argv.slice(2);
 const isYes = args.includes('--yes');
