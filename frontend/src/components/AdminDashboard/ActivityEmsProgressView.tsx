@@ -56,6 +56,7 @@ const ActivityEmsProgressView: React.FC = () => {
   const [isLoadingDrilldown, setIsLoadingDrilldown] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingTaskDetails, setIsExportingTaskDetails] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [groupBy, setGroupBy] = useState<EmsDrilldownGroupBy>('state');
   const defaultRange = getDefaultDateRange();
@@ -133,11 +134,23 @@ const ActivityEmsProgressView: React.FC = () => {
     setIsExporting(true);
     try {
       await reportsAPI.downloadExport(filters);
-      showSuccess('Report downloaded');
+      showSuccess('Summary report downloaded');
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Export failed');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportTaskDetails = async () => {
+    setIsExportingTaskDetails(true);
+    try {
+      await reportsAPI.downloadTaskDetailsExport(filters);
+      showSuccess('Task details Excel downloaded');
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setIsExportingTaskDetails(false);
     }
   };
 
@@ -185,14 +198,24 @@ const ActivityEmsProgressView: React.FC = () => {
             Refresh
           </Button>
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             onClick={handleExport}
             disabled={isExporting}
             className="flex items-center gap-2"
           >
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Export Excel
+            Summary report
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleExportTaskDetails}
+            disabled={isExportingTaskDetails}
+            className="flex items-center gap-2"
+          >
+            {isExportingTaskDetails ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Export task details (Excel)
           </Button>
         </div>
       </div>

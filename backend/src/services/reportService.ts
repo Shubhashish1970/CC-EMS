@@ -5,6 +5,38 @@ import mongoose from 'mongoose';
 import type { EmsProgressFilters } from './kpiService.js';
 import { buildActivityMatch } from './kpiService.js';
 
+/** One row per task for Excel task-detail export */
+export interface TaskDetailExportRow {
+  officerName: string;
+  fda: string; // officerId or same as officerName
+  farmerName: string;
+  territory: string;
+  activityType: string;
+  activityDate: string;
+  activityLocation: string;
+  activityCrops: string;
+  activityProducts: string;
+  taskScheduledDate: string;
+  taskStatus: string;
+  taskCreatedAt: string;
+  taskUpdatedAt: string;
+  agentName: string;
+  agentEmail: string;
+  callStatus: string;
+  didAttend: string;
+  cropsDiscussed: string;
+  productsDiscussed: string;
+  hasPurchased: string;
+  willingToPurchase: string;
+  likelyPurchaseDate: string;
+  farmerComments: string;
+  sentiment: string;
+  nonPurchaseReason: string;
+  purchasedProducts: string;
+  outcome: string;
+  finalStatus: string;
+}
+
 export interface ReportFilters extends EmsProgressFilters {
   bucket?: 'daily' | 'weekly' | 'monthly';
 }
@@ -225,5 +257,79 @@ export async function getPeriodReport(
     };
   });
   rows.sort((a, b) => a.period.localeCompare(b.period));
+  return rows;
+}
+
+const fmtDate = (d: Date | undefined | null): string => {
+  if (!d) return '';
+  const x = new Date(d);
+  return Number.isNaN(x.getTime()) ? '' : x.toISOString().slice(0, 19).replace('T', ' ');
+};
+
+/**
+ * Task-level detail rows for Excel: Officer Name, FDA, farmer name, territory,
+ * Activity details, Task details, dates, agent, responses, final status.
+ */
+export async function getTaskDetailExportRows(filters?: ReportFilters): Promise<TaskDetailExportRow[]> {
+  const activityMatch = buildActivityMatch(filters);
+  const activities = await Activity.find(activityMatch as any).select('_id').lean();
+  const activityIds = activities.map((a: any) => a._id);
+  if (activityIds.length === 0) return [];
+
+  const tasks = await CallTask.find({ activityId: { $in: activityIds } })
+    .populate('farmerId', 'name mobileNumber preferredLanguage location')
+    .populate('activityId', 'activityId type date officerId officerName tmName location territory territoryName zoneName buName state crops products')
+    .populate('assignedAgentId', 'name email employeeId')
+    .sort({ scheduledDate: -1, createdAt: -1 })
+    .lean();
+
+  const rows: TaskDetailExportRow[] = [];
+  for (const t of tasks as any[]) {
+    const act = t.activityId;
+    const farmer = t.farmerId;
+    const agent = t.assignedAgentId;
+    const log = t.callLog || {};
+    const farmerName = farmer?.name ?? '';
+    const officerName = act?.officerName ?? '';
+    const territory = [act?.territoryName, act?.territory].filter(Boolean).join(' ') || '';
+    const crops = Array.isArray(act?.crops) ? act.crops.join(', ') : String(act?.crops ?? '');
+    const products = Array.isArray(act?.products) ? act.products.join(', ') : String(act?.products ?? '');
+    const cropsDiscussed = Array.isArray(log.cropsDiscussed) ? log.cropsDiscussed.join(', ') : String(log.cropsDiscussed ?? '');
+    const productsDiscussed = Array.isArray(log.productsDiscussed) ? log.productsDiscussed.join(', ') : String(log.productsDiscussed ?? '');
+    const purchasedProducts = Array.isArray(log.purchasedProducts)
+      ? log.purchasedProducts.map((p: any) => `${p.product || ''} (${p.quantity || ''} ${p.unit || ''})`).filter(Boolean).join('; ')
+      : '';
+
+    rows.push({
+      officerName,
+      fda: act?.officerId ?? officerName,
+      farmerName,
+      territory,
+      activityType: act?.type ?? '',
+      activityDate: fmtDate(act?.date),
+      activityLocation: act?.location ?? '',
+      activityCrops: crops,
+      activityProducts: products,
+      taskScheduledDate: fmtDate(t.scheduledDate),
+      taskStatus: t.status ?? '',
+      taskCreatedAt: fmtDate(t.createdAt),
+      taskUpdatedAt: fmtDate(t.updatedAt),
+      agentName: agent?.name ?? '',
+      agentEmail: agent?.email ?? '',
+      callStatus: log.callStatus ?? '',
+      didAttend: log.didAttend != null ? String(log.didAttend) : '',
+      cropsDiscussed,
+      productsDiscussed,
+      hasPurchased: log.hasPurchased != null ? String(log.hasPurchased) : '',
+      willingToPurchase: log.willingToPurchase != null ? String(log.willingToPurchase) : '',
+      likelyPurchaseDate: log.likelyPurchaseDate ?? '',
+      farmerComments: log.farmerComments ?? '',
+      sentiment: log.sentiment ?? '',
+      nonPurchaseReason: log.nonPurchaseReason ?? '',
+      purchasedProducts,
+      outcome: t.outcome ?? '',
+      finalStatus: t.outcome ?? t.status ?? '',
+    });
+  }
   return rows;
 }

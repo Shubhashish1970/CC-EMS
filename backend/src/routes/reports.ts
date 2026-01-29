@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { query, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
-import { getDailyReport, getPeriodReport } from '../services/reportService.js';
+import { getDailyReport, getPeriodReport, getTaskDetailExportRows } from '../services/reportService.js';
 import { getEmsProgress, getEmsDrilldown, type EmsDrilldownGroupBy } from '../services/kpiService.js';
 import * as XLSX from 'xlsx';
 
@@ -180,6 +180,93 @@ router.get('/export', filterValidators, async (req: Request, res: Response, next
 
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const filename = `ems-progress-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/reports/tasks-detail-export
+ * Excel export of task-level details: Officer Name, FDA, farmer name, territory,
+ * Activity details, Task details, dates, agent, responses, final status.
+ */
+router.get('/tasks-detail-export', filterValidators, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: { message: 'Validation failed', errors: errors.array() } });
+    }
+    const filters = parseFilters(req);
+    const rows = await getTaskDetailExportRows(filters);
+
+    const wb = XLSX.utils.book_new();
+    const headers = [
+      'Officer Name',
+      'FDA',
+      'Farmer Name',
+      'Territory',
+      'Activity Type',
+      'Activity Date',
+      'Activity Location',
+      'Activity Crops',
+      'Activity Products',
+      'Task Scheduled Date',
+      'Task Status',
+      'Task Created At',
+      'Task Updated At',
+      'Agent Name',
+      'Agent Email',
+      'Call Status',
+      'Did Attend',
+      'Crops Discussed',
+      'Products Discussed',
+      'Has Purchased',
+      'Willing to Purchase',
+      'Likely Purchase Date',
+      'Farmer Comments',
+      'Sentiment',
+      'Non-Purchase Reason',
+      'Purchased Products',
+      'Outcome',
+      'Final Status',
+    ];
+    const data = [headers, ...rows.map((r) => [
+      r.officerName,
+      r.fda,
+      r.farmerName,
+      r.territory,
+      r.activityType,
+      r.activityDate,
+      r.activityLocation,
+      r.activityCrops,
+      r.activityProducts,
+      r.taskScheduledDate,
+      r.taskStatus,
+      r.taskCreatedAt,
+      r.taskUpdatedAt,
+      r.agentName,
+      r.agentEmail,
+      r.callStatus,
+      r.didAttend,
+      r.cropsDiscussed,
+      r.productsDiscussed,
+      r.hasPurchased,
+      r.willingToPurchase,
+      r.likelyPurchaseDate,
+      r.farmerComments,
+      r.sentiment,
+      r.nonPurchaseReason,
+      r.purchasedProducts,
+      r.outcome,
+      r.finalStatus,
+    ])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Task Details');
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = `ems-task-details-${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buf);
