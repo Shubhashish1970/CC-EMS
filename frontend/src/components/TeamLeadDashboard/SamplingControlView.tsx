@@ -584,7 +584,7 @@ const SamplingControlView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 overflow-x-hidden">
       <Modal
         isOpen={isReactivateConfirmOpen}
         onClose={() => setIsReactivateConfirmOpen(false)}
@@ -708,18 +708,18 @@ const SamplingControlView: React.FC = () => {
       </div>
 
       {/* Quick Dashboard */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <h3 className="text-lg font-black text-slate-900">Sampling Dashboard</h3>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600 break-words">
               Quick view by activity type for the selected date range
               {activityFilters.dateFrom && activityFilters.dateTo
                 ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
                 : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleResetSelections}
               disabled={isLoading || isSamplingRunning}
@@ -812,8 +812,8 @@ const SamplingControlView: React.FC = () => {
         </div>
 
         {/* Run type + Filters */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 min-w-0">
+          <div className="min-w-0">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run type</label>
             <StyledSelect
               value={runType}
@@ -825,7 +825,7 @@ const SamplingControlView: React.FC = () => {
               placeholder="Run type"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
             <StyledSelect
               value={activityFilters.lifecycleStatus}
@@ -839,7 +839,7 @@ const SamplingControlView: React.FC = () => {
               placeholder="Select lifecycle"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
               Date Range
               {runType === 'first_sample' && (
@@ -870,9 +870,9 @@ const SamplingControlView: React.FC = () => {
               </button>
 
               {isDatePickerOpen && (
-                <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
-                  <div className="flex">
-                    <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-full sm:max-w-[720px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
                       {([
                         'Custom',
                         'Today',
@@ -904,8 +904,8 @@ const SamplingControlView: React.FC = () => {
                       })}
                     </div>
 
-                    <div className="flex-1 p-4">
-                      <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex-1 p-4 min-w-0">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
                         <div className="flex-1">
                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
                             Start date
@@ -989,13 +989,13 @@ const SamplingControlView: React.FC = () => {
         </div>
 
         <div className="mt-5 border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
+          <div className="bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-black text-slate-700">By Activity Type</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 min-w-0">
               Farmers sampled = sampling audit total; Tasks created = call tasks count
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0 -mx-px">
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-white border-b border-slate-200">
                 <tr className="text-left">

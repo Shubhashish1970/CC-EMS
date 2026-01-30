@@ -83,7 +83,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-6 min-w-0 overflow-x-hidden">
         {activeTab === 'sampling' && <SamplingControlView />}
         {activeTab === 'tasks' && <TaskDashboardView />}
         {activeTab === 'callbacks' && <CallbackRequestView />}
