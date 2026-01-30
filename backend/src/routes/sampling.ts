@@ -36,14 +36,32 @@ const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise
   return null; // no previous first-sample run → user must select date range manually
 };
 
-/** Suggested default range for the very first first-sample run (e.g. last 30 days). */
-const getFirstSampleSuggestedRange = (): { dateFrom: Date; dateTo: Date } => {
+/** Fallback when no activities exist: last 30 days. */
+const getFirstSampleSuggestedRangeFallback = (): { dateFrom: Date; dateTo: Date } => {
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const dateFrom = new Date(today);
   dateFrom.setDate(dateFrom.getDate() - 30);
   dateFrom.setHours(0, 0, 0, 0);
   return { dateFrom, dateTo: today };
+};
+
+/** Suggested default range for the very first first-sample run: from earliest to latest activity date among eligible activities (firstSampleRun !== true, active), so all synced activities are included. */
+const getFirstSampleSuggestedRange = async (): Promise<{ dateFrom: Date; dateTo: Date }> => {
+  const agg = await Activity.aggregate([
+    { $match: { firstSampleRun: { $ne: true }, lifecycleStatus: 'active' } },
+    { $group: { _id: null, minDate: { $min: '$date' }, maxDate: { $max: '$date' } } },
+  ]);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (agg.length && agg[0].minDate != null && agg[0].maxDate != null) {
+    const dateFrom = new Date(agg[0].minDate);
+    dateFrom.setHours(0, 0, 0, 0);
+    const dateTo = new Date(agg[0].maxDate);
+    dateTo.setHours(23, 59, 59, 999);
+    return { dateFrom, dateTo };
+  }
+  return getFirstSampleSuggestedRangeFallback();
 };
 
 // ============================================================================
@@ -467,7 +485,7 @@ router.get(
           },
         });
       }
-      const suggested = getFirstSampleSuggestedRange();
+      const suggested = await getFirstSampleSuggestedRange();
       return res.json({
         success: true,
         data: {
@@ -527,18 +545,17 @@ router.post(
         const autoRange = await getFirstSampleAutoRange(authUserObjId);
         let rangeStart: Date;
         let rangeEnd: Date;
-        if (autoRange) {
+        // User can override auto range by sending dateFrom/dateTo in the body
+        if (dateFrom && dateTo) {
+          rangeStart = new Date(dateFrom);
+          rangeEnd = new Date(dateTo);
+        } else if (autoRange) {
           rangeStart = autoRange.dateFrom;
           rangeEnd = autoRange.dateTo;
         } else {
-          if (dateFrom && dateTo) {
-            rangeStart = new Date(dateFrom);
-            rangeEnd = new Date(dateTo);
-          } else {
-            const suggested = getFirstSampleSuggestedRange();
-            rangeStart = suggested.dateFrom;
-            rangeEnd = suggested.dateTo;
-          }
+          const suggested = await getFirstSampleSuggestedRange();
+          rangeStart = suggested.dateFrom;
+          rangeEnd = suggested.dateTo;
         }
         resolvedDateFrom = rangeStart.toISOString().split('T')[0];
         resolvedDateTo = rangeEnd.toISOString().split('T')[0];

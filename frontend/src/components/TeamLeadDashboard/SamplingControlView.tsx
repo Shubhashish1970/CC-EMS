@@ -254,9 +254,7 @@ const SamplingControlView: React.FC = () => {
       setIsFirstSampleRun(d?.isFirstRun === true);
       if (d?.dateFrom && d?.dateTo) {
         setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
-        if (d.isFirstRun) {
-          setActivityFilters((prev) => ({ ...prev, dateFrom: d.dateFrom, dateTo: d.dateTo }));
-        }
+        setActivityFilters((prev) => ({ ...prev, dateFrom: d.dateFrom, dateTo: d.dateTo }));
       }
     }).catch(() => { setFirstSampleRange(null); setIsFirstSampleRun(false); });
   }, [runType]);
@@ -395,7 +393,7 @@ const SamplingControlView: React.FC = () => {
       setLatestRun({
         _id: 'optimistic',
         status: 'running',
-        matched: runType === 'first_sample' && !isFirstSampleRun ? 0 : totalMatchingByLifecycle,
+        matched: totalMatchingByLifecycle,
         processed: 0,
         tasksCreatedTotal: 0,
         errorCount: 0,
@@ -404,8 +402,8 @@ const SamplingControlView: React.FC = () => {
       const res: any = await samplingAPI.runSampling({
         runType,
         lifecycleStatus: activityFilters.lifecycleStatus,
-        dateFrom: (runType === 'adhoc' || (runType === 'first_sample' && isFirstSampleRun)) ? (activityFilters.dateFrom || undefined) : undefined,
-        dateTo: (runType === 'adhoc' || (runType === 'first_sample' && isFirstSampleRun)) ? (activityFilters.dateTo || undefined) : undefined,
+        dateFrom: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateFrom || undefined) : undefined,
+        dateTo: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateTo || undefined) : undefined,
       });
       toast.showSuccess(
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
@@ -842,14 +840,12 @@ const SamplingControlView: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
-            {runType === 'first_sample' && !isFirstSampleRun ? (
-              <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700">
-                {firstSampleRange
-                  ? `Auto: ${formatPretty(firstSampleRange.dateFrom)} – ${formatPretty(firstSampleRange.dateTo)}`
-                  : 'Auto (from last first-sample run to today)'}
-              </div>
-            ) : (
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+              Date Range
+              {runType === 'first_sample' && (
+                <span className="normal-case font-normal text-slate-500 ml-1">(auto, editable)</span>
+              )}
+            </label>
             <div className="relative" ref={datePickerRef}>
               <button
                 type="button"
@@ -971,7 +967,6 @@ const SamplingControlView: React.FC = () => {
                 </div>
               )}
             </div>
-            )}
           </div>
         </div>
 
