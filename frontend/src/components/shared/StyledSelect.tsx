@@ -67,7 +67,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
-          w-full px-4 py-3 text-left
+          w-full min-h-12 px-4 py-3 text-left
           bg-white border-2 rounded-xl
           flex items-center justify-between gap-2
           transition-all duration-200
@@ -84,7 +84,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
           focus:outline-none
         `}
       >
-        <span className={selectedOption ? 'text-slate-900 font-medium' : 'text-slate-400'}>
+        <span className={`text-sm ${selectedOption ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown 

@@ -859,7 +859,7 @@ const SamplingControlView: React.FC = () => {
                   });
                 }}
                 className={`
-                  w-full px-4 py-3 rounded-xl border-2 bg-white text-left flex items-center justify-between gap-2
+                  w-full min-h-12 px-4 py-3 rounded-xl border-2 bg-white text-left flex items-center justify-between gap-2
                   transition-all duration-200 focus:outline-none
                   ${isDatePickerOpen
                     ? 'border-lime-500 ring-2 ring-lime-500/20'
