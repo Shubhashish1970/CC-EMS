@@ -870,9 +870,9 @@ const SamplingControlView: React.FC = () => {
               </button>
 
               {isDatePickerOpen && (
-                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-full sm:max-w-[720px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-[45vw] min-w-[280px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
+                    <div className="w-full sm:w-[42%] min-w-0 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
                       {([
                         'Custom',
                         'Today',
