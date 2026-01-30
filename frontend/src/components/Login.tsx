@@ -119,7 +119,7 @@ const Login: React.FC = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-lime-100 focus:border-lime-500 outline-none transition-all text-sm font-medium"
+                        className="w-full min-h-12 px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 transition-all"
                         placeholder="Enter your email"
                       />
                     </div>

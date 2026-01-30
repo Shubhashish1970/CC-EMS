@@ -172,7 +172,7 @@ const MultiTagSelect: React.FC<MultiTagSelectProps> = ({
                     }
                   }}
                   placeholder="Search or type..."
-                  className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-lime-500 min-w-[120px] max-w-[200px]"
+                  className="min-h-12 px-4 py-3 text-sm font-medium border-2 border-slate-200 rounded-xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 min-w-[120px] max-w-[200px]"
                   autoFocus
                 />
                 {/* Show matching master items as suggestions */}

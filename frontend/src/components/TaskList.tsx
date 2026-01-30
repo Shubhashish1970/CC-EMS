@@ -819,7 +819,7 @@ const TaskList: React.FC = () => {
                         syncDraftFromFilters();
                         setIsDatePickerOpen((v) => !v);
                       }}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-between"
+                      className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
                       title="Choose date range"
                     >
                       <span className="truncate">
@@ -859,7 +859,7 @@ const TaskList: React.FC = () => {
                                   setSelectedPreset('Custom');
                                   setDraftStart(e.target.value);
                                 }}
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                               />
                             </div>
                             <div>
@@ -871,7 +871,7 @@ const TaskList: React.FC = () => {
                                   setSelectedPreset('Custom');
                                   setDraftEnd(e.target.value);
                                 }}
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                               />
                             </div>
                           </div>
@@ -908,7 +908,7 @@ const TaskList: React.FC = () => {
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     placeholder="Search by farmer name, mobile, agent, or location..."
-                    className="w-full pl-12 pr-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
+                    className="w-full min-h-12 pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                   />
                 </div>
               </div>
@@ -1314,7 +1314,7 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
+              className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
               placeholder="Add notes about this status change..."
             />
           </div>

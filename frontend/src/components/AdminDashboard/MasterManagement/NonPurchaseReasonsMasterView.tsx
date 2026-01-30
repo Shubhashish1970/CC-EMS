@@ -274,7 +274,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
             placeholder="Search reasons..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
+            className="w-full min-h-12 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
           />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -410,7 +410,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                   placeholder="Enter reason name"
                   disabled={isSubmitting}
                 />
@@ -423,7 +423,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
                   type="number"
                   value={formData.displayOrder}
                   onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-lime-500 focus:outline-none"
+                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                   min="0"
                   disabled={isSubmitting}
                 />

@@ -475,7 +475,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                           type="date"
                                           value={formData.likelyPurchaseDate || ''}
                                           onChange={(e) => setFormData((p: any) => ({ ...p, likelyPurchaseDate: e.target.value }))}
-                                          className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-500 bg-white text-slate-600 w-auto max-w-[200px]"
+                                          className="min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 w-auto max-w-[200px]"
                                           min={new Date().toISOString().split('T')[0]}
                                         />
                                       </div>
@@ -527,7 +527,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                 onChange={(e) => {
                                   setFormData(prev => ({ ...prev, farmerComments: e.target.value }));
                                 }}
-                                className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-lime-500 focus:outline-none resize-none"
+                                className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 resize-none"
                                 placeholder="3 bullet points summarizing the conversation (20-25 words each)"
                                 rows={6}
                               />

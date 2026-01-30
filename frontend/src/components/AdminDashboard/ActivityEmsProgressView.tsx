@@ -230,7 +230,7 @@ const ActivityEmsProgressView: React.FC = () => {
                 type="date"
                 value={filters.dateFrom || ''}
                 onChange={(e) => applyFilter('dateFrom', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
               />
             </div>
             <div>
@@ -239,7 +239,7 @@ const ActivityEmsProgressView: React.FC = () => {
                 type="date"
                 value={filters.dateTo || ''}
                 onChange={(e) => applyFilter('dateTo', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
               />
             </div>
             <div>

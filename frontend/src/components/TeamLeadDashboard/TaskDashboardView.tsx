@@ -459,7 +459,7 @@ const TaskDashboardView: React.FC = () => {
                     return next;
                   });
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
               >
                 <span className="truncate">
                   {selectedPreset}
@@ -513,7 +513,7 @@ const TaskDashboardView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftStart(e.target.value);
                             }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                           />
                         </div>
                         <div className="flex-1">
@@ -525,7 +525,7 @@ const TaskDashboardView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftEnd(e.target.value);
                             }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                           />
                         </div>
                       </div>
@@ -656,7 +656,7 @@ const TaskDashboardView: React.FC = () => {
                 min={0}
                 value={allocCount}
                 onChange={(e) => setAllocCount(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                 placeholder="0 = All"
               />
             </div>

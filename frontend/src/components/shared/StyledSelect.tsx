@@ -79,7 +79,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
           }
           ${disabled 
             ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-            : 'cursor-pointer'
+            : 'cursor-pointer focus:ring-2 focus:ring-lime-500 focus:border-lime-500'
           }
           focus:outline-none
         `}

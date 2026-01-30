@@ -344,7 +344,7 @@ const CallbackRequestView: React.FC = () => {
                     return !prev;
                   });
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 flex items-center justify-between"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
               >
                 <span className="truncate">
                   {selectedPreset}
@@ -383,7 +383,7 @@ const CallbackRequestView: React.FC = () => {
                             type="date"
                             value={draftStart}
                             onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                           />
                         </div>
                         <div className="flex-1">
@@ -392,7 +392,7 @@ const CallbackRequestView: React.FC = () => {
                             type="date"
                             value={draftEnd}
                             onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                           />
                         </div>
                       </div>
