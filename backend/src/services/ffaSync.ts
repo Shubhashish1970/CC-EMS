@@ -553,7 +553,7 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
       activitiesSynced,
       farmersSynced,
       errors,
-      syncType: fullSync ? 'full' : 'incremental' as const,
+      syncType: (fullSync ? 'full' : 'incremental') as 'full' | 'incremental',
       lastSyncDate,
     };
     syncProgress.running = false;
@@ -568,7 +568,7 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
       activitiesSynced: syncProgress.activitiesSynced,
       farmersSynced: syncProgress.farmersSynced,
       errors: [error instanceof Error ? error.message : 'Unknown error'],
-      syncType: syncProgress.syncType || 'incremental',
+      syncType: (syncProgress.syncType || 'incremental') as 'full' | 'incremental',
     };
     isSyncing = false;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
