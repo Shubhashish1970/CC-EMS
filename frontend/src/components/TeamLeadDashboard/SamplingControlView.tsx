@@ -811,9 +811,9 @@ const SamplingControlView: React.FC = () => {
           )}
         </div>
 
-        {/* Run type + Filters */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 min-w-0">
-          <div className="min-w-0">
+        {/* Run type + Filters: narrow Run type & Lifecycle so Date Range gets more space */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-[minmax(0,200px)_minmax(0,140px)_1fr] gap-3 min-w-0">
+          <div className="min-w-0 max-w-[200px] md:max-w-none">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run type</label>
             <StyledSelect
               value={runType}
@@ -825,7 +825,7 @@ const SamplingControlView: React.FC = () => {
               placeholder="Run type"
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[160px] md:max-w-none">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
             <StyledSelect
               value={activityFilters.lifecycleStatus}
@@ -858,7 +858,7 @@ const SamplingControlView: React.FC = () => {
                     return next;
                   });
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
+                className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
               >
                 <span className="truncate">
                   {selectedPreset}
@@ -870,9 +870,9 @@ const SamplingControlView: React.FC = () => {
               </button>
 
               {isDatePickerOpen && (
-                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-full sm:max-w-[720px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="absolute z-50 mt-2 right-0 left-auto w-full max-w-[calc(100vw-2rem)] sm:max-w-[720px] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
+                    <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
                       {([
                         'Custom',
                         'Today',
@@ -904,9 +904,9 @@ const SamplingControlView: React.FC = () => {
                       })}
                     </div>
 
-                    <div className="flex-1 p-4 min-w-0">
+                    <div className="flex-1 p-4 min-w-[260px]">
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
                             Start date
                           </p>
@@ -920,7 +920,7 @@ const SamplingControlView: React.FC = () => {
                             className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500"
                           />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
                             End date
                           </p>
