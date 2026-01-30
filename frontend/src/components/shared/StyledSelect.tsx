@@ -105,10 +105,10 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
                   type="button"
                   onClick={() => handleSelect(option.value)}
                   className={`
-                    w-full px-4 py-3 text-left flex items-center justify-between
+                    w-full px-4 py-3 text-left flex items-center justify-between text-sm font-medium
                     transition-colors duration-150
                     ${isSelected 
-                      ? 'bg-lime-50 text-lime-800 font-semibold' 
+                      ? 'bg-lime-50 text-lime-800' 
                       : 'text-slate-700 hover:bg-slate-50'
                     }
                   `}
