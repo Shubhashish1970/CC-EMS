@@ -739,7 +739,7 @@ const SamplingControlView: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black disabled:opacity-50"
             >
               <Play size={16} />
-              {runType === 'first_sample' ? 'Run first sample (auto range)' : `Run ad-hoc sampling (${totalMatchingByLifecycle} in range)`}
+              {runType === 'first_sample' ? (isFirstSampleRun ? 'Run first sample (auto range)' : 'Run Sample') : `Run ad-hoc sampling (${totalMatchingByLifecycle} in range)`}
             </button>
             <button
               onClick={handleReactivateSelected}
@@ -819,7 +819,7 @@ const SamplingControlView: React.FC = () => {
               value={runType}
               onChange={(value) => setRunType(value as 'first_sample' | 'adhoc')}
               options={[
-                { value: 'first_sample', label: 'First sample (auto date range)' },
+                { value: 'first_sample', label: isFirstSampleRun ? 'First sample (auto date range)' : 'Run Sample (auto date range)' },
                 { value: 'adhoc', label: 'Ad-hoc (pick date range)' },
               ]}
               placeholder="Run type"
