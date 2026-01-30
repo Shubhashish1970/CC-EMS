@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart3, Users, Activity as ActivityIcon, List, LogOut, User as UserIcon, Database, Leaf, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import HeaderRoleSwitcher from '../shared/HeaderRoleSwitcher';
 import ActivitySamplingView from './ActivitySamplingView';
 import AgentQueueView from './AgentQueueView';
 import TaskList from '../TaskList';
@@ -53,7 +54,7 @@ const AdminDashboardContainer: React.FC = () => {
                   <UserIcon size={16} className="text-slate-400" />
                   <span className="font-medium">{user.name}</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role).replace('_', ' ')}</span>
+                  <HeaderRoleSwitcher />
                 </div>
               )}
               <button

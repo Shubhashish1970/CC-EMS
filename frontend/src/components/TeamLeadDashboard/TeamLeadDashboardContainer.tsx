@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sliders, List, LogOut, User as UserIcon, PhoneForwarded, Leaf } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import HeaderRoleSwitcher from '../shared/HeaderRoleSwitcher';
 import SamplingControlView from './SamplingControlView';
 import TaskDashboardView from './TaskDashboardView';
 import CallbackRequestView from './CallbackRequestView';
@@ -48,7 +49,7 @@ const TeamLeadDashboardContainer: React.FC = () => {
                   <UserIcon size={16} className="text-slate-400" />
                   <span className="font-medium">{user.name}</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role).replace('_', ' ')}</span>
+                  <HeaderRoleSwitcher />
                 </div>
               )}
               <button

@@ -15,6 +15,7 @@ import AICopilotPanel from './AICopilotPanel';
 import CallReviewModal from './CallReviewModal';
 import TaskSelectionModal from './TaskSelectionModal';
 import Button from './shared/Button';
+import HeaderRoleSwitcher from './shared/HeaderRoleSwitcher';
 import AgentHistoryView from './AgentHistoryView';
 import AgentAnalyticsView from './AgentAnalyticsView';
 
@@ -591,7 +592,7 @@ const AgentWorkspace: React.FC = () => {
                 <User size={16} className="text-slate-400" />
                 <span className="font-medium">{user.name}</span>
                 <span className="text-slate-500">•</span>
-                <span className="text-xs text-slate-400 uppercase">{(activeRole || user.role)?.replace('_', ' ')}</span>
+                <HeaderRoleSwitcher />
               </div>
             )}
             <button
