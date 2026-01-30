@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square } from 'lucide-react';
+import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square, ChevronDown } from 'lucide-react';
 import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
@@ -858,15 +858,24 @@ const SamplingControlView: React.FC = () => {
                     return next;
                   });
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-lime-500 flex items-center justify-between"
+                className={`
+                  w-full px-4 py-3 rounded-xl border-2 bg-white text-left flex items-center justify-between gap-2
+                  transition-all duration-200 focus:outline-none
+                  ${isDatePickerOpen
+                    ? 'border-lime-500 ring-2 ring-lime-500/20'
+                    : 'border-slate-200 hover:border-lime-400'}
+                `}
               >
-                <span className="truncate">
+                <span className="truncate text-sm font-medium text-slate-900">
                   {selectedPreset}
                   {activityFilters.dateFrom && activityFilters.dateTo
                     ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
                     : ''}
                 </span>
-                <span className="text-slate-400 font-black">▾</span>
+                <ChevronDown
+                  size={18}
+                  className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isDatePickerOpen && (
