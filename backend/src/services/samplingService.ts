@@ -119,6 +119,10 @@ export const sampleAndCreateTasks = async (
     scheduledDate?: Date; // defaults to now (Team Lead run time)
     /** When true (first-sample run), set activity.firstSampleRun = true and firstSampledAt after sampling. When false (adhoc), do not change firstSampleRun. */
     setFirstSampleRun?: boolean;
+    /** Minimum farmers to sample for this activity (e.g. for FDA mandatory representation). */
+    minFarmersToSample?: number;
+    /** Cap on farmers to sample for this activity (e.g. for FDA proportional quota). */
+    maxFarmersToSample?: number;
   }
 ): Promise<{
   skipped?: boolean;
@@ -207,7 +211,13 @@ export const sampleAndCreateTasks = async (
     }
 
     // Calculate sample size
-    const sampleSize = eligibleFarmerIds.length > 0 ? calculateSampleSize(eligibleFarmerIds.length, percentage) : 0;
+    let sampleSize = eligibleFarmerIds.length > 0 ? calculateSampleSize(eligibleFarmerIds.length, percentage) : 0;
+    if (options?.minFarmersToSample != null && eligibleFarmerIds.length > 0) {
+      sampleSize = Math.max(sampleSize, Math.min(options.minFarmersToSample, eligibleFarmerIds.length));
+    }
+    if (options?.maxFarmersToSample != null) {
+      sampleSize = Math.min(sampleSize, options.maxFarmersToSample);
+    }
 
     // Perform reservoir sampling
     const sampledFarmerIds = sampleSize > 0 ? reservoirSampling(eligibleFarmerIds, sampleSize) : [];

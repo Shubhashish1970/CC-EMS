@@ -64,6 +64,57 @@ const getFirstSampleSuggestedRange = async (): Promise<{ dateFrom: Date; dateTo:
   return getFirstSampleSuggestedRangeFallback();
 };
 
+/** Group activities by FDA (officerId); allocate proportional target sample size per FDA. Every FDA gets at least 1 (mandatory representation). */
+type FdaGroupDoc = { _id: mongoose.Types.ObjectId; officerId: string; officerName?: string; farmerIds?: unknown[] };
+async function buildFdaGroups(
+  docs: FdaGroupDoc[],
+  samplingPercentage?: number | null
+): Promise<{ officerId: string; officerName: string; activities: { id: string; farmerCount: number }[]; totalFarmers: number; target: number }[]> {
+  const withFarmers = docs.filter((d) => d.farmerIds && Array.isArray(d.farmerIds) && d.farmerIds.length > 0);
+  const byOfficer = new Map<string, { officerName: string; activities: { id: string; farmerCount: number }[]; totalFarmers: number }>();
+  for (const d of withFarmers) {
+    const count = (d.farmerIds as unknown[]).length;
+    const oid = (d.officerId || 'unknown').trim() || 'unknown';
+    const existing = byOfficer.get(oid);
+    const entry = { id: d._id.toString(), farmerCount: count };
+    if (!existing) {
+      byOfficer.set(oid, {
+        officerName: (d.officerName as string) || oid,
+        activities: [entry],
+        totalFarmers: count,
+      });
+    } else {
+      existing.activities.push(entry);
+      existing.totalFarmers += count;
+    }
+  }
+  for (const g of byOfficer.values()) {
+    g.activities.sort((a, b) => b.farmerCount - a.farmerCount);
+  }
+  const totalWeight = Array.from(byOfficer.values()).reduce((s, g) => s + g.totalFarmers, 0);
+  if (totalWeight === 0) {
+    return [];
+  }
+  let resolvedPct = samplingPercentage ?? 10;
+  const config = await SamplingConfig.findOne({ key: 'default' }).select('defaultPercentage').lean();
+  if (config && (samplingPercentage == null || samplingPercentage === undefined)) {
+    resolvedPct = (config as any).defaultPercentage ?? 10;
+  }
+  const desiredTotal = Math.min(totalWeight, Math.max(1, Math.ceil((totalWeight * resolvedPct) / 100)));
+  const out: { officerId: string; officerName: string; activities: { id: string; farmerCount: number }[]; totalFarmers: number; target: number }[] = [];
+  for (const [officerId, g] of byOfficer.entries()) {
+    const target = Math.max(1, Math.round((g.totalFarmers / totalWeight) * desiredTotal));
+    out.push({
+      officerId,
+      officerName: g.officerName,
+      activities: g.activities,
+      totalFarmers: g.totalFarmers,
+      target,
+    });
+  }
+  return out;
+}
+
 // ============================================================================
 // Sampling Control (Team Lead + MIS Admin)
 // ============================================================================
@@ -538,6 +589,9 @@ router.post(
 
       let ids: string[] = [];
 
+      type FdaGroup = { officerId: string; officerName: string; activities: { id: string; farmerCount: number }[]; totalFarmers: number; target: number };
+      let fdaGroups: FdaGroup[] | null = null;
+
       if (Array.isArray(activityIds) && activityIds.length > 0) {
         ids = activityIds;
         matchedCount = activityIds.length;
@@ -545,7 +599,6 @@ router.post(
         const autoRange = await getFirstSampleAutoRange(authUserObjId);
         let rangeStart: Date;
         let rangeEnd: Date;
-        // User can override auto range by sending dateFrom/dateTo in the body
         if (dateFrom && dateTo) {
           rangeStart = new Date(dateFrom);
           rangeEnd = new Date(dateTo);
@@ -563,16 +616,17 @@ router.post(
           firstSampleRun: { $ne: true },
           lifecycleStatus: lifecycleStatus || 'active',
           date: { $gte: rangeStart, $lte: rangeEnd },
+          farmerIds: { $exists: true, $ne: [] },
         };
         matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
-          .select('_id')
+          .select('_id officerId officerName farmerIds')
           .sort({ date: -1 })
           .limit(MAX_BULK)
           .lean();
-        ids = docs.map((a) => a._id.toString());
+        fdaGroups = await buildFdaGroups(docs, samplingPercentage);
+        ids = docs.map((a) => (a as any)._id.toString());
       } else {
-        // adhoc: require date range
         if (!dateFrom || !dateTo) {
           return res.status(400).json({
             success: false,
@@ -584,21 +638,23 @@ router.post(
         const q: any = {
           firstSampleRun: true,
           date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
+          farmerIds: { $exists: true, $ne: [] },
         };
         matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
-          .select('_id')
+          .select('_id officerId officerName farmerIds')
           .sort({ date: -1 })
           .limit(MAX_BULK)
           .lean();
-        ids = docs.map((a) => a._id.toString());
+        fdaGroups = await buildFdaGroups(docs, samplingPercentage);
+        ids = docs.map((a) => (a as any)._id.toString());
       }
 
       if (matchedCount > MAX_BULK) {
         logger.warn('Sampling run truncated by safety cap', { matchedCount, processed: ids.length, MAX_BULK });
       }
 
-      logger.info('Sampling run requested', { runType: effectiveRunType, requestedCount: ids.length, forceRun: !!forceRun });
+      logger.info('Sampling run requested', { runType: effectiveRunType, requestedCount: ids.length, forceRun: !!forceRun, fdaCount: fdaGroups?.length ?? 0 });
 
       const shouldIncludeResults = includeResults === true;
       const results: any[] = [];
@@ -635,52 +691,106 @@ router.post(
       const setFirstSampleRun = effectiveRunType === 'first_sample';
 
       let processed = 0;
-      for (const id of ids) {
-        try {
-          if (effectiveRunType === 'adhoc') {
-            await CallTask.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
-            await SamplingAudit.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
-            await Activity.updateOne(
-              { _id: new mongoose.Types.ObjectId(id) },
-              { $set: { lifecycleStatus: 'active', lifecycleUpdatedAt: new Date() } }
-            );
-          }
-          const r = await sampleAndCreateTasks(id, samplingPercentage, {
-            runByUserId: authUserId,
-            forceRun: !!forceRun,
-            scheduledDate: new Date(),
-            setFirstSampleRun,
-          });
-          if (shouldIncludeResults) {
-            results.push({ activityId: id, ...r });
-          }
-          tasksCreatedTotal += r.tasksCreated || 0;
-          if (r.skipped) skipped++;
-          if (r.activityLifecycleStatus === 'sampled') sampledActivities++;
-          if (r.activityLifecycleStatus === 'inactive') inactiveActivities++;
-        } catch (e: any) {
-          const msg = `Failed activity ${id}: ${e?.message || 'Unknown error'}`;
-          errorsList.push(msg);
-          logger.error(msg, e);
-        } finally {
-          processed++;
-          if (processed % 5 === 0 || processed === ids.length) {
-            await SamplingRun.updateOne(
-              { _id: runDoc._id },
-              {
-                $set: {
-                  processed,
-                  tasksCreatedTotal,
-                  sampledActivities,
-                  inactiveActivities,
-                  skipped,
-                  errorCount: errorsList.length,
-                  lastProgressAt: new Date(),
-                  lastActivityId: id,
-                  ...(errorsList.length ? { errorMessages: errorsList.slice(-50) } : {}),
-                },
+
+      const processOne = async (id: string, opts: { maxFarmersToSample?: number; minFarmersToSample?: number }) => {
+        if (effectiveRunType === 'adhoc') {
+          await CallTask.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
+          await SamplingAudit.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
+          await Activity.updateOne(
+            { _id: new mongoose.Types.ObjectId(id) },
+            { $set: { lifecycleStatus: 'active', lifecycleUpdatedAt: new Date() } }
+          );
+        }
+        return sampleAndCreateTasks(id, samplingPercentage, {
+          runByUserId: authUserId,
+          forceRun: !!forceRun,
+          scheduledDate: new Date(),
+          setFirstSampleRun,
+          ...opts,
+        });
+      };
+
+      if (fdaGroups && fdaGroups.length > 0) {
+        for (const group of fdaGroups) {
+          let createdForFDA = 0;
+          for (const act of group.activities) {
+            try {
+              const maxFarmers = Math.max(0, group.target - createdForFDA);
+              const minFarmers = createdForFDA === 0 ? 1 : undefined;
+              const r = await processOne(act.id, {
+                maxFarmersToSample: maxFarmers > 0 ? maxFarmers : undefined,
+                minFarmersToSample: minFarmers,
+              });
+              if (shouldIncludeResults) {
+                results.push({ activityId: act.id, ...r });
               }
-            );
+              tasksCreatedTotal += r.tasksCreated || 0;
+              createdForFDA += r.tasksCreated || 0;
+              if (r.skipped) skipped++;
+              if (r.activityLifecycleStatus === 'sampled') sampledActivities++;
+              if (r.activityLifecycleStatus === 'inactive') inactiveActivities++;
+            } catch (e: any) {
+              const msg = `Failed activity ${act.id}: ${e?.message || 'Unknown error'}`;
+              errorsList.push(msg);
+              logger.error(msg, e);
+            } finally {
+              processed++;
+              if (processed % 5 === 0) {
+                await SamplingRun.updateOne(
+                  { _id: runDoc._id },
+                  {
+                    $set: {
+                      processed,
+                      tasksCreatedTotal,
+                      sampledActivities,
+                      inactiveActivities,
+                      skipped,
+                      errorCount: errorsList.length,
+                      lastProgressAt: new Date(),
+                      lastActivityId: act.id,
+                      ...(errorsList.length ? { errorMessages: errorsList.slice(-50) } : {}),
+                    },
+                  }
+                );
+              }
+            }
+          }
+        }
+      } else {
+        for (const id of ids) {
+          try {
+            const r = await processOne(id, {});
+            if (shouldIncludeResults) {
+              results.push({ activityId: id, ...r });
+            }
+            tasksCreatedTotal += r.tasksCreated || 0;
+            if (r.skipped) skipped++;
+            if (r.activityLifecycleStatus === 'sampled') sampledActivities++;
+            if (r.activityLifecycleStatus === 'inactive') inactiveActivities++;
+          } catch (e: any) {
+            const msg = `Failed activity ${id}: ${e?.message || 'Unknown error'}`;
+            errorsList.push(msg);
+            logger.error(msg, e);
+          } finally {
+            processed++;
+            if (processed % 5 === 0 || processed === ids.length) {
+              await SamplingRun.updateOne(
+                { _id: runDoc._id },
+                {
+                  $set: {
+                    processed,
+                    tasksCreatedTotal,
+                    sampledActivities,
+                    inactiveActivities,
+                    skipped,
+                    errorCount: errorsList.length,
+                    lastProgressAt: new Date(),
+                    lastActivityId: id,
+                    ...(errorsList.length ? { errorMessages: errorsList.slice(-50) } : {}),
+                  },
+                }
+              );
+            }
           }
         }
       }
@@ -713,7 +823,7 @@ router.post(
           dateFrom: resolvedDateFrom,
           dateTo: resolvedDateTo,
           matched: matchedCount,
-          processed: ids.length,
+          processed,
           sampledActivities,
           inactiveActivities,
           skipped,
