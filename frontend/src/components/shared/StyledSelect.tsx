@@ -68,18 +68,18 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
         disabled={disabled}
         className={`
           w-full min-h-12 px-4 py-3 text-left
-          bg-white border-2 rounded-xl
+          bg-white border rounded-xl
           flex items-center justify-between gap-2
           transition-all duration-200
           ${error 
             ? 'border-red-300 focus:border-red-500' 
             : isOpen 
-              ? 'border-lime-500 ring-2 ring-lime-500/20' 
-              : 'border-slate-200 hover:border-lime-400'
+              ? 'border-lime-400 ring-2 ring-lime-400/20' 
+              : 'border-slate-200 hover:border-lime-300'
           }
           ${disabled 
             ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-            : 'cursor-pointer focus:ring-2 focus:ring-lime-500 focus:border-lime-500'
+            : 'cursor-pointer focus:ring-2 focus:ring-lime-400 focus:border-lime-400'
           }
           focus:outline-none
         `}
@@ -95,7 +95,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-lg overflow-hidden">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
           <div className="max-h-60 overflow-y-auto">
             {options.map((option) => {
               const isSelected = option.value === value;

@@ -647,7 +647,7 @@ const SamplingControlView: React.FC = () => {
                   type="number"
                   value={activityCoolingDays}
                   onChange={(e) => setActivityCoolingDays(Number(e.target.value))}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
               <div>
@@ -656,7 +656,7 @@ const SamplingControlView: React.FC = () => {
                   type="number"
                   value={farmerCoolingDays}
                   onChange={(e) => setFarmerCoolingDays(Number(e.target.value))}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
               <div>
@@ -665,7 +665,7 @@ const SamplingControlView: React.FC = () => {
                   type="number"
                   value={defaultPercentage}
                   onChange={(e) => setDefaultPercentage(Number(e.target.value))}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
             </div>
@@ -879,7 +879,7 @@ const SamplingControlView: React.FC = () => {
               </button>
 
               {isDatePickerOpen && (
-                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-[45vw] min-w-[280px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-[45vw] min-w-[280px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
                     <div className="w-full sm:w-[42%] min-w-0 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2">
                       {([
@@ -926,7 +926,7 @@ const SamplingControlView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftStart(e.target.value);
                             }}
-                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                           />
                         </div>
                         <div className="flex-1">
@@ -940,7 +940,7 @@ const SamplingControlView: React.FC = () => {
                               setSelectedPreset('Custom');
                               setDraftEnd(e.target.value);
                             }}
-                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                           />
                         </div>
                       </div>

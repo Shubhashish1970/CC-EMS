@@ -344,7 +344,7 @@ const CallbackRequestView: React.FC = () => {
                     return !prev;
                   });
                 }}
-                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
               >
                 <span className="truncate">
                   {selectedPreset}
@@ -354,7 +354,7 @@ const CallbackRequestView: React.FC = () => {
               </button>
 
               {isDatePickerOpen && (
-                <div className="absolute z-50 mt-2 w-[500px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="absolute z-50 mt-2 w-[500px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                   <div className="flex">
                     <div className="w-44 border-r border-slate-200 bg-slate-50 p-2">
                       {(['Custom', 'Today', 'Yesterday', 'Last 7 days', 'Last 14 days', 'Last 30 days'] as DateRangePreset[]).map((p) => (
@@ -383,7 +383,7 @@ const CallbackRequestView: React.FC = () => {
                             type="date"
                             value={draftStart}
                             onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }}
-                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                           />
                         </div>
                         <div className="flex-1">
@@ -392,7 +392,7 @@ const CallbackRequestView: React.FC = () => {
                             type="date"
                             value={draftEnd}
                             onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }}
-                            className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                            className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                           />
                         </div>
                       </div>

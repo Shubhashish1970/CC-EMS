@@ -172,12 +172,12 @@ const MultiTagSelect: React.FC<MultiTagSelectProps> = ({
                     }
                   }}
                   placeholder="Search or type..."
-                  className="min-h-12 px-4 py-3 text-sm font-medium border-2 border-slate-200 rounded-xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 min-w-[120px] max-w-[200px]"
+                  className="min-h-12 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 min-w-[120px] max-w-[200px]"
                   autoFocus
                 />
                 {/* Show matching master items as suggestions */}
                 {customValue.trim() && (
-                  <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto min-w-[200px]">
+                  <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-32 overflow-y-auto min-w-[200px]">
                     {items
                       .filter(item => 
                         item.toLowerCase().includes(customValue.toLowerCase()) &&
@@ -194,7 +194,7 @@ const MultiTagSelect: React.FC<MultiTagSelectProps> = ({
                             setCustomValue('');
                             setShowAddInput(false);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm font-medium hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                          className="w-full px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
                         >
                           {item}
                         </button>
@@ -204,7 +204,7 @@ const MultiTagSelect: React.FC<MultiTagSelectProps> = ({
                       !activityItemsLower.includes(item.toLowerCase()) &&
                       !selected.some(s => s.toLowerCase() === item.toLowerCase())
                     ).length === 0 && (
-                      <div className="px-3 py-2 text-xs text-slate-500 italic font-normal">
+                      <div className="px-4 py-3 text-sm text-slate-500 italic font-normal">
                         Press Enter to add "{customValue}" (will preserve your typing)
                       </div>
                     )}

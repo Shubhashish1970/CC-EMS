@@ -135,13 +135,13 @@ const PurchasedProductsInput: React.FC<PurchasedProductsInputProps> = ({
               />
               {/* Show matching products as suggestions */}
               {(searchTerm || customProduct) && filteredProducts.length > 0 && (
-                <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto min-w-[200px]">
+                <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-32 overflow-y-auto min-w-[200px]">
                   {filteredProducts.slice(0, 5).map((product) => (
                     <button
                       key={product}
                       type="button"
                       onClick={() => handleAddProduct(product)}
-                      className="w-full px-3 py-2 text-left text-sm font-medium hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                      className="w-full px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
                     >
                       {product}
                     </button>
@@ -149,8 +149,8 @@ const PurchasedProductsInput: React.FC<PurchasedProductsInputProps> = ({
                 </div>
               )}
               {filteredProducts.length === 0 && (searchTerm || customProduct) && (
-                <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[200px]">
-                  <div className="px-3 py-2 text-xs text-slate-500 italic font-normal">
+                <div className="dropdown-suggestions absolute z-10 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[200px]">
+                  <div className="px-4 py-3 text-sm text-slate-500 italic font-normal">
                     Press Enter to add "{customProduct}"
                   </div>
                 </div>

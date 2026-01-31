@@ -113,11 +113,11 @@ const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-full min-h-12 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium flex items-center justify-between transition-all ${
+          className={`w-full min-h-12 px-4 py-3 rounded-xl border text-left text-sm font-medium flex items-center justify-between transition-all ${
             isOpen
-              ? 'border-lime-500 ring-2 ring-lime-500/20'
-              : 'border-slate-200 hover:border-lime-400'
-          } focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 ${selected.length === 0 ? 'text-slate-400' : 'text-slate-900'}`}
+              ? 'border-lime-400 ring-2 ring-lime-400/20'
+              : 'border-slate-200 hover:border-lime-300'
+          } focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 ${selected.length === 0 ? 'text-slate-400' : 'text-slate-900'}`}
         >
           <span className="flex items-center gap-2">
             <Search size={16} className="text-slate-400" />
@@ -131,7 +131,7 @@ const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute z-50 w-full mt-2 bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-64 overflow-hidden">
+          <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-hidden">
             {/* Search Input */}
             <div className="p-2 border-b border-slate-200">
               <div className="relative">
@@ -145,7 +145,7 @@ const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full min-h-12 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
             </div>
@@ -166,7 +166,7 @@ const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
                       key={item}
                       type="button"
                       onClick={() => handleToggle(item)}
-                      className={`w-full px-4 py-2.5 text-left text-sm font-medium border-b border-slate-100 last:border-b-0 flex items-center justify-between transition-colors ${getButtonStyle(item)}`}
+                      className={`w-full px-4 py-3 text-left text-sm font-medium border-b border-slate-100 last:border-b-0 flex items-center justify-between transition-colors ${getButtonStyle(item)}`}
                     >
                       <div className="flex items-center gap-2">
                         {selected && (

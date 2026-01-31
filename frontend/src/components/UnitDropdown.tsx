@@ -40,17 +40,17 @@ const UnitDropdown: React.FC<UnitDropdownProps> = ({ value, onChange, className 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 px-2 py-1.5 text-xs font-medium border border-slate-200 rounded-lg bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-lime-500"
+        className="min-h-12 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-900 hover:border-lime-300 transition-colors flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 min-w-[72px]"
       >
         <span>{selectedUnit.label}</span>
         <ChevronDown 
-          size={12} 
+          size={18} 
           className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-16 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full min-w-[72px] bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
           {units.map((unit) => (
             <button
               key={unit.value}
@@ -59,10 +59,10 @@ const UnitDropdown: React.FC<UnitDropdownProps> = ({ value, onChange, className 
                 onChange(unit.value);
                 setIsOpen(false);
               }}
-              className={`w-full px-2 py-1.5 text-xs font-medium text-left transition-colors ${
+              className={`w-full px-4 py-3 text-sm font-medium text-left transition-colors ${
                 value === unit.value
-                  ? 'bg-green-50 text-green-700'
-                  : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-lime-50 text-lime-800'
+                  : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
               {unit.label}

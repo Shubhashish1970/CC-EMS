@@ -65,7 +65,7 @@ const HeaderRoleSwitcher: React.FC = () => {
 
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 min-w-[160px] py-1 bg-white border-2 border-slate-200 rounded-xl shadow-lg"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[160px] py-1 bg-white border border-slate-200 rounded-xl shadow-lg"
           role="listbox"
         >
           {user.roles.map((role) => {

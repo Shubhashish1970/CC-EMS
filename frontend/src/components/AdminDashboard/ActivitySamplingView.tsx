@@ -892,7 +892,7 @@ const ActivitySamplingView: React.FC = () => {
                         setExcelFile(f);
                         setImportReport(null);
                       }}
-                      className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                      className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                     />
                   </div>
 
@@ -989,7 +989,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.activityType}
                   onChange={(e) => setFilters({ ...filters, activityType: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 >
                   <option value="">All Types</option>
                   <option value="Field Day">Field Day</option>
@@ -1007,7 +1007,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.territory}
                   onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 >
                   <option value="">All Territories</option>
                   {filterOptions.territoryOptions.map((t) => (
@@ -1023,7 +1023,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.zone}
                   onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 >
                   <option value="">All Zones</option>
                   {filterOptions.zoneOptions.map((z) => (
@@ -1039,7 +1039,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.bu}
                   onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 >
                   <option value="">All BUs</option>
                   {filterOptions.buOptions.map((b) => (
@@ -1057,7 +1057,7 @@ const ActivitySamplingView: React.FC = () => {
                 <select
                   value={filters.samplingStatus}
                   onChange={(e) => setFilters({ ...filters, samplingStatus: e.target.value as any })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 >
                   <option value="">All Statuses</option>
                   <option value="sampled">Sampled</option>
@@ -1081,7 +1081,7 @@ const ActivitySamplingView: React.FC = () => {
                         return next;
                       });
                     }}
-                    className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
+                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
                   >
                     <span className="truncate">
                       {selectedPreset}
@@ -1091,7 +1091,7 @@ const ActivitySamplingView: React.FC = () => {
                   </button>
 
                   {isDatePickerOpen && (
-                    <div className="absolute z-50 mt-2 right-0 left-auto w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="absolute z-50 mt-2 right-0 left-auto w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                       <div className="flex flex-col sm:flex-row">
                         {/* Presets */}
                         <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
@@ -1140,7 +1140,7 @@ const ActivitySamplingView: React.FC = () => {
                                   setSelectedPreset('Custom');
                                   setDraftStart(e.target.value);
                                 }}
-                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
                             <div className="flex-1">
@@ -1154,7 +1154,7 @@ const ActivitySamplingView: React.FC = () => {
                                   setSelectedPreset('Custom');
                                   setDraftEnd(e.target.value);
                                 }}
-                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
                             </div>
                           </div>
@@ -1748,7 +1748,7 @@ const ActivitySamplingView: React.FC = () => {
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                    className="min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                     title="Rows per page"
                   >
                     {[10, 20, 50, 100].map((n) => (
