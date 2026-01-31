@@ -12,6 +12,8 @@ interface ActivitySamplingStatus {
     type: string;
     date: string;
     officerName: string;
+    officerId?: string;
+    tmName?: string;
     location: string;
     territory: string;
     farmerIds: string[];
@@ -1491,6 +1493,31 @@ const ActivitySamplingView: React.FC = () => {
                               ) : (
                                 <p className="text-xs text-slate-400">No products</p>
                               )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* FDA & TM Details */}
+                        <div>
+                          <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
+                            <UserIcon size={14} className="text-slate-500" />
+                            FDA & TM Details
+                          </h4>
+                          <div className="flex flex-wrap gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">FDA</p>
+                              <p className="text-xs font-bold text-slate-900">
+                                {item.activity.officerName || '-'}
+                                {item.activity.officerId && (
+                                  <span className="text-[10px] font-normal text-slate-600 ml-1">({item.activity.officerId})</span>
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-500 font-medium mb-0.5">TM</p>
+                              <p className="text-xs font-bold text-slate-900">
+                                {item.activity.tmName || '-'}
+                              </p>
                             </div>
                           </div>
                         </div>
