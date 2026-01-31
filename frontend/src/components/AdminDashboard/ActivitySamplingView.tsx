@@ -310,7 +310,7 @@ const ActivitySamplingView: React.FC = () => {
     filters.dateTo,
   ]);
 
-  const fetchActivities = async (page: number = 1) => {
+  const fetchActivities = async (page: number = 1, forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -321,6 +321,7 @@ const ActivitySamplingView: React.FC = () => {
         dateTo: filters.dateTo || undefined,
         page,
         limit: pageSize,
+        ...(forceRefresh && { _refresh: Date.now() }),
       }) as any;
 
       if (response.success && response.data) {
@@ -407,6 +408,15 @@ const ActivitySamplingView: React.FC = () => {
       // Silently fail - sync status is not critical
       console.error('Failed to fetch sync status:', err);
     }
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      fetchActivities(pagination.page, true),
+      fetchStats(),
+      fetchSyncStatus(),
+      fetchFilterOptions(),
+    ]);
   };
 
   const handleSyncFFA = async (fullSync: boolean = false) => {
@@ -766,10 +776,10 @@ const ActivitySamplingView: React.FC = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => fetchActivities(pagination.page)}
-              disabled={isLoading}
+              onClick={handleRefresh}
+              disabled={isLoading || isStatsLoading}
             >
-              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={isLoading || isStatsLoading ? 'animate-spin' : ''} />
               Refresh
             </Button>
             <Button

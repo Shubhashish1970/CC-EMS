@@ -622,6 +622,7 @@ export const adminAPI = {
     dateTo?: string;
     page?: number;
     limit?: number;
+    _refresh?: number;
   }) => {
     const params = new URLSearchParams();
     if (filters?.activityType) params.append('activityType', filters.activityType);
@@ -633,6 +634,7 @@ export const adminAPI = {
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     if (filters?.page) params.append('page', String(filters.page));
     if (filters?.limit) params.append('limit', String(filters.limit));
+    if (filters?._refresh != null) params.append('_t', String(filters._refresh));
 
     const query = params.toString();
     return apiRequest(`/admin/activities-sampling${query ? `?${query}` : ''}`);
