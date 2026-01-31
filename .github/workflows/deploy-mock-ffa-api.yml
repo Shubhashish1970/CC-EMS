@@ -125,7 +125,7 @@ jobs:
               --memory 256Mi \
               --cpu 1 \
               --min-instances 0 \
-              --max-instances 10 \
+              --max-instances 1 \
               $MOCK_ENV_ARGS \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
@@ -135,6 +135,7 @@ jobs:
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
+              --max-instances 1 \
               $MOCK_ENV_ARGS \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet

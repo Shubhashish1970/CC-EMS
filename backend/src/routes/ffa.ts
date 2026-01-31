@@ -666,6 +666,15 @@ function getRowValue(row: Record<string, unknown>, ...keys: string[]): string {
   }
   return '';
 }
+/** Find first column key that matches any of the regex patterns (case-insensitive) */
+function findColumnKey(row: Record<string, unknown> | undefined, patterns: RegExp[]): string | null {
+  if (!row || typeof row !== 'object') return null;
+  for (const key of Object.keys(row)) {
+    const n = normalizeHeader(key).toLowerCase().replace(/\s/g, '');
+    if (patterns.some((p) => p.test(n))) return key;
+  }
+  return null;
+}
 /** Capitalize first letter of each word, rest lowercase (proper case) */
 function toProperCase(s: string): string {
   if (!s || typeof s !== 'string') return '';
@@ -698,31 +707,33 @@ router.post(
         }
         const sheet = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false });
-        const headerMap: Record<string, string> = {};
-        const first = rows[0];
-        if (first && typeof first === 'object') {
-          for (const key of Object.keys(first)) {
-            const n = normalizeHeader(key).toLowerCase().replace(/\s/g, '');
-            headerMap[n] = key;
-          }
-        }
-        const territoryCode = headerMap['territorycode'] ?? headerMap['territory_code'] ?? 'Territory Code';
-        const territoryName = headerMap['territoryname'] ?? headerMap['territory_name'] ?? headerMap['territory'] ?? 'Territory Name';
-        const regionCode = headerMap['regioncode'] ?? headerMap['region_code'] ?? 'Region Code';
-        const region = headerMap['region'] ?? 'Region';
-        const zoneCode = headerMap['zonecode'] ?? headerMap['zone_code'] ?? 'Zone Code';
-        const zoneName = headerMap['zonename'] ?? headerMap['zone_name'] ?? headerMap['zone'] ?? 'Zone Name';
-        const bu = headerMap['bu'] ?? headerMap['buname'] ?? headerMap['businessunit'] ?? 'BU';
+        const first = rows[0] as Record<string, unknown> | undefined;
+        // Flexible column detection: match headers that contain expected terms (e.g. "Territory Name", "Territory", "TerritoryName")
+        const territoryCode = findColumnKey(first, [/territorycode/, /territory_code/]) ?? (first && 'Territory Code' in first ? 'Territory Code' : null);
+        const territoryName = findColumnKey(first, [/territoryname/, /territory_name/, /territory\s*name/, /^territory$/]) ?? (first && 'Territory Name' in first ? 'Territory Name' : null);
+        const regionCode = findColumnKey(first, [/regioncode/, /region_code/]) ?? (first && 'Region Code' in first ? 'Region Code' : null);
+        const region = findColumnKey(first, [/^region$/]) ?? (first && 'Region' in first ? 'Region' : null);
+        const zoneCode = findColumnKey(first, [/zonecode/, /zone_code/]) ?? (first && 'Zone Code' in first ? 'Zone Code' : null);
+        const zoneName = findColumnKey(first, [/zonename/, /zone_name/, /zone\s*name/, /^zone$/]) ?? (first && 'Zone Name' in first ? 'Zone Name' : null);
+        const bu = findColumnKey(first, [/^bu$/, /buname/, /businessunit/, /business\s*unit/]) ?? (first && 'BU' in first ? 'BU' : null);
+
+        const territoryNameKey = territoryName || 'Territory Name';
+        const regionKey = region || 'Region';
+        const zoneNameKey = zoneName || 'Zone Name';
+        const buKey = bu || 'BU';
+        const territoryCodeKey = territoryCode || 'Territory Code';
+        const regionCodeKey = regionCode || 'Region Code';
+        const zoneCodeKey = zoneCode || 'Zone Code';
 
         for (const row of rows) {
           const r = row as Record<string, unknown>;
-          const tCode = getRowValue(r, territoryCode, 'Territory Code');
-          const tName = toProperCase(getRowValue(r, territoryName, 'Territory Name'));
-          const rCode = getRowValue(r, regionCode, 'Region Code');
-          const rName = toProperCase(getRowValue(r, region, 'Region'));
-          const zCode = getRowValue(r, zoneCode, 'Zone Code');
-          const zName = toProperCase(getRowValue(r, zoneName, 'Zone Name'));
-          const bRaw = getRowValue(r, bu, 'BU');
+          const tCode = getRowValue(r, territoryCodeKey, 'Territory Code');
+          const tName = toProperCase(getRowValue(r, territoryNameKey, 'Territory Name'));
+          const rCode = getRowValue(r, regionCodeKey, 'Region Code');
+          const rName = toProperCase(getRowValue(r, regionKey, 'Region'));
+          const zCode = getRowValue(r, zoneCodeKey, 'Zone Code');
+          const zName = toProperCase(getRowValue(r, zoneNameKey, 'Zone Name'));
+          const bRaw = getRowValue(r, buKey, 'BU');
           const b = bRaw ? bRaw.trim().toUpperCase() : 'SBU';
           if (!tName && !rName && !zName && !bRaw) continue;
           hierarchy.push({
@@ -736,9 +747,17 @@ router.post(
           });
         }
         if (hierarchy.length === 0 && rows.length > 0) {
-          logger.warn('[FFA] Seed-from-hierarchy: Excel had rows but no hierarchy rows parsed. Check column names: Territory Name, Region, Zone Name, BU.');
-        } else if (hierarchy.length > 0) {
-          logger.info('[FFA] Seed-from-hierarchy: parsed %d hierarchy rows from Excel', hierarchy.length);
+          const headersSeen = first ? Object.keys(first).join(', ') : 'none';
+          logger.warn('[FFA] Seed-from-hierarchy: Excel had %d rows but no hierarchy parsed. Headers seen: %s', rows.length, headersSeen);
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: 'Could not parse hierarchy from Excel. Ensure the first sheet has columns: Territory Name (or Territory), Region, Zone Name (or Zone), BU. Headers seen: ' + headersSeen,
+            },
+          });
+        }
+        if (hierarchy.length > 0) {
+          logger.info('[FFA] Seed-from-hierarchy: parsed %d hierarchy rows from Excel. First territory: %s', hierarchy.length, hierarchy[0]?.territoryName);
         }
       }
 
@@ -779,8 +798,32 @@ router.post(
       const seedData = await seedRes.json() as { success?: boolean; data?: { activitiesGenerated?: number; farmersGenerated?: number } };
       logger.info('[FFA] Mock FFA seed completed', seedData);
 
-      syncFFAData(true).catch((err) => logger.error('[FFA] Background sync after seed failed', err));
+      // When hierarchy was used: run sync in same request so the same Mock instance is likely to serve both seed and activities
+      if (hierarchy.length > 0) {
+        try {
+          const syncResult = await syncFFAData(true);
+          logger.info('[FFA] Sync after seed completed', syncResult);
+          return res.json({
+            success: true,
+            message: 'Data generated from your hierarchy file and synced to EMS. Territories should match your Excel.',
+            data: {
+              seed: seedData?.data ?? {},
+              sync: syncResult ? { activitiesSynced: syncResult.activitiesSynced, farmersSynced: syncResult.farmersSynced } : undefined,
+              activityCount,
+              farmersPerActivity,
+              hierarchyRowsUsed: hierarchy.length,
+            },
+          });
+        } catch (syncErr) {
+          logger.error('[FFA] Sync after seed failed', syncErr);
+          return res.status(500).json({
+            success: false,
+            error: { message: 'Seed succeeded but sync failed: ' + (syncErr instanceof Error ? syncErr.message : String(syncErr)) },
+          });
+        }
+      }
 
+      syncFFAData(true).catch((err) => logger.error('[FFA] Background sync after seed failed', err));
       res.json({
         success: true,
         message: 'Data generated via Mock FFA and full sync started. Poll /api/ffa/sync-progress for progress.',
