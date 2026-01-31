@@ -39,6 +39,7 @@ interface CallLog {
   purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
   farmerComments?: string;
   sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
+  activityQuality?: number; // 1-5 (4B. Activity Quality)
 }
 
 interface TaskData {
@@ -95,6 +96,7 @@ const AgentWorkspace: React.FC = () => {
     purchasedProducts: [] as Array<{ product: string; quantity: string; unit: string }>,
     farmerComments: '',
     sentiment: 'N/A' as 'Positive' | 'Negative' | 'Neutral' | 'N/A',
+    activityQuality: undefined as number | undefined,
   });
 
   // Timer for call duration (only when call status is "Connected")
@@ -163,6 +165,7 @@ const AgentWorkspace: React.FC = () => {
         purchasedProducts: [],
         farmerComments: '',
         sentiment: 'N/A',
+        activityQuality: undefined,
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load selected task');
@@ -347,6 +350,7 @@ const AgentWorkspace: React.FC = () => {
             purchasedProducts: [],
             farmerComments: '',
             sentiment: 'N/A',
+            activityQuality: undefined,
           });
           setCallDuration(0);
           // Clear any previous errors
@@ -409,6 +413,7 @@ const AgentWorkspace: React.FC = () => {
         purchasedProducts: [],
         farmerComments: '',
         sentiment: 'N/A',
+        activityQuality: undefined,
       });
       setTaskData(null);
       setCallDuration(0);

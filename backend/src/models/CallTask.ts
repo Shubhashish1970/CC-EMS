@@ -32,6 +32,7 @@ export interface ICallLog {
   purchasedProducts: Array<{ product: string; quantity: string; unit: string }>;
   farmerComments: string; // Replaces agentObservations
   sentiment: 'Positive' | 'Negative' | 'Neutral' | 'N/A'; // Sentiment indicator
+  activityQuality?: number; // 1-5: FDA holistic crop solution understanding (4B. Activity Quality)
 }
 
 export type Outcome = 
@@ -128,6 +129,12 @@ const CallLogSchema = new Schema<ICallLog>({
     type: String,
     enum: ['Positive', 'Negative', 'Neutral', 'N/A'],
     default: 'N/A',
+  },
+  activityQuality: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: undefined,
   },
 }, { _id: false });
 

@@ -16,6 +16,7 @@ interface CallLog {
   purchasedProducts?: Array<{ product: string; quantity: string; unit: string }>;
   farmerComments?: string;
   sentiment?: 'Positive' | 'Negative' | 'Neutral' | 'N/A';
+  activityQuality?: number;
 }
 
 interface TaskDetailsPanelProps {
@@ -274,6 +275,21 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                         <p className="text-[10px] text-slate-500">-</p>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4B. Activity Quality - FDA holistic crop solution */}
+              {taskData.callLog.callStatus === 'Connected' && taskData.callLog.didRecall === true && taskData.callLog.activityQuality != null && taskData.callLog.activityQuality >= 1 && taskData.callLog.activityQuality <= 5 && (
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                    4B. Activity Quality
+                  </label>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">FDA holistic crop solution</p>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lime-100 text-lime-800 border border-lime-300">
+                      {'⭐'.repeat(taskData.callLog.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[taskData.callLog.activityQuality]}
+                    </span>
                   </div>
                 </div>
               )}

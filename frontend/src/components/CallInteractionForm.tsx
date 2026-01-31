@@ -14,6 +14,7 @@ interface CallInteractionFormProps {
     didRecall: boolean | null;
     cropsDiscussed: string[];
     productsDiscussed: string[];
+    activityQuality?: number; // 1-5 (4B. Activity Quality)
     hasPurchased: boolean | null;
     willingToPurchase: boolean | null;
     likelyPurchaseDate?: string;
@@ -161,6 +162,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
         didRecall: null,
         cropsDiscussed: [],
         productsDiscussed: [],
+        activityQuality: undefined,
         hasPurchased: null,
         willingToPurchase: null,
         likelyPurchaseDate: undefined,
@@ -182,6 +184,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
         didRecall: null,
         cropsDiscussed: [],
         productsDiscussed: [],
+        activityQuality: undefined,
         hasPurchased: null,
         willingToPurchase: null,
         likelyPurchaseDate: undefined,
@@ -199,6 +202,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
         ...p,
         cropsDiscussed: [],
         productsDiscussed: [],
+        activityQuality: undefined,
         hasPurchased: null,
         willingToPurchase: null,
         likelyPurchaseDate: undefined,
@@ -349,7 +353,7 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                         {/* Product Matrix (PRD 7.4.3) */}
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            4. Product & Crop Recall
+                            4A. Product & Crop Recall
                           </h3>
                           <div className="space-y-4">
                             {loadingMasterData ? (
@@ -376,6 +380,42 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                 />
                               </>
                             )}
+                          </div>
+                        </div>
+
+                        {/* 4B. Activity Quality - FDA holistic crop solution (after 4A, before Commercial Conversion) */}
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            4B. Activity Quality
+                          </h3>
+                          <p className="text-sm font-medium text-slate-700">
+                            Did the FDA understand your problem and offer a holistic crop solution?
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { value: 1, label: 'Did not understand or provide a solution', stars: '⭐' },
+                              { value: 2, label: 'Limited understanding; partial solution', stars: '⭐⭐' },
+                              { value: 3, label: 'Understood problem, basic solution', stars: '⭐⭐⭐' },
+                              { value: 4, label: 'Good understanding; mostly holistic solution', stars: '⭐⭐⭐⭐' },
+                              { value: 5, label: 'Excellent understanding; complete holistic solution', stars: '⭐⭐⭐⭐⭐' },
+                            ].map(({ value, label, stars }) => {
+                              const isSelected = formData.activityQuality === value;
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => setFormData((p: any) => ({ ...p, activityQuality: isSelected ? undefined : value }))}
+                                  className={`py-2.5 px-3 rounded-xl border text-left text-[10px] font-bold transition-all min-h-[40px] flex items-center gap-2 ${
+                                    isSelected
+                                      ? 'bg-lime-600 text-white border-lime-600 shadow-sm'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:border-lime-400 hover:bg-lime-50/50'
+                                  }`}
+                                >
+                                  <span className="text-sm">{stars}</span>
+                                  <span className="hidden sm:inline">{label}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 

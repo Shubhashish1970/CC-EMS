@@ -2811,6 +2811,7 @@ router.post(
     body('purchasedProducts.*.unit').optional().isIn(['kg', 'gms', 'lt']),
     body('farmerComments').optional().isString(),
     body('sentiment').optional().isIn(['Positive', 'Negative', 'Neutral', 'N/A']).withMessage('Invalid sentiment value'),
+    body('activityQuality').optional({ nullable: true }).isInt({ min: 1, max: 5 }).withMessage('activityQuality must be 1-5'),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -2856,6 +2857,7 @@ router.post(
         purchasedProducts: req.body.purchasedProducts || [],
         farmerComments: req.body.farmerComments || '',
         sentiment: req.body.sentiment || 'N/A',
+        ...(req.body.activityQuality != null && { activityQuality: Number(req.body.activityQuality) }),
       };
 
       // Update task with call log

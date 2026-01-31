@@ -12,6 +12,7 @@ interface CallReviewModalProps {
     didRecall: boolean | null;
     cropsDiscussed: string[];
     productsDiscussed: string[];
+    activityQuality?: number;
     hasPurchased: boolean | null;
     willingToPurchase: boolean | null;
     likelyPurchaseDate?: string;
@@ -156,11 +157,11 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                 </div>
               )}
 
-              {/* Product & Crop Recall */}
+              {/* 4A. Product & Crop Recall */}
               {(formData.didRecall === true) && (
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-                    4. Product & Crop Recall
+                    4A. Product & Crop Recall
                   </h3>
                   <div className="space-y-4">
                     <div className="bg-white p-4 rounded-xl border border-slate-200">
@@ -197,6 +198,25 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                         <span className="text-sm text-slate-400 italic">None selected</span>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4B. Activity Quality - FDA holistic crop solution */}
+              {formData.didRecall === true && (
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    4B. Activity Quality
+                  </h3>
+                  <div className="bg-white p-4 rounded-xl border border-slate-200">
+                    <label className="text-xs font-bold text-slate-600 mb-2 block">Did the FDA understand your problem and offer a holistic crop solution?</label>
+                    {formData.activityQuality != null && formData.activityQuality >= 1 && formData.activityQuality <= 5 ? (
+                      <span className="px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 bg-lime-100 text-lime-800 border border-lime-300">
+                        {'⭐'.repeat(formData.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[formData.activityQuality]}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-400 italic">Not selected</span>
+                    )}
                   </div>
                 </div>
               )}

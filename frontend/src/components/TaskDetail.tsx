@@ -46,6 +46,7 @@ interface Task {
     didRecall?: boolean | null;
     cropsDiscussed?: string[];
     productsDiscussed?: string[];
+    activityQuality?: number;
     hasPurchased?: boolean | null;
     willingToPurchase?: boolean | null;
     nonPurchaseReason?: string;
@@ -385,6 +386,14 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+              {fullTask.callLog.activityQuality != null && fullTask.callLog.activityQuality >= 1 && fullTask.callLog.activityQuality <= 5 && (
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">4B. Activity Quality – FDA holistic crop solution</p>
+                  <p className="text-sm font-medium text-slate-700">
+                    {'⭐'.repeat(fullTask.callLog.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[fullTask.callLog.activityQuality]}
+                  </p>
                 </div>
               )}
               {fullTask.callLog.farmerComments && (
