@@ -143,7 +143,7 @@ const DataManagementView: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Sales Hierarchy Excel (optional)</label>
-            <p className="text-xs text-slate-500 mb-2">Columns: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU</p>
+            <p className="text-xs text-slate-500 mb-2">Download template for clearly labelled columns (Territory Name, Region, Zone Name, BU). Template includes an Instructions sheet.</p>
             <div className="flex flex-wrap items-center gap-3 mb-2">
               <button
                 type="button"

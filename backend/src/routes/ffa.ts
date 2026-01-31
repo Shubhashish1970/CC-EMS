@@ -298,13 +298,39 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Instructions – easy to identify what each column means
+      const instructionRows = [
+        ['SALES HIERARCHY UPLOAD – INSTRUCTIONS'],
+        [''],
+        ['Fill the "Sales Hierarchy" sheet (next tab) with one row per territory.'],
+        ['Use exactly these column headers in row 1: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU'],
+        [''],
+        ['COLUMN MEANINGS:'],
+        ['• Territory Code  = Optional code (e.g. 714, 715)'],
+        ['• Territory Name  = Territory / location name (e.g. Palakolu, Eluru)'],
+        ['• Region Code     = Optional region code (e.g. 2204)'],
+        ['• Region          = Region name (e.g. Vijayawada, Guntur)'],
+        ['• Zone Code       = Optional zone code (e.g. 2200)'],
+        ['• Zone Name       = Zone name (e.g. AP & South KA)'],
+        ['• BU              = Business Unit – use acronym (e.g. SBU, EBU, CBU)'],
+        [''],
+        ['Then upload this file in Data Management → Generate data via Mock FFA API.'],
+      ];
+      const wsInstructions = XLSX.utils.aoa_to_sheet(instructionRows);
+      wsInstructions['!cols'] = [{ wch: 70 }];
+      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
+
+      // Sheet 2: Sales Hierarchy – exact format: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU
       const sample = [
         { 'Territory Code': '714', 'Territory Name': 'Palakolu', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
         { 'Territory Code': '715', 'Territory Name': 'Eluru', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
         { 'Territory Code': '720', 'Territory Name': 'Vijayawada', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
       ];
       const ws = XLSX.utils.json_to_sheet(sample);
+      ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 16 }, { wch: 26 }];
       XLSX.utils.book_append_sheet(wb, ws, 'Sales Hierarchy');
+
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="sales_hierarchy_template.xlsx"');
@@ -701,21 +727,24 @@ router.post(
       const file = (req as any).file as Express.Multer.File | undefined;
       if (file?.buffer) {
         const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
+        const allNames = workbook.SheetNames;
+        const hierarchySheetName = allNames.find((n) => /sales\s*hierarchy|hierarchy/i.test(n.trim()));
+        const sheetName = hierarchySheetName ?? allNames[0];
         if (!sheetName) {
           return res.status(400).json({ success: false, error: { message: 'Excel file has no sheets.' } });
         }
         const sheet = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false });
         const first = rows[0] as Record<string, unknown> | undefined;
-        // Flexible column detection: match headers that contain expected terms (e.g. "Territory Name", "Territory", "TerritoryName")
-        const territoryCode = findColumnKey(first, [/territorycode/, /territory_code/]) ?? (first && 'Territory Code' in first ? 'Territory Code' : null);
-        const territoryName = findColumnKey(first, [/territoryname/, /territory_name/, /territory\s*name/, /^territory$/]) ?? (first && 'Territory Name' in first ? 'Territory Name' : null);
-        const regionCode = findColumnKey(first, [/regioncode/, /region_code/]) ?? (first && 'Region Code' in first ? 'Region Code' : null);
-        const region = findColumnKey(first, [/^region$/]) ?? (first && 'Region' in first ? 'Region' : null);
-        const zoneCode = findColumnKey(first, [/zonecode/, /zone_code/]) ?? (first && 'Zone Code' in first ? 'Zone Code' : null);
-        const zoneName = findColumnKey(first, [/zonename/, /zone_name/, /zone\s*name/, /^zone$/]) ?? (first && 'Zone Name' in first ? 'Zone Name' : null);
-        const bu = findColumnKey(first, [/^bu$/, /buname/, /businessunit/, /business\s*unit/]) ?? (first && 'BU' in first ? 'BU' : null);
+        // Standard format: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU – prefer exact names when present
+        const exact = (key: string) => (first && Object.prototype.hasOwnProperty.call(first, key) ? key : null);
+        const territoryCode = exact('Territory Code') ?? findColumnKey(first, [/territorycode/, /territory_code/]);
+        const territoryName = exact('Territory Name') ?? findColumnKey(first, [/territoryname/, /territory_name/, /territory\s*name/, /^territory$/]);
+        const regionCode = exact('Region Code') ?? findColumnKey(first, [/regioncode/, /region_code/]);
+        const region = exact('Region') ?? findColumnKey(first, [/^region$/]);
+        const zoneCode = exact('Zone Code') ?? findColumnKey(first, [/zonecode/, /zone_code/]);
+        const zoneName = exact('Zone Name') ?? findColumnKey(first, [/zonename/, /zone_name/, /zone\s*name/, /^zone$/]);
+        const bu = exact('BU') ?? findColumnKey(first, [/^bu$/, /^bu\(/, /buname/, /businessunit/, /business\s*unit/]);
 
         const territoryNameKey = territoryName || 'Territory Name';
         const regionKey = region || 'Region';
