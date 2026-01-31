@@ -41,16 +41,17 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
       const response = await aiAPI.extractData(scratchpad, context);
 
       if (response.success && response.data) {
-        // Merge extracted data with existing form data
+        // Notetaker only writes Farmer Comments; button selections are not updated
+        const farmerComments =
+          (response.data.farmerComments && response.data.farmerComments.trim()) ||
+          scratchpad.trim();
         setFormData((prev: any) => ({
           ...prev,
-          ...response.data,
-          // Ensure sentiment defaults to N/A if not provided
-          sentiment: response.data.sentiment || 'N/A',
+          farmerComments,
         }));
         
         setSuccess(true);
-        showSuccess('Form fields populated successfully! Please review and edit as needed.');
+        showSuccess('Farmer comments updated from notes.');
         
         // Clear success message after 3 seconds
         setTimeout(() => setSuccess(false), 3000);
@@ -115,7 +116,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
         {success && (
           <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs">
             <CheckCircle size={16} className="flex-shrink-0 mt-0.5" />
-            <p className="flex-1">Form fields populated successfully! Please review and edit as needed.</p>
+            <p className="flex-1">Farmer comments updated from notes.</p>
           </div>
         )}
         
@@ -145,7 +146,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
           <span className="text-[10px] font-black uppercase tracking-widest">Compliance Note</span>
         </div>
         <p className="text-[11px] text-yellow-700 leading-normal font-medium italic">
-          PRD 7.4.5: Structured data (buttons) is mandatory. The Notetaker helps populate them faster but agent verification is required.
+          PRD 7.4.5: Structured data (buttons) is mandatory and must be selected by the agent. The Notetaker only fills Farmer Comments.
         </p>
       </div>
     </section>
