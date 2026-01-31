@@ -97,6 +97,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
           bg-white border rounded-xl
           flex items-center justify-between gap-2
           transition-all duration-200
+          min-w-0
           ${error 
             ? 'border-red-300 focus:border-red-500' 
             : isOpen 
@@ -110,7 +111,7 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
           focus:outline-none
         `}
       >
-        <span className={`text-sm ${selectedOption ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
+        <span className={`text-sm flex-1 min-w-0 text-left whitespace-normal break-words ${selectedOption ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown 
@@ -135,15 +136,15 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
                   type="button"
                   onClick={() => handleSelect(option.value)}
                   className={`
-                    w-full px-4 py-3 text-left flex items-center justify-between text-sm font-medium
-                    transition-colors duration-150
+                    w-full px-4 py-3 text-left flex items-center justify-between gap-2 text-sm font-medium
+                    transition-colors duration-150 whitespace-normal
                     ${isSelected 
                       ? 'bg-lime-50 text-lime-800' 
                       : 'text-slate-700 hover:bg-slate-50'
                     }
                   `}
                 >
-                  <span>{option.label}</span>
+                  <span className="min-w-0 break-words flex-1">{option.label}</span>
                   {isSelected && (
                     <Check size={16} className="text-lime-600 flex-shrink-0" />
                   )}

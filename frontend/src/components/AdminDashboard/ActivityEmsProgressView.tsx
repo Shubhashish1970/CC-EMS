@@ -530,12 +530,14 @@ const ActivityEmsProgressView: React.FC = () => {
           <h3 className="font-semibold text-slate-800">Drill-down</h3>
           <div className="flex items-center gap-2 relative z-10">
             <span className="text-sm text-slate-500">Group by</span>
-            <StyledSelect
-              value={groupBy}
-              onChange={(v) => setGroupBy(v as EmsDrilldownGroupBy)}
-              options={GROUP_BY_OPTIONS}
-              placeholder="Group by"
-            />
+            <div className="min-w-[240px] w-64">
+              <StyledSelect
+                value={groupBy}
+                onChange={(v) => setGroupBy(v as EmsDrilldownGroupBy)}
+                options={GROUP_BY_OPTIONS}
+                placeholder="Group by"
+              />
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
