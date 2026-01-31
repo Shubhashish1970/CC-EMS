@@ -113,7 +113,7 @@ const DataManagementView: React.FC = () => {
           </div>
           <div>
             <h3 className="font-bold text-slate-900">Generate data via Mock FFA API</h3>
-            <p className="text-xs text-slate-600">Set activity and farmer counts; optionally upload Sales Hierarchy Excel (Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU). Data uses Indian names.</p>
+            <p className="text-xs text-slate-600">Set activity and farmer counts; optionally upload Sales Hierarchy Excel (Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU). When you upload a hierarchy file and click Generate &amp; Sync, existing transaction data is cleared first so all activities and territories come from your file. Data uses Indian names.</p>
           </div>
         </div>
         <div className="p-6 space-y-6">

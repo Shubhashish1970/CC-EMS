@@ -441,9 +441,9 @@ app.post('/api/seed', (req: Request, res: Response) => {
     if (Array.isArray(body?.hierarchy) && body.hierarchy.length > 0) {
       const parsed = body.hierarchy
         .map((r: Record<string, unknown>) => {
-          const territoryName = toProperCase(String(r?.territoryName ?? r?.['Territory Name'] ?? '').trim());
+          const territoryName = toProperCase(String(r?.territoryName ?? r?.['Territory Name'] ?? r?.territory ?? '').trim());
           const region = toProperCase(String(r?.region ?? r?.['Region'] ?? '').trim());
-          const zoneName = toProperCase(String(r?.zoneName ?? r?.['Zone Name'] ?? '').trim());
+          const zoneName = toProperCase(String(r?.zoneName ?? r?.['Zone Name'] ?? r?.zone ?? '').trim());
           const buRaw = String(r?.bu ?? r?.['BU'] ?? '').trim();
           const bu = buRaw ? buRaw.toUpperCase() : 'SBU';
           if (!territoryName && !region && !zoneName && !buRaw) return null;
@@ -458,7 +458,10 @@ app.post('/api/seed', (req: Request, res: Response) => {
           } as HierarchyRow;
         })
         .filter((r): r is HierarchyRow => r !== null);
-      if (parsed.length > 0) hierarchyRows = parsed;
+      if (parsed.length > 0) {
+        hierarchyRows = parsed;
+        console.log(`[Mock FFA] Using ${parsed.length} hierarchy rows from request (territories from file)`);
+      }
     }
     const result = generateSampleDataWithParams(activityCount, farmersPerActivity, hierarchyRows);
     res.json({

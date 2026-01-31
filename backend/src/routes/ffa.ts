@@ -707,12 +707,12 @@ router.post(
           }
         }
         const territoryCode = headerMap['territorycode'] ?? headerMap['territory_code'] ?? 'Territory Code';
-        const territoryName = headerMap['territoryname'] ?? headerMap['territory_name'] ?? 'Territory Name';
+        const territoryName = headerMap['territoryname'] ?? headerMap['territory_name'] ?? headerMap['territory'] ?? 'Territory Name';
         const regionCode = headerMap['regioncode'] ?? headerMap['region_code'] ?? 'Region Code';
         const region = headerMap['region'] ?? 'Region';
         const zoneCode = headerMap['zonecode'] ?? headerMap['zone_code'] ?? 'Zone Code';
-        const zoneName = headerMap['zonename'] ?? headerMap['zone_name'] ?? 'Zone Name';
-        const bu = headerMap['bu'] ?? headerMap['buname'] ?? 'BU';
+        const zoneName = headerMap['zonename'] ?? headerMap['zone_name'] ?? headerMap['zone'] ?? 'Zone Name';
+        const bu = headerMap['bu'] ?? headerMap['buname'] ?? headerMap['businessunit'] ?? 'BU';
 
         for (const row of rows) {
           const r = row as Record<string, unknown>;
@@ -735,6 +735,25 @@ router.post(
             bu: b,
           });
         }
+        if (hierarchy.length === 0 && rows.length > 0) {
+          logger.warn('[FFA] Seed-from-hierarchy: Excel had rows but no hierarchy rows parsed. Check column names: Territory Name, Region, Zone Name, BU.');
+        } else if (hierarchy.length > 0) {
+          logger.info('[FFA] Seed-from-hierarchy: parsed %d hierarchy rows from Excel', hierarchy.length);
+        }
+      }
+
+      // When hierarchy from file is used: clear transaction data first so EMS only has hierarchy-based activities
+      if (hierarchy.length > 0) {
+        logger.info('[FFA] Clearing transaction data before seed so territories come from hierarchy file');
+        await CallTask.deleteMany({});
+        await SamplingAudit.deleteMany({});
+        await CoolingPeriod.deleteMany({});
+        await SamplingConfig.deleteMany({});
+        await SamplingRun.deleteMany({});
+        await AllocationRun.deleteMany({});
+        await InboundQuery.deleteMany({});
+        await Activity.deleteMany({});
+        await Farmer.deleteMany({});
       }
 
       const baseUrl = (process.env.FFA_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
