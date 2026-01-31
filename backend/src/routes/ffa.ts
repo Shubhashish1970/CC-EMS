@@ -8,7 +8,11 @@ import { CallTask } from '../models/CallTask.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
 import { CoolingPeriod } from '../models/CoolingPeriod.js';
 import { SamplingConfig } from '../models/SamplingConfig.js';
-import { MasterCrop, MasterProduct } from '../models/MasterData.js';
+import { MasterCrop, MasterProduct, NonPurchaseReason, Sentiment, MasterLanguage } from '../models/MasterData.js';
+import { StateLanguageMapping } from '../models/StateLanguageMapping.js';
+import { SamplingRun } from '../models/SamplingRun.js';
+import { AllocationRun } from '../models/AllocationRun.js';
+import { InboundQuery } from '../models/InboundQuery.js';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { getLanguageForState } from '../utils/stateLanguageMapper.js';
@@ -285,6 +289,32 @@ router.get(
   }
 );
 
+// @route   GET /api/ffa/hierarchy-template
+// @desc    Download Sales Hierarchy Excel template (Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU)
+// @access  Private (MIS Admin)
+router.get(
+  '/hierarchy-template',
+  requirePermission('config.ffa'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const wb = XLSX.utils.book_new();
+      const sample = [
+        { 'Territory Code': '714', 'Territory Name': 'Palakolu', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
+        { 'Territory Code': '715', 'Territory Name': 'Eluru', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
+        { 'Territory Code': '720', 'Territory Name': 'Vijayawada', 'Region Code': '2204', 'Region': 'Vijayawada', 'Zone Code': '2200', 'Zone Name': 'AP & South KA', 'BU': 'SBU' },
+      ];
+      const ws = XLSX.utils.json_to_sheet(sample);
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales Hierarchy');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="sales_hierarchy_template.xlsx"');
+      res.status(200).send(buf);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   POST /api/ffa/import-excel
 // @desc    Import Activities + Farmers via Excel (2 sheets) as fallback when FFA API is unavailable
 // @access  Private (MIS Admin)
@@ -545,6 +575,201 @@ router.get(
             total,
             pages: Math.ceil(total / Number(limit)),
           },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   POST /api/ffa/clear-data
+// @desc    Clear transaction and/or master data (Admin). Use for dev/test DB reset.
+// @access  Private (MIS Admin)
+router.post(
+  '/clear-data',
+  requirePermission('config.ffa'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { clearTransactions = false, clearMasters = false } = req.body as { clearTransactions?: boolean; clearMasters?: boolean };
+      if (!clearTransactions && !clearMasters) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Set at least one of clearTransactions or clearMasters to true.' },
+        });
+      }
+
+      const data: Record<string, number> = {};
+
+      if (clearTransactions) {
+        const taskResult = await CallTask.deleteMany({});
+        const auditResult = await SamplingAudit.deleteMany({});
+        const coolingResult = await CoolingPeriod.deleteMany({});
+        const samplingConfigResult = await SamplingConfig.deleteMany({});
+        const samplingRunResult = await SamplingRun.deleteMany({});
+        const allocationRunResult = await AllocationRun.deleteMany({});
+        const inboundResult = await InboundQuery.deleteMany({});
+        const activityResult = await Activity.deleteMany({});
+        const farmerResult = await Farmer.deleteMany({});
+        Object.assign(data, {
+          tasksDeleted: taskResult.deletedCount,
+          samplingAuditsDeleted: auditResult.deletedCount,
+          coolingPeriodsDeleted: coolingResult.deletedCount,
+          samplingConfigsDeleted: samplingConfigResult.deletedCount,
+          samplingRunsDeleted: samplingRunResult.deletedCount,
+          allocationRunsDeleted: allocationRunResult.deletedCount,
+          inboundQueriesDeleted: inboundResult.deletedCount,
+          farmersDeleted: farmerResult.deletedCount,
+          activitiesDeleted: activityResult.deletedCount,
+        });
+        logger.info('[FFA] Cleared transaction data', data);
+      }
+
+      if (clearMasters) {
+        const cropResult = await MasterCrop.deleteMany({});
+        const productResult = await MasterProduct.deleteMany({});
+        const nprResult = await NonPurchaseReason.deleteMany({});
+        const sentimentResult = await Sentiment.deleteMany({});
+        const langResult = await MasterLanguage.deleteMany({});
+        const slmResult = await StateLanguageMapping.deleteMany({});
+        Object.assign(data, {
+          cropsDeleted: cropResult.deletedCount,
+          productsDeleted: productResult.deletedCount,
+          nonPurchaseReasonsDeleted: nprResult.deletedCount,
+          sentimentsDeleted: sentimentResult.deletedCount,
+          languagesDeleted: langResult.deletedCount,
+          stateLanguageMappingsDeleted: slmResult.deletedCount,
+        });
+        logger.info('[FFA] Cleared master data', data);
+      }
+
+      res.json({
+        success: true,
+        message: 'Database clear completed.',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Expected Excel columns for Sales Hierarchy: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU
+function normalizeHeader(str: unknown): string {
+  if (str == null || typeof str !== 'string') return '';
+  return str.trim().replace(/\s+/g, ' ');
+}
+function getRowValue(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = row[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+/** Capitalize first letter of each word, rest lowercase (proper case) */
+function toProperCase(s: string): string {
+  if (!s || typeof s !== 'string') return '';
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/(?:^|\s|[-+])\S/g, (c) => c.toUpperCase());
+}
+
+// @route   POST /api/ffa/seed-from-hierarchy
+// @desc    Upload Sales Hierarchy Excel + activity/farmer counts; Mock FFA regenerates data, then full sync into EMS.
+// @access  Private (MIS Admin)
+router.post(
+  '/seed-from-hierarchy',
+  requirePermission('config.ffa'),
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const activityCount = Math.max(1, Math.min(500, Number((req.body as any).activityCount) || 50));
+      const farmersPerActivity = Math.max(1, Math.min(50, Number((req.body as any).farmersPerActivity) || 12));
+
+      let hierarchy: Array<{ territoryCode?: string; territoryName: string; regionCode?: string; region: string; zoneCode?: string; zoneName: string; bu: string }> = [];
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      if (file?.buffer) {
+        const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+          return res.status(400).json({ success: false, error: { message: 'Excel file has no sheets.' } });
+        }
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false });
+        const headerMap: Record<string, string> = {};
+        const first = rows[0];
+        if (first && typeof first === 'object') {
+          for (const key of Object.keys(first)) {
+            const n = normalizeHeader(key).toLowerCase().replace(/\s/g, '');
+            headerMap[n] = key;
+          }
+        }
+        const territoryCode = headerMap['territorycode'] ?? headerMap['territory_code'] ?? 'Territory Code';
+        const territoryName = headerMap['territoryname'] ?? headerMap['territory_name'] ?? 'Territory Name';
+        const regionCode = headerMap['regioncode'] ?? headerMap['region_code'] ?? 'Region Code';
+        const region = headerMap['region'] ?? 'Region';
+        const zoneCode = headerMap['zonecode'] ?? headerMap['zone_code'] ?? 'Zone Code';
+        const zoneName = headerMap['zonename'] ?? headerMap['zone_name'] ?? 'Zone Name';
+        const bu = headerMap['bu'] ?? headerMap['buname'] ?? 'BU';
+
+        for (const row of rows) {
+          const r = row as Record<string, unknown>;
+          const tCode = getRowValue(r, territoryCode, 'Territory Code');
+          const tName = toProperCase(getRowValue(r, territoryName, 'Territory Name'));
+          const rCode = getRowValue(r, regionCode, 'Region Code');
+          const rName = toProperCase(getRowValue(r, region, 'Region'));
+          const zCode = getRowValue(r, zoneCode, 'Zone Code');
+          const zName = toProperCase(getRowValue(r, zoneName, 'Zone Name'));
+          const bRaw = getRowValue(r, bu, 'BU');
+          const b = bRaw ? bRaw.trim().toUpperCase() : 'SBU';
+          if (!tName && !rName && !zName && !bRaw) continue;
+          hierarchy.push({
+            territoryCode: tCode || undefined,
+            territoryName: tName || 'Territory',
+            regionCode: rCode || undefined,
+            region: rName || 'Region',
+            zoneCode: zCode || undefined,
+            zoneName: zName || 'Zone',
+            bu: b,
+          });
+        }
+      }
+
+      const baseUrl = (process.env.FFA_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
+      const seedUrl = `${baseUrl}/seed`;
+      const body = { activityCount, farmersPerActivity, hierarchy: hierarchy.length > 0 ? hierarchy : undefined };
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const ffaToken = process.env.FFA_API_TOKEN;
+      const ffaKey = process.env.FFA_API_KEY;
+      if (ffaToken?.trim()) headers['Authorization'] = `Bearer ${ffaToken.trim()}`;
+      else if (ffaKey?.trim()) headers['X-API-Key'] = ffaKey.trim();
+
+      const seedRes = await fetch(seedUrl, { method: 'POST', headers, body: JSON.stringify(body) });
+      if (!seedRes.ok) {
+        const errText = await seedRes.text();
+        logger.error('[FFA] Mock seed failed', { status: seedRes.status, body: errText });
+        return res.status(502).json({
+          success: false,
+          error: { message: `Mock FFA seed failed: ${seedRes.status} ${errText.slice(0, 200)}` },
+        });
+      }
+
+      const seedData = await seedRes.json() as { success?: boolean; data?: { activitiesGenerated?: number; farmersGenerated?: number } };
+      logger.info('[FFA] Mock FFA seed completed', seedData);
+
+      syncFFAData(true).catch((err) => logger.error('[FFA] Background sync after seed failed', err));
+
+      res.json({
+        success: true,
+        message: 'Data generated via Mock FFA and full sync started. Poll /api/ffa/sync-progress for progress.',
+        data: {
+          seed: seedData?.data ?? {},
+          activityCount,
+          farmersPerActivity,
+          hierarchyRowsUsed: hierarchy.length,
         },
       });
     } catch (error) {

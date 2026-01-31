@@ -169,6 +169,15 @@ const INDIAN_NAMES: Record<string, string[]> = {
   ]
 };
 
+/** Capitalize first letter of each word, rest lowercase (proper case / title case) */
+const toProperCase = (s: string): string => {
+  if (!s || typeof s !== 'string') return '';
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/(?:^|\s|[-+])\S/g, (c) => c.toUpperCase());
+};
+
 const formatDDMMYYYY = (d: Date): string => {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -205,7 +214,18 @@ const generateMobileNumber = (index: number): string => {
   return String(base + (index % 100000000)).padStart(10, '0');
 };
 
-// Pick BU → Zone (state combo) → Territory (tehsil); state for language from zone
+// Sales hierarchy row from Excel: Territory Code, Territory Name, Region Code, Region, Zone Code, Zone Name, BU
+interface HierarchyRow {
+  territoryCode?: string;
+  territoryName: string;
+  regionCode?: string;
+  region: string;
+  zoneCode?: string;
+  zoneName: string;
+  bu: string;
+}
+
+// Pick BU → Zone → Territory from default constants; BU as uppercase acronym, rest in proper case
 const pickHierarchy = (index: number): { bu: string; zone: string; territory: string; state: string } => {
   const bu = BUS[index % BUS.length];
   const zones = ZONES_BY_BU[bu] || [];
@@ -213,34 +233,51 @@ const pickHierarchy = (index: number): { bu: string; zone: string; territory: st
   const zone = zones[Math.floor((index / BUS.length) % zones.length)];
   const territory = territories[Math.floor((index / (BUS.length * zones.length)) % territories.length)];
   const state = ZONE_TO_STATE[zone] || 'Uttar Pradesh';
-  return { bu, zone, territory, state };
+  return {
+    bu: bu ? bu.toUpperCase() : 'SBU',
+    zone: toProperCase(zone),
+    territory: toProperCase(territory),
+    state: toProperCase(state),
+  };
+};
+
+// Pick from uploaded hierarchy rows (Excel format); BU kept as uppercase acronym (e.g. SBU, EBU, CBU)
+const pickHierarchyFromRows = (index: number, rows: HierarchyRow[]): { bu: string; zone: string; territory: string; state: string } => {
+  const row = rows[index % rows.length];
+  const buRaw = String(row?.bu ?? 'SBU').trim();
+  return {
+    bu: buRaw ? buRaw.toUpperCase() : 'SBU',
+    zone: toProperCase(String(row?.zoneName ?? '').trim()) || 'Zone',
+    territory: toProperCase(String(row?.territoryName ?? '').trim()) || 'Territory',
+    state: toProperCase(String(row?.region ?? '').trim()) || 'Andhra Pradesh',
+  };
 };
 
 const generateFieldSalesHierarchy = (index: number) => {
-  // Synthetic hierarchy values for mock payload
+  // Synthetic hierarchy values for mock payload; all names in proper case
   const fda = {
     empCode: `FDA-${String(index).padStart(4, '0')}`,
-    name: INDIAN_OFFICER_NAMES[index % INDIAN_OFFICER_NAMES.length],
+    name: toProperCase(INDIAN_OFFICER_NAMES[index % INDIAN_OFFICER_NAMES.length]),
   };
   const tm = {
     empCode: `TM-${String(index % 300).padStart(4, '0')}`,
-    name: `TM ${INDIAN_OFFICER_NAMES[(index + 7) % INDIAN_OFFICER_NAMES.length]}`,
+    name: toProperCase(`TM ${INDIAN_OFFICER_NAMES[(index + 7) % INDIAN_OFFICER_NAMES.length]}`),
   };
   const rm = {
     empCode: `RM-${String(index % 120).padStart(4, '0')}`,
-    name: `RM ${INDIAN_OFFICER_NAMES[(index + 13) % INDIAN_OFFICER_NAMES.length]}`,
+    name: toProperCase(`RM ${INDIAN_OFFICER_NAMES[(index + 13) % INDIAN_OFFICER_NAMES.length]}`),
   };
   const zm = {
     empCode: `ZM-${String(index % 40).padStart(3, '0')}`,
-    name: `ZM ${INDIAN_OFFICER_NAMES[(index + 19) % INDIAN_OFFICER_NAMES.length]}`,
+    name: toProperCase(`ZM ${INDIAN_OFFICER_NAMES[(index + 19) % INDIAN_OFFICER_NAMES.length]}`),
   };
   const buHead = {
     empCode: `BUH-${String(index % 12).padStart(3, '0')}`,
-    name: `BU Head ${INDIAN_OFFICER_NAMES[(index + 23) % INDIAN_OFFICER_NAMES.length]}`,
+    name: toProperCase(`BU Head ${INDIAN_OFFICER_NAMES[(index + 23) % INDIAN_OFFICER_NAMES.length]}`),
   };
   const rdm = {
     empCode: `RDM-${String(index % 50).padStart(3, '0')}`,
-    name: `RDM ${INDIAN_OFFICER_NAMES[(index + 29) % INDIAN_OFFICER_NAMES.length]}`,
+    name: toProperCase(`RDM ${INDIAN_OFFICER_NAMES[(index + 29) % INDIAN_OFFICER_NAMES.length]}`),
   };
   return { fda, tm, rm, zm, buHead, rdm };
 };
@@ -250,28 +287,31 @@ const generateFarmerName = (index: number, language: string): string => {
   return names[index % names.length];
 };
 
-// Generate sample data on startup
-const generateSampleData = () => {
-  const ACTIVITY_COUNT = 50; // Generate 50 activities
-  const FARMERS_PER_ACTIVITY = 12; // 12 farmers per activity for proper sampling
-  
-  // Clear existing data
+// Generate sample data with optional counts and hierarchy rows (from Excel)
+function generateSampleDataWithParams(
+  activityCount: number,
+  farmersPerActivity: number,
+  hierarchyRows?: HierarchyRow[]
+): { activitiesGenerated: number; farmersGenerated: number } {
+  const ACTIVITY_COUNT = Math.max(1, Math.min(500, activityCount));
+  const FARMERS_PER_ACTIVITY = Math.max(1, Math.min(50, farmersPerActivity));
+
   mockActivities = [];
   mockFarmers = [];
-  
-  // Track unique mobile numbers
   const usedMobileNumbers = new Set<string>();
   let farmerIndex = 0;
 
+  const pick = hierarchyRows?.length
+    ? (i: number) => pickHierarchyFromRows(i, hierarchyRows)
+    : pickHierarchy;
+
   for (let i = 1; i <= ACTIVITY_COUNT; i++) {
     const activityDate = new Date();
-    activityDate.setDate(activityDate.getDate() - (i * 2)); // Activities spread over last 100 days
-
-    // BU → Zone (state combo) → Territory (tehsil)
-    const { bu, zone, territory, state } = pickHierarchy(i);
+    activityDate.setDate(activityDate.getDate() - (i * 2));
+    const { bu, zone, territory, state } = pick(i);
     const language = LANGUAGES[i % LANGUAGES.length];
     const village = INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
-    
+
     const activityCrops = CROPS
       .sort(() => Math.random() - 0.5)
       .slice(0, 2 + Math.floor(Math.random() * 4));
@@ -280,8 +320,9 @@ const generateSampleData = () => {
       .slice(0, 1 + Math.floor(Math.random() * 3));
 
     const hierarchy = generateFieldSalesHierarchy(i);
-    const officerName = hierarchy.fda.name;
+    const officerName = toProperCase(hierarchy.fda.name);
     const officerId = hierarchy.fda.empCode;
+    const villageProper = toProperCase(village);
 
     const activity = {
       activityId: `FFA-ACT-${1000 + i}`,
@@ -289,23 +330,21 @@ const generateSampleData = () => {
       date: formatDDMMYYYY(activityDate),
       officerId: officerId,
       officerName: officerName,
-      location: `${village}, ${territory}`,
+      location: `${villageProper}, ${territory}`,
       territory: territory,
       state: state,
       territoryName: territory,
       zoneName: zone,
       buName: bu,
       tmEmpCode: hierarchy.tm.empCode,
-      tmName: hierarchy.tm.name,
+      tmName: toProperCase(hierarchy.tm.name),
       fieldSalesHierarchy: hierarchy,
       crops: activityCrops,
       products: activityProducts,
       farmers: [] as any[],
     };
 
-    // Generate 12 farmers per activity
     for (let j = 1; j <= FARMERS_PER_ACTIVITY; j++) {
-      // Generate unique mobile number
       let mobileNumber: string;
       do {
         mobileNumber = generateMobileNumber(farmerIndex);
@@ -313,27 +352,30 @@ const generateSampleData = () => {
       } while (usedMobileNumbers.has(mobileNumber));
       usedMobileNumbers.add(mobileNumber);
 
-      const farmerName = generateFarmerName(farmerIndex, language);
+      const farmerName = toProperCase(generateFarmerName(farmerIndex, language));
       const photoUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(farmerName)}&size=128&background=${Math.floor(Math.random() * 16777215).toString(16)}&color=fff&bold=true&format=png`;
-      
+
       const farmer = {
         farmerId: `FFA-FARM-${i}-${j}`,
         name: farmerName,
         mobileNumber: mobileNumber,
-        location: `${village}, ${territory}, ${state}`,
-        // preferredLanguage: language, // REMOVED - will be derived from state in backend
+        location: `${villageProper}, ${territory}, ${state}`,
         crops: [activityCrops[Math.floor(Math.random() * activityCrops.length)]],
         photoUrl: photoUrl,
       };
-      
       activity.farmers.push(farmer);
       mockFarmers.push(farmer);
     }
-
     mockActivities.push(activity);
   }
-  
+
   console.log(`✅ Generated ${mockActivities.length} activities with ${mockFarmers.length} farmers`);
+  return { activitiesGenerated: mockActivities.length, farmersGenerated: mockFarmers.length };
+}
+
+// Generate sample data on startup (default 50 activities, 12 farmers each)
+const generateSampleData = () => {
+  generateSampleDataWithParams(50, 12);
 };
 
 /** EMS GET /api/ffa/master-data response shape (for TypeScript) */
@@ -384,6 +426,54 @@ async function fetchMastersFromEMS(): Promise<{ crops: string[]; products: strin
     return null;
   }
 }
+
+// Seed/generate data with optional activity count, farmers per activity, and hierarchy from Excel
+app.post('/api/seed', (req: Request, res: Response) => {
+  try {
+    const body = req.body as {
+      activityCount?: number;
+      farmersPerActivity?: number;
+      hierarchy?: Array<{ territoryCode?: string; territoryName?: string; regionCode?: string; region?: string; zoneCode?: string; zoneName?: string; bu?: string }>;
+    };
+    const activityCount = typeof body?.activityCount === 'number' ? body.activityCount : 50;
+    const farmersPerActivity = typeof body?.farmersPerActivity === 'number' ? body.farmersPerActivity : 12;
+    let hierarchyRows: HierarchyRow[] | undefined;
+    if (Array.isArray(body?.hierarchy) && body.hierarchy.length > 0) {
+      const parsed = body.hierarchy
+        .map((r: Record<string, unknown>) => {
+          const territoryName = toProperCase(String(r?.territoryName ?? r?.['Territory Name'] ?? '').trim());
+          const region = toProperCase(String(r?.region ?? r?.['Region'] ?? '').trim());
+          const zoneName = toProperCase(String(r?.zoneName ?? r?.['Zone Name'] ?? '').trim());
+          const buRaw = String(r?.bu ?? r?.['BU'] ?? '').trim();
+          const bu = buRaw ? buRaw.toUpperCase() : 'SBU';
+          if (!territoryName && !region && !zoneName && !buRaw) return null;
+          return {
+            territoryCode: String(r?.territoryCode ?? r?.['Territory Code'] ?? '').trim(),
+            territoryName: territoryName || 'Territory',
+            regionCode: String(r?.regionCode ?? r?.['Region Code'] ?? '').trim(),
+            region: region || 'Region',
+            zoneCode: String(r?.zoneCode ?? r?.['Zone Code'] ?? '').trim(),
+            zoneName: zoneName || 'Zone',
+            bu: bu,
+          } as HierarchyRow;
+        })
+        .filter((r): r is HierarchyRow => r !== null);
+      if (parsed.length > 0) hierarchyRows = parsed;
+    }
+    const result = generateSampleDataWithParams(activityCount, farmersPerActivity, hierarchyRows);
+    res.json({
+      success: true,
+      message: `Generated ${result.activitiesGenerated} activities and ${result.farmersGenerated} farmers`,
+      data: result,
+    });
+  } catch (err) {
+    console.error('[Mock FFA] Seed error:', err);
+    res.status(500).json({
+      success: false,
+      error: { message: err instanceof Error ? err.message : 'Seed failed' },
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {

@@ -961,6 +961,60 @@ export const ffaAPI = {
     return apiRequest('/ffa/sync-progress');
   },
 
+  clearData: async (clearTransactions: boolean, clearMasters: boolean) => {
+    return apiRequest<{ success: boolean; message: string; data: Record<string, number> }>('/ffa/clear-data', {
+      method: 'POST',
+      body: JSON.stringify({ clearTransactions, clearMasters }),
+    });
+  },
+
+  downloadHierarchyTemplate: async () => {
+    const token = getAuthToken();
+    const activeRole = getActiveRole();
+    const res = await fetch(`${API_BASE_URL}/ffa/hierarchy-template`, {
+      method: 'GET',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(activeRole && { 'X-Active-Role': activeRole }),
+      },
+    });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sales_hierarchy_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
+  seedFromHierarchy: async (file: File | null, activityCount: number, farmersPerActivity: number) => {
+    const token = getAuthToken();
+    const activeRole = getActiveRole();
+    const formData = new FormData();
+    formData.append('activityCount', String(activityCount));
+    formData.append('farmersPerActivity', String(farmersPerActivity));
+    if (file) formData.append('file', file);
+
+    const res = await fetch(`${API_BASE_URL}/ffa/seed-from-hierarchy`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(activeRole && { 'X-Active-Role': activeRole }),
+      },
+      body: formData,
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = json?.error?.message || json?.message || `Seed failed (${res.status})`;
+      throw new Error(msg);
+    }
+    return json;
+  },
+
   importExcel: async (file: File) => {
     const token = getAuthToken();
 
