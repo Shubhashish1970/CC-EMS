@@ -391,9 +391,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onBack, onTaskUpdated }) 
               {fullTask.callLog.activityQuality != null && fullTask.callLog.activityQuality >= 1 && fullTask.callLog.activityQuality <= 5 && (
                 <div>
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">4B. Activity Quality – FDA holistic crop solution</p>
-                  <p className="text-sm font-medium text-slate-700">
+                  <span
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border ${
+                      fullTask.callLog.activityQuality <= 2
+                        ? 'bg-red-600 text-white border-red-600'
+                        : fullTask.callLog.activityQuality === 3
+                          ? 'bg-amber-500 text-white border-amber-500'
+                          : fullTask.callLog.activityQuality === 4
+                            ? 'bg-green-400 text-white border-green-400'
+                            : 'bg-green-700 text-white border-green-700'
+                    }`}
+                  >
                     {'⭐'.repeat(fullTask.callLog.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[fullTask.callLog.activityQuality]}
-                  </p>
+                  </span>
                 </div>
               )}
               {fullTask.callLog.farmerComments && (

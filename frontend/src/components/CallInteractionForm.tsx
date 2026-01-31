@@ -400,6 +400,14 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                               { value: 5, label: 'Excellent understanding; complete holistic solution', stars: '⭐⭐⭐⭐⭐' },
                             ].map(({ value, label, stars }) => {
                               const isSelected = formData.activityQuality === value;
+                              const selectedStyle =
+                                value <= 2
+                                  ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                                  : value === 3
+                                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                    : value === 4
+                                      ? 'bg-green-400 text-white border-green-400 shadow-sm'
+                                      : 'bg-green-700 text-white border-green-700 shadow-sm';
                               return (
                                 <button
                                   key={value}
@@ -407,8 +415,8 @@ const CallInteractionForm: React.FC<CallInteractionFormProps> = ({
                                   onClick={() => setFormData((p: any) => ({ ...p, activityQuality: isSelected ? undefined : value }))}
                                   className={`py-2.5 px-3 rounded-xl border text-left text-[10px] font-bold transition-all min-h-[40px] flex items-center gap-2 ${
                                     isSelected
-                                      ? 'bg-lime-600 text-white border-lime-600 shadow-sm'
-                                      : 'bg-white text-slate-700 border-slate-200 hover:border-lime-400 hover:bg-lime-50/50'
+                                      ? selectedStyle
+                                      : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                                   }`}
                                 >
                                   <span className="text-sm">{stars}</span>

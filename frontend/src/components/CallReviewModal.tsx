@@ -211,7 +211,17 @@ const CallReviewModal: React.FC<CallReviewModalProps> = ({
                   <div className="bg-white p-4 rounded-xl border border-slate-200">
                     <label className="text-xs font-bold text-slate-600 mb-2 block">Did the FDA understand your problem and offer a holistic crop solution?</label>
                     {formData.activityQuality != null && formData.activityQuality >= 1 && formData.activityQuality <= 5 ? (
-                      <span className="px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 bg-lime-100 text-lime-800 border border-lime-300">
+                      <span
+                        className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 border shadow-sm ${
+                          formData.activityQuality <= 2
+                            ? 'bg-red-600 text-white border-red-600'
+                            : formData.activityQuality === 3
+                              ? 'bg-amber-500 text-white border-amber-500'
+                              : formData.activityQuality === 4
+                                ? 'bg-green-400 text-white border-green-400'
+                                : 'bg-green-700 text-white border-green-700'
+                        }`}
+                      >
                         {'⭐'.repeat(formData.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[formData.activityQuality]}
                       </span>
                     ) : (

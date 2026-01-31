@@ -287,7 +287,17 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                   </label>
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">FDA holistic crop solution</p>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lime-100 text-lime-800 border border-lime-300">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        taskData.callLog.activityQuality <= 2
+                          ? 'bg-red-600 text-white border-red-600'
+                          : taskData.callLog.activityQuality === 3
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : taskData.callLog.activityQuality === 4
+                              ? 'bg-green-400 text-white border-green-400'
+                              : 'bg-green-700 text-white border-green-700'
+                      }`}
+                    >
                       {'⭐'.repeat(taskData.callLog.activityQuality)} {(['', 'Did not understand or provide a solution', 'Limited understanding; partial solution', 'Understood problem, basic solution', 'Good understanding; mostly holistic solution', 'Excellent understanding; complete holistic solution'] as const)[taskData.callLog.activityQuality]}
                     </span>
                   </div>
