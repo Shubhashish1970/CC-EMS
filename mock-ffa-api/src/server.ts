@@ -336,6 +336,15 @@ const generateSampleData = () => {
   console.log(`✅ Generated ${mockActivities.length} activities with ${mockFarmers.length} farmers`);
 };
 
+/** EMS GET /api/ffa/master-data response shape (for TypeScript) */
+interface EMSMasterDataResponse {
+  success?: boolean;
+  data?: {
+    crops?: unknown[];
+    products?: unknown[];
+  };
+}
+
 /**
  * Fetch active crops and products from EMS backend (Option A).
  * Set EMS_API_URL and FFA_MASTER_KEY so FFA (mock or real) uses current masters.
@@ -358,7 +367,7 @@ async function fetchMastersFromEMS(): Promise<{ crops: string[]; products: strin
       console.warn(`[Mock FFA] EMS master-data returned ${res.status}, using fallback crops/products`);
       return null;
     }
-    const data = await res.json();
+    const data = (await res.json()) as EMSMasterDataResponse;
     if (!data?.success || !data?.data) {
       console.warn('[Mock FFA] EMS master-data invalid response, using fallback');
       return null;
