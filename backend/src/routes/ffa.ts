@@ -8,6 +8,7 @@ import { CallTask } from '../models/CallTask.js';
 import { SamplingAudit } from '../models/SamplingAudit.js';
 import { CoolingPeriod } from '../models/CoolingPeriod.js';
 import { SamplingConfig } from '../models/SamplingConfig.js';
+import { MasterCrop, MasterProduct } from '../models/MasterData.js';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { getLanguageForState } from '../utils/stateLanguageMapper.js';
@@ -17,7 +18,53 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25MB
 const TEMPLATE_FILENAME = 'ffa_ems_template.xlsx';
 
-// All routes require authentication
+// ---------------------------------------------------------------------------
+// GET /api/ffa/master-data – active crops & products for Mock FFA API (API-key protected, no JWT)
+// Set FFA_MASTER_KEY on EMS backend; FFA (mock or real) sends X-FFA-Master-Key with same value.
+// ---------------------------------------------------------------------------
+router.get(
+  '/master-data',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expectedKey = process.env.FFA_MASTER_KEY;
+      const providedKey = (req.headers['x-ffa-master-key'] as string)?.trim();
+
+      if (!expectedKey || !expectedKey.trim()) {
+        logger.warn('[FFA] Master-data endpoint: FFA_MASTER_KEY not set');
+        return res.status(503).json({
+          success: false,
+          error: { message: 'Master-data for FFA is not configured (FFA_MASTER_KEY missing).' },
+        });
+      }
+      if (providedKey !== expectedKey) {
+        return res.status(401).json({
+          success: false,
+          error: { message: 'Invalid or missing X-FFA-Master-Key.' },
+        });
+      }
+
+      const [crops, products] = await Promise.all([
+        MasterCrop.find({ isActive: true }).select('name').sort({ name: 1 }).lean(),
+        MasterProduct.find({ isActive: true }).select('name').sort({ name: 1 }).lean(),
+      ]);
+
+      const cropNames = crops.map((c: any) => (c.name || '').trim()).filter(Boolean);
+      const productNames = products.map((p: any) => (p.name || '').trim()).filter(Boolean);
+
+      res.json({
+        success: true,
+        data: {
+          crops: cropNames,
+          products: productNames,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// All other routes require authentication
 router.use(authenticate);
 
 type ExcelActivityRow = {

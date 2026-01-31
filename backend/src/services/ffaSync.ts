@@ -116,13 +116,21 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
     dateFrom: dateFrom?.toISOString(),
   });
 
+  // Optional auth for real FFA API (use FFA_API_TOKEN for Bearer, or FFA_API_KEY for X-API-Key)
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const ffaToken = process.env.FFA_API_TOKEN;
+  const ffaKey = process.env.FFA_API_KEY;
+  if (ffaToken && ffaToken.trim()) {
+    headers['Authorization'] = `Bearer ${ffaToken.trim()}`;
+  } else if (ffaKey && ffaKey.trim()) {
+    headers['X-API-Key'] = ffaKey.trim();
+  }
+
   try {
     // Use axios with timeout and proper error handling
     const response = await axios.get(url, {
       timeout: 30000, // 30 second timeout
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       validateStatus: (status) => status < 500, // Don't throw for 4xx errors, we'll handle them
     });
     

@@ -86,6 +86,33 @@ jobs:
             echo "ℹ️ Service does not exist, will create..."
           fi
           
+          # Get EMS backend URL for mock to fetch masters (Option A)
+          EMS_BACKEND_URL=""
+          if gcloud run services describe cc-ems-backend --region ${{ env.REGION }} --project ${{ secrets.GCP_PROJECT_ID }} --format 'value(status.url)' 2>/dev/null; then
+            EMS_BACKEND_URL=$(gcloud run services describe cc-ems-backend --region ${{ env.REGION }} --project ${{ secrets.GCP_PROJECT_ID }} --format 'value(status.url)' 2>/dev/null)
+          fi
+          if [ -z "$EMS_BACKEND_URL" ]; then
+            echo "⚠️ EMS backend (cc-ems-backend) not found; mock will use fallback crops/products until EMS is deployed"
+          else
+            echo "✅ EMS backend URL for masters: $EMS_BACKEND_URL"
+          fi
+
+          # Build env vars for mock: EMS_API_URL (backend URL) and FFA_MASTER_KEY (from secret)
+          MOCK_ENV_ARGS=""
+          if [ -n "$EMS_BACKEND_URL" ]; then
+            MOCK_ENV_ARGS="--set-env-vars=EMS_API_URL=$EMS_BACKEND_URL"
+          fi
+          if [ -n "${{ secrets.FFA_MASTER_KEY }}" ]; then
+            if [ -n "$MOCK_ENV_ARGS" ]; then
+              MOCK_ENV_ARGS="$MOCK_ENV_ARGS,FFA_MASTER_KEY=${{ secrets.FFA_MASTER_KEY }}"
+            else
+              MOCK_ENV_ARGS="--set-env-vars=FFA_MASTER_KEY=${{ secrets.FFA_MASTER_KEY }}"
+            fi
+          fi
+          if [ -z "$MOCK_ENV_ARGS" ]; then
+            echo "⚠️ Set FFA_MASTER_KEY secret and deploy EMS first so mock can load masters from EMS"
+          fi
+
           # Deploy service
           if [ "$SERVICE_EXISTS" = "false" ]; then
             echo "🆕 Creating new service..."
@@ -99,6 +126,7 @@ jobs:
               --cpu 1 \
               --min-instances 0 \
               --max-instances 10 \
+              $MOCK_ENV_ARGS \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           else
@@ -107,6 +135,7 @@ jobs:
               --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cc-ems-repo/${{ env.SERVICE_NAME }} \
               --platform managed \
               --region ${{ env.REGION }} \
+              $MOCK_ENV_ARGS \
               --project ${{ secrets.GCP_PROJECT_ID }} \
               --quiet
           fi

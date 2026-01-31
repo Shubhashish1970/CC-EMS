@@ -57,9 +57,12 @@ const ZONE_TO_STATE: Record<string, string> = {
 
 const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Marathi', 'Kannada', 'Tamil'];
 const ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM'];
-// Align with backend seedMasterData so FFA Sync gets activities with valid crop/product master refs
-const CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
-const PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
+// Fallback when EMS master-data is not available (e.g. local dev without EMS)
+const FALLBACK_CROPS = ['Paddy', 'Cotton', 'Chilli', 'Soybean', 'Maize', 'Wheat', 'Sugarcane', 'Groundnut', 'Sunflower', 'Mustard', 'Jowar', 'Bajra', 'Ragi', 'Turmeric', 'Onion', 'Tomato', 'Potato', 'Brinjal', 'Okra', 'Cucumber'];
+const FALLBACK_PRODUCTS = ['Nagarjuna Urea', 'Specialty Fungicide', 'Bio-Stimulant X', 'Insecticide Pro', 'Root Booster', 'Growth Enhancer', 'Foliar Spray', 'Seed Treatment', 'Soil Conditioner', 'Micronutrient Mix'];
+// Used by generateSampleData; set from EMS master-data at startup when EMS_API_URL + FFA_MASTER_KEY are set
+let CROPS: string[] = [...FALLBACK_CROPS];
+let PRODUCTS: string[] = [...FALLBACK_PRODUCTS];
 
 // Indian officer names
 const INDIAN_OFFICER_NAMES = [
@@ -333,8 +336,45 @@ const generateSampleData = () => {
   console.log(`✅ Generated ${mockActivities.length} activities with ${mockFarmers.length} farmers`);
 };
 
-// Initialize sample data
-generateSampleData();
+/**
+ * Fetch active crops and products from EMS backend (Option A).
+ * Set EMS_API_URL and FFA_MASTER_KEY so FFA (mock or real) uses current masters.
+ */
+async function fetchMastersFromEMS(): Promise<{ crops: string[]; products: string[] } | null> {
+  const emsUrl = (process.env.EMS_API_URL || '').trim();
+  const masterKey = (process.env.FFA_MASTER_KEY || '').trim();
+  if (!emsUrl || !masterKey) {
+    return null;
+  }
+  const base = emsUrl.replace(/\/$/, '');
+  const url = `${base}/api/ffa/master-data`;
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-FFA-Master-Key': masterKey },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      console.warn(`[Mock FFA] EMS master-data returned ${res.status}, using fallback crops/products`);
+      return null;
+    }
+    const data = await res.json();
+    if (!data?.success || !data?.data) {
+      console.warn('[Mock FFA] EMS master-data invalid response, using fallback');
+      return null;
+    }
+    const crops = Array.isArray(data.data.crops) ? data.data.crops.map((c: unknown) => String(c).trim()).filter(Boolean) : [];
+    const products = Array.isArray(data.data.products) ? data.data.products.map((p: unknown) => String(p).trim()).filter(Boolean) : [];
+    if (crops.length === 0 || products.length === 0) {
+      console.warn('[Mock FFA] EMS returned empty crops or products, using fallback');
+      return null;
+    }
+    return { crops, products };
+  } catch (err) {
+    console.warn('[Mock FFA] Failed to fetch masters from EMS:', (err as Error).message, '– using fallback crops/products');
+    return null;
+  }
+}
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
@@ -426,9 +466,25 @@ app.get('/api/farmers', (req: Request, res: Response) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Mock FFA API running on port ${PORT}`);
-  console.log(`📊 Sample data: ${mockActivities.length} activities, ${mockFarmers.length} farmers`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+// Start server: fetch masters from EMS (if configured), then generate data and listen
+async function startServer() {
+  const masters = await fetchMastersFromEMS();
+  if (masters) {
+    CROPS = masters.crops;
+    PRODUCTS = masters.products;
+    console.log(`✅ Loaded masters from EMS: ${CROPS.length} crops, ${PRODUCTS.length} products`);
+  } else {
+    console.log(`📋 Using fallback crops/products (set EMS_API_URL + FFA_MASTER_KEY to use EMS masters)`);
+  }
+  generateSampleData();
+  app.listen(PORT, () => {
+    console.log(`🚀 Mock FFA API running on port ${PORT}`);
+    console.log(`📊 Sample data: ${mockActivities.length} activities, ${mockFarmers.length} farmers`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error('Failed to start Mock FFA API:', err);
+  process.exit(1);
 });
