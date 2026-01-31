@@ -8,6 +8,7 @@
  * See frontend/UI_STANDARDS.md for full UI standards.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 interface Option {
@@ -35,16 +36,32 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
   error = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find(opt => opt.value === value);
 
-  // Close dropdown when clicking outside
+  // Position dropdown when open (for portal – avoids parent overflow clipping)
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: 'fixed',
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    });
+  }, [isOpen]);
+
+  // Close dropdown when clicking outside (trigger or dropdown)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = event.target as Node;
+      const inTrigger = containerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inTrigger && !inDropdown) setIsOpen(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -102,9 +119,13 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
         />
       </button>
 
-      {/* Dropdown Menu */}
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+      {/* Dropdown Menu – rendered in portal so all options are visible (not clipped by overflow) */}
+      {typeof document !== 'undefined' && isOpen && !disabled && createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+        >
           <div className="max-h-60 overflow-y-auto">
             {options.map((option) => {
               const isSelected = option.value === value;
@@ -130,7 +151,8 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

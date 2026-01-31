@@ -302,7 +302,17 @@ export async function getEmsDrilldown(
   groupBy: EmsDrilldownGroupBy
 ): Promise<EmsDrilldownRow[]> {
   const activityMatch = buildActivityMatch(filters);
-  const fieldName = groupBy === 'activityType' ? 'type' : groupBy === 'territory' ? 'territoryName' : groupBy;
+  // Activity model uses zoneName/buName, not zone/bu
+  const fieldName =
+    groupBy === 'activityType'
+      ? 'type'
+      : groupBy === 'territory'
+        ? 'territoryName'
+        : groupBy === 'zone'
+          ? 'zoneName'
+          : groupBy === 'bu'
+            ? 'buName'
+            : groupBy;
 
   const activityCollection = Activity.collection.name;
   const auditCollection = SamplingAudit.collection.name;
@@ -321,7 +331,14 @@ export async function getEmsDrilldown(
       $addFields: {
         farmerCount: { $size: { $ifNull: ['$farmerIds', []] } },
         sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
-        __group: groupBy === 'territory' ? { $ifNull: ['$territoryName', '$territory'] } : `$${fieldName}`,
+        __group:
+          groupBy === 'territory'
+            ? { $ifNull: ['$territoryName', '$territory'] }
+            : groupBy === 'zone'
+              ? { $ifNull: ['$zoneName', '—'] }
+              : groupBy === 'bu'
+                ? { $ifNull: ['$buName', '—'] }
+                : `$${fieldName}`,
       },
     },
     {

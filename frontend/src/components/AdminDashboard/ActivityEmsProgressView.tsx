@@ -524,11 +524,11 @@ const ActivityEmsProgressView: React.FC = () => {
         )}
       </div>
 
-      {/* Drill-down */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Drill-down - no overflow-hidden so Group by dropdown shows all options (not clipped) */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-200 bg-slate-50">
           <h3 className="font-semibold text-slate-800">Drill-down</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative z-10">
             <span className="text-sm text-slate-500">Group by</span>
             <StyledSelect
               value={groupBy}
