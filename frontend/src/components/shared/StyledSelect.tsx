@@ -125,9 +125,9 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+          className="bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto overscroll-contain"
         >
-          <div className="max-h-60 overflow-y-auto">
+          <div>
             {options.map((option) => {
               const isSelected = option.value === value;
               return (
