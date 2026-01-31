@@ -880,7 +880,6 @@ export const reportsAPI = {
     return apiRequest<{ success: boolean; data: any[] }>(`/reports/monthly${query ? `?${query}` : ''}`);
   },
   downloadExport: async (filters?: EmsProgressFilters) => {
-    const token = getAuthToken();
     const params = new URLSearchParams();
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
@@ -892,7 +891,7 @@ export const reportsAPI = {
     const query = params.toString();
     const res = await fetch(`${API_BASE_URL}/reports/export${query ? `?${query}` : ''}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: getAuthHeaders(),
     });
     if (!res.ok) {
       const json = await res.json().catch(() => null);
@@ -913,7 +912,6 @@ export const reportsAPI = {
   },
   /** Task-level detail Excel: Officer Name, FDA, farmer name, territory, Activity/Task details, dates, agent, responses, final status */
   downloadTaskDetailsExport: async (filters?: EmsProgressFilters) => {
-    const token = getAuthToken();
     const params = new URLSearchParams();
     if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters?.dateTo) params.append('dateTo', filters.dateTo);
@@ -925,7 +923,7 @@ export const reportsAPI = {
     const query = params.toString();
     const res = await fetch(`${API_BASE_URL}/reports/tasks-detail-export${query ? `?${query}` : ''}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: getAuthHeaders(),
     });
     if (!res.ok) {
       const json = await res.json().catch(() => null);

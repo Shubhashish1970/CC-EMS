@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { query, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/rbac.js';
+import { requirePermission } from '../middleware/rbac.js';
 import { getDailyReport, getPeriodReport, getTaskDetailExportRows } from '../services/reportService.js';
 import { getEmsProgress, getEmsDrilldown, type EmsDrilldownGroupBy } from '../services/kpiService.js';
 import * as XLSX from 'xlsx';
@@ -9,7 +9,8 @@ import * as XLSX from 'xlsx';
 const router = express.Router();
 
 router.use(authenticate);
-router.use(requireRole('mis_admin'));
+// Permission-based: mis_admin has reports.weekly; normalizes "admin" -> mis_admin so Admin always has access
+router.use(requirePermission('reports.weekly'));
 
 function parseFilters(req: Request): {
   dateFrom?: Date;

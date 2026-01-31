@@ -223,6 +223,60 @@ export async function getEmsProgress(filters?: EmsProgressFilters): Promise<EmsP
 
 export type EmsDrilldownGroupBy = 'state' | 'territory' | 'zone' | 'bu' | 'activityType';
 
+/**
+ * Map territory/district names (often stored in Activity.state by mistake) to actual state names.
+ * Used when "Group by State" is selected so drill-down shows states (e.g. Andhra Pradesh) not territories (Guntur, Vijayawada).
+ */
+const TERRITORY_TO_STATE: Record<string, string> = {
+  // Andhra Pradesh districts/territories
+  Guntur: 'Andhra Pradesh',
+  Vijayawada: 'Andhra Pradesh',
+  Nellore: 'Andhra Pradesh',
+  Visakhapatnam: 'Andhra Pradesh',
+  Kurnool: 'Andhra Pradesh',
+  Tirupati: 'Andhra Pradesh',
+  Kadapa: 'Andhra Pradesh',
+  Anantapur: 'Andhra Pradesh',
+  Kakinada: 'Andhra Pradesh',
+  Rajahmundry: 'Andhra Pradesh',
+  // Telangana
+  Hyderabad: 'Telangana',
+  Warangal: 'Telangana',
+  Nizamabad: 'Telangana',
+  Karimnagar: 'Telangana',
+  // Karnataka
+  Bangalore: 'Karnataka',
+  Bengaluru: 'Karnataka',
+  Mysore: 'Karnataka',
+  Hubli: 'Karnataka',
+  Mangalore: 'Karnataka',
+  Belgaum: 'Karnataka',
+  Dharwad: 'Karnataka',
+  // Tamil Nadu
+  Chennai: 'Tamil Nadu',
+  Coimbatore: 'Tamil Nadu',
+  Madurai: 'Tamil Nadu',
+  Trichy: 'Tamil Nadu',
+  Tiruchirappalli: 'Tamil Nadu',
+  Erode: 'Tamil Nadu',
+  Salem: 'Tamil Nadu',
+  // Kerala
+  Kochi: 'Kerala',
+  Thiruvananthapuram: 'Kerala',
+  Kozhikode: 'Kerala',
+  // Others (expand as needed)
+  Chittorgarh: 'Rajasthan',
+  Fatehpur: 'Uttar Pradesh',
+  Jodhpur: 'Rajasthan',
+  Imphal: 'Manipur',
+};
+
+function normalizeStateForDrilldown(value: string): string {
+  if (!value || typeof value !== 'string') return value || '—';
+  const trimmed = value.trim();
+  return TERRITORY_TO_STATE[trimmed] ?? trimmed;
+}
+
 export interface EmsDrilldownRow {
   key: string;
   label: string;
@@ -304,11 +358,57 @@ export async function getEmsDrilldown(
     return [];
   }
 
+  // When groupBy is 'state', normalize territory names (e.g. Guntur, Vijayawada) to actual state (e.g. Andhra Pradesh) and merge rows
+  let rowsToUse = activityAgg;
+  if (groupBy === 'state') {
+    const mergedByState = new Map<
+      string,
+      {
+        _id: string;
+        activitiesTotal: number;
+        activitiesSampled: number;
+        activitiesNotSampled: number;
+        activitiesPartial: number;
+        farmersTotal: number;
+        farmersSampled: number;
+        activityIds: mongoose.Types.ObjectId[];
+      }
+    >();
+    for (const row of activityAgg) {
+      const rawKey = row._id != null ? String(row._id).trim() || '—' : '—';
+      const stateKey = normalizeStateForDrilldown(rawKey);
+      const existing = mergedByState.get(stateKey);
+      const activityIds = (row.activityIds || []) as mongoose.Types.ObjectId[];
+      if (existing) {
+        existing.activitiesTotal += Number(row.activitiesTotal || 0);
+        existing.activitiesSampled += Number(row.activitiesSampled || 0);
+        existing.activitiesNotSampled += Number(row.activitiesNotSampled || 0);
+        existing.activitiesPartial += Number(row.activitiesPartial || 0);
+        existing.farmersTotal += Number(row.farmersTotal || 0);
+        existing.farmersSampled += Number(row.farmersSampled || 0);
+        existing.activityIds.push(...activityIds);
+      } else {
+        mergedByState.set(stateKey, {
+          _id: stateKey,
+          activitiesTotal: Number(row.activitiesTotal || 0),
+          activitiesSampled: Number(row.activitiesSampled || 0),
+          activitiesNotSampled: Number(row.activitiesNotSampled || 0),
+          activitiesPartial: Number(row.activitiesPartial || 0),
+          farmersTotal: Number(row.farmersTotal || 0),
+          farmersSampled: Number(row.farmersSampled || 0),
+          activityIds: [...activityIds],
+        });
+      }
+    }
+    rowsToUse = Array.from(mergedByState.values());
+  }
+
   // Task breakdown per group (by activityId -> group mapping)
   const idToGroup = new Map<string, string>();
-  for (const row of activityAgg) {
+  for (const row of rowsToUse) {
     const key = row._id != null ? String(row._id).trim() || '—' : '—';
-    for (const id of row.activityIds || []) {
+    const activityIds = (row as any).activityIds || [];
+    for (const id of activityIds) {
       idToGroup.set(String(id), key);
     }
   }
@@ -331,7 +431,7 @@ export async function getEmsDrilldown(
   }
 
   const rows: EmsDrilldownRow[] = [];
-  for (const row of activityAgg) {
+  for (const row of rowsToUse) {
     const key = row._id != null ? String(row._id).trim() || '—' : '—';
     const label = key;
     const tasks = taskByGroup.get(key);
