@@ -99,7 +99,7 @@ const AICopilotPanel: React.FC<AICopilotPanelProps> = ({ formData, setFormData, 
             setError(null);
             setSuccess(false);
           }}
-          className="flex-1 w-full min-h-12 px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 leading-relaxed resize-none"
+          className="flex-1 w-full min-h-12 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 leading-relaxed resize-none"
           placeholder="Agent shorthand: 'Farmer Rao attended, high paddy recall. Bought Root Booster but not Insecticide due to price...'"
         />
         

@@ -859,11 +859,11 @@ const SamplingControlView: React.FC = () => {
                   });
                 }}
                 className={`
-                  w-full min-h-12 px-4 py-3 rounded-xl border-2 bg-white text-left flex items-center justify-between gap-2
-                  transition-all duration-200 focus:outline-none
+                  w-full min-h-12 px-4 py-3 rounded-xl border bg-white text-left flex items-center justify-between gap-2
+                  transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400
                   ${isDatePickerOpen
-                    ? 'border-lime-500 ring-2 ring-lime-500/20'
-                    : 'border-slate-200 hover:border-lime-400'}
+                    ? 'border-lime-400 ring-2 ring-lime-400/20'
+                    : 'border-slate-200 hover:border-lime-300'}
                 `}
               >
                 <span className="truncate text-sm font-medium text-slate-900">

@@ -81,7 +81,7 @@ const PurchasedProductsInput: React.FC<PurchasedProductsInputProps> = ({
                   value={item.quantity}
                   onChange={(e) => handleQuantityChange(index, e.target.value)}
                   placeholder="Qty"
-                  className="w-20 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-500"
+                  className="w-20 min-h-12 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
                 <UnitDropdown
                   value={item.unit || 'kg'}
@@ -130,7 +130,7 @@ const PurchasedProductsInput: React.FC<PurchasedProductsInputProps> = ({
                   }
                 }}
                 placeholder="Search or type product name..."
-                className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-lime-500 min-w-[180px] max-w-[250px]"
+                className="min-h-12 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 min-w-[180px] max-w-[250px]"
                 autoFocus
               />
               {/* Show matching products as suggestions */}

@@ -48,12 +48,14 @@ import StyledSelect from '../shared/StyledSelect';  // adjust path as needed
 
 ## Form inputs (text, number, date, textarea)
 
-Use these classes for consistency with dropdowns:
+Use the **same** border and focus as dropdowns so all inputs have the same green highlight and thickness:
 
+- **Border:** `border` (1px), **not** `border-2`. Use `border-slate-200` for default state.
+- **Focus:** `focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400` (lighter green, same as dropdowns).
+- **Sizing:** `min-h-12`, `px-4 py-3`, `rounded-xl`, `text-sm font-medium text-slate-900`, placeholder `text-slate-400`.
 - **Container:** `w-full` for full-width fields in a column layout.
-- **Input:** `min-h-12`, `px-4 py-3`, `rounded-xl`, `border border-slate-200`, `text-sm font-medium text-slate-900`, placeholder `text-slate-400`.
-- **Focus:** `focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400`.
 - **Error state:** `border-red-300` / `focus:border-red-500` as appropriate.
+- **Checkboxes:** Same border and focus as inputs: `border border-slate-200`, `focus:ring-2 focus:ring-lime-400 focus:border-lime-400`, plus `text-lime-600` for the check color. Use `w-4 h-4` or `w-5 h-5` and `rounded` as needed.
 
 ---
 

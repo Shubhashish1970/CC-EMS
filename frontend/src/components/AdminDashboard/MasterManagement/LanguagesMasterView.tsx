@@ -442,7 +442,7 @@ const LanguagesMasterView: React.FC = () => {
             placeholder="Search languages..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full min-h-12 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+            className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
           />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -450,7 +450,7 @@ const LanguagesMasterView: React.FC = () => {
             type="checkbox"
             checked={showInactive}
             onChange={(e) => setShowInactive(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+            className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
           />
           Show inactive
         </label>
@@ -581,7 +581,7 @@ const LanguagesMasterView: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Enter language name"
-                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   required
                 />
               </div>
@@ -595,7 +595,7 @@ const LanguagesMasterView: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                   placeholder="e.g., HI, TE, MR"
                   maxLength={5}
-                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   required
                 />
                 <p className="text-xs text-slate-500 mt-1">2-5 character code (auto-capitalized)</p>
@@ -607,7 +607,7 @@ const LanguagesMasterView: React.FC = () => {
                   value={formData.displayOrder}
                   onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
                   min="0"
-                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -616,7 +616,7 @@ const LanguagesMasterView: React.FC = () => {
                   id="isActive"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+                  className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
                 <label htmlFor="isActive" className="text-sm text-slate-700">
                   Active

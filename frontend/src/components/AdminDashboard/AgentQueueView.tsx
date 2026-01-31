@@ -287,7 +287,7 @@ const AgentQueueView: React.FC = () => {
                 type="checkbox"
                 checked={showOnlyActive}
                 onChange={(e) => setShowOnlyActive(e.target.checked)}
-                className="w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-lime-500"
+                className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               />
               <span className="text-sm font-medium text-slate-700">Active Only</span>
             </label>

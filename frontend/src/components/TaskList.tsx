@@ -922,7 +922,7 @@ const TaskList: React.FC = () => {
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     placeholder="Search by farmer name, mobile, agent, or location..."
-                    className="w-full min-h-12 pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                    className="w-full min-h-12 pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   />
                 </div>
               </div>
@@ -1058,7 +1058,7 @@ const TaskList: React.FC = () => {
                           type="checkbox"
                           checked={selectedTasks.size === sortedTasks.length && sortedTasks.length > 0}
                           onChange={toggleSelectAll}
-                          className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-lime-500"
+                          className="w-5 h-5 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                           title="Select all on this page"
                         />
                         <div className="absolute right-0 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => startResize(e, 'select')} />
@@ -1122,7 +1122,7 @@ const TaskList: React.FC = () => {
                                 type="checkbox"
                                 checked={selectedTasks.has(task._id)}
                                 onChange={() => toggleTaskSelection(task._id)}
-                                className="w-5 h-5 text-green-600 border-slate-300 rounded focus:ring-lime-500"
+                                className="w-5 h-5 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                               />
                             </td>
                             <td className="px-3 py-3 text-sm" style={{ width: tableColumnWidths.farmer, minWidth: tableColumnWidths.farmer }}>
@@ -1328,7 +1328,7 @@ const BulkStatusModal: React.FC<BulkStatusModalProps> = ({ isOpen, onClose, onUp
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               placeholder="Add notes about this status change..."
             />
           </div>

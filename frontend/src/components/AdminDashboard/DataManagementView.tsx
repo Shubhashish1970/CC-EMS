@@ -76,7 +76,7 @@ const DataManagementView: React.FC = () => {
                 type="checkbox"
                 checked={clearTransactions}
                 onChange={(e) => setClearTransactions(e.target.checked)}
-                className="w-4 h-4 rounded border-2 border-slate-300 text-lime-600 focus:ring-lime-500"
+                className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               />
               <span className="text-sm font-medium text-slate-800">Clear transaction data</span>
             </label>
@@ -88,7 +88,7 @@ const DataManagementView: React.FC = () => {
                 type="checkbox"
                 checked={clearMasters}
                 onChange={(e) => setClearMasters(e.target.checked)}
-                className="w-4 h-4 rounded border-2 border-slate-300 text-lime-600 focus:ring-lime-500"
+                className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               />
               <span className="text-sm font-medium text-slate-800">Clear master data</span>
             </label>
@@ -126,7 +126,7 @@ const DataManagementView: React.FC = () => {
                 max={500}
                 value={activityCount}
                 onChange={(e) => setActivityCount(Math.max(1, Math.min(500, Number(e.target.value) || 50)))}
-                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               />
             </div>
             <div>
@@ -137,7 +137,7 @@ const DataManagementView: React.FC = () => {
                 max={50}
                 value={farmersPerActivity}
                 onChange={(e) => setFarmersPerActivity(Math.max(1, Math.min(50, Number(e.target.value) || 12)))}
-                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
               />
             </div>
           </div>
@@ -154,7 +154,7 @@ const DataManagementView: React.FC = () => {
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-slate-200 border-dashed bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors min-h-12">
+              <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-200 border-dashed bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors min-h-12">
                 <FileSpreadsheet size={20} className="text-slate-500" />
                 <span className="text-sm font-medium text-slate-700">{hierarchyFile ? hierarchyFile.name : 'Choose .xlsx file'}</span>
                 <input

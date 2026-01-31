@@ -54,7 +54,7 @@ const HeaderRoleSwitcher: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-xs text-slate-400 uppercase hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:ring-offset-2 focus:ring-offset-slate-900 rounded-lg px-2 py-1 -my-1 transition-colors"
+        className="flex items-center gap-1.5 text-xs text-slate-400 uppercase hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-slate-900 rounded-lg px-2 py-1 -my-1 transition-colors"
         title="Switch role"
         aria-haspopup="listbox"
         aria-expanded={isOpen}

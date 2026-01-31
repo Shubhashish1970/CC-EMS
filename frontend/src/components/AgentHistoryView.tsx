@@ -487,7 +487,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       value={filters.search}
                       onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
                       placeholder="Farmer, mobile, territory, activity..."
-                      className="w-full min-h-12 pl-10 pr-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                      className="w-full min-h-12 pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                     />
                   </div>
                 </div>

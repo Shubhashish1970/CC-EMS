@@ -322,7 +322,7 @@ const SentimentsMasterView: React.FC = () => {
             placeholder="Search sentiments..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full min-h-12 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+            className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
           />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -330,7 +330,7 @@ const SentimentsMasterView: React.FC = () => {
             type="checkbox"
             checked={showInactive}
             onChange={(e) => setShowInactive(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-lime-600 focus:ring-lime-500"
+            className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
           />
           Show inactive
         </label>
@@ -465,7 +465,7 @@ const SentimentsMasterView: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   placeholder="Enter sentiment name"
                   disabled={isSubmitting}
                 />
@@ -528,7 +528,7 @@ const SentimentsMasterView: React.FC = () => {
                   type="number"
                   value={formData.displayOrder}
                   onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full min-h-12 px-4 py-3 border-2 border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
+                  className="w-full min-h-12 px-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   min="0"
                   disabled={isSubmitting}
                 />
@@ -557,7 +557,7 @@ const SentimentsMasterView: React.FC = () => {
                   id="isActive"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-5 h-5 text-lime-600 border-slate-300 rounded focus:ring-lime-500"
+                  className="w-5 h-5 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                   disabled={isSubmitting}
                 />
                 <label htmlFor="isActive" className="text-sm font-medium text-slate-700">
