@@ -3,6 +3,7 @@ import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
 import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, ArrowUpToLine, UserCheck, Package, BarChart } from 'lucide-react';
 import Button from '../shared/Button';
+import StyledSelect from '../shared/StyledSelect';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
 interface ActivitySamplingStatus {
@@ -986,66 +987,60 @@ const ActivitySamplingView: React.FC = () => {
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Activity Type
                 </label>
-                <select
+                <StyledSelect
                   value={filters.activityType}
-                  onChange={(e) => setFilters({ ...filters, activityType: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                >
-                  <option value="">All Types</option>
-                  <option value="Field Day">Field Day</option>
-                  <option value="Group Meeting">Group Meeting</option>
-                  <option value="Demo Visit">Demo Visit</option>
-                  <option value="OFM">OFM</option>
-                  <option value="Other">Other</option>
-                </select>
+                  onChange={(v) => setFilters({ ...filters, activityType: v })}
+                  options={[
+                    { value: '', label: 'All Types' },
+                    { value: 'Field Day', label: 'Field Day' },
+                    { value: 'Group Meeting', label: 'Group Meeting' },
+                    { value: 'Demo Visit', label: 'Demo Visit' },
+                    { value: 'OFM', label: 'OFM' },
+                    { value: 'Other', label: 'Other' },
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Territory
                 </label>
-                <select
+                <StyledSelect
                   value={filters.territory}
-                  onChange={(e) => setFilters({ ...filters, territory: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                >
-                  <option value="">All Territories</option>
-                  {filterOptions.territoryOptions.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setFilters({ ...filters, territory: v })}
+                  options={[
+                    { value: '', label: 'All Territories' },
+                    ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t })),
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Zone
                 </label>
-                <select
+                <StyledSelect
                   value={filters.zone}
-                  onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                >
-                  <option value="">All Zones</option>
-                  {filterOptions.zoneOptions.map((z) => (
-                    <option key={z} value={z}>{z}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setFilters({ ...filters, zone: v })}
+                  options={[
+                    { value: '', label: 'All Zones' },
+                    ...filterOptions.zoneOptions.map((z) => ({ value: z, label: z })),
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   BU
                 </label>
-                <select
+                <StyledSelect
                   value={filters.bu}
-                  onChange={(e) => setFilters({ ...filters, bu: e.target.value })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                >
-                  <option value="">All BUs</option>
-                  {filterOptions.buOptions.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setFilters({ ...filters, bu: v })}
+                  options={[
+                    { value: '', label: 'All BUs' },
+                    ...filterOptions.buOptions.map((b) => ({ value: b, label: b })),
+                  ]}
+                />
               </div>
             </div>
 
@@ -1054,16 +1049,16 @@ const ActivitySamplingView: React.FC = () => {
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
                   Sampling Status
                 </label>
-                <select
+                <StyledSelect
                   value={filters.samplingStatus}
-                  onChange={(e) => setFilters({ ...filters, samplingStatus: e.target.value as any })}
-                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="sampled">Sampled</option>
-                  <option value="not_sampled">Not Sampled</option>
-                  <option value="partial">Partial</option>
-                </select>
+                  onChange={(v) => setFilters({ ...filters, samplingStatus: v as any })}
+                  options={[
+                    { value: '', label: 'All Statuses' },
+                    { value: 'sampled', label: 'Sampled' },
+                    { value: 'not_sampled', label: 'Not Sampled' },
+                    { value: 'partial', label: 'Partial' },
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
@@ -1745,18 +1740,12 @@ const ActivitySamplingView: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                    title="Rows per page"
-                  >
-                    {[10, 20, 50, 100].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    value={String(pageSize)}
+                    onChange={(v) => setPageSize(Number(v))}
+                    options={[10, 20, 50, 100].map((n) => ({ value: String(n), label: String(n) }))}
+                    className="min-w-[80px]"
+                  />
                 </div>
                 <Button
                   variant="secondary"

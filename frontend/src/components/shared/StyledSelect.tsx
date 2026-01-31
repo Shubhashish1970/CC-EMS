@@ -1,3 +1,12 @@
+/**
+ * StyledSelect – STANDARD single-select dropdown for the application.
+ *
+ * Do not use native <select> elements; they use OS/browser styling (e.g. dark
+ * dropdown panel) and break the theme. Use this component for all single-value
+ * dropdowns: filters, pagination, form fields, etc.
+ *
+ * See frontend/UI_STANDARDS.md for full UI standards.
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 

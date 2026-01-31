@@ -1038,11 +1038,10 @@ export const ffaAPI = {
   },
 
   downloadExcelTemplate: async () => {
-    const token = getAuthToken();
-
+    const headers = getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/ffa/excel-template`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers,
     });
 
     if (!res.ok) {

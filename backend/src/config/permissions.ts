@@ -101,8 +101,15 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
   ],
 };
 
+/** Normalize role so "admin" (if ever stored) is treated as mis_admin for permission checks */
+const normalizeRole = (role: string): UserRole => {
+  if (role === 'admin') return 'mis_admin';
+  return role as UserRole;
+};
+
 export const hasPermission = (role: UserRole, permission: Permission): boolean => {
-  return rolePermissions[role]?.includes(permission) || false;
+  const normalized = normalizeRole(role);
+  return rolePermissions[normalized]?.includes(permission) || false;
 };
 
 export const requirePermission = (permission: Permission) => {

@@ -127,7 +127,8 @@ Frontend will run on `http://localhost:3000`
 
 ## Documentation
 
-See `IMPLEMENTATION_PLAN.md` for complete implementation details, module breakdown, and architecture.
+- **Implementation:** `IMPLEMENTATION_PLAN.md` – implementation details, module breakdown, and architecture.
+- **Frontend UI standards:** `frontend/UI_STANDARDS.md` – dropdowns (use `StyledSelect`, not native `<select>`), form inputs, and shared components so the app stays on-theme.
 
 ## License
 

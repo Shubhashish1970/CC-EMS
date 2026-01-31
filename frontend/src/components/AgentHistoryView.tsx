@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, ChevronDown, ArrowDownToLine, Filter, RefreshCw, Search, ChevronRight, Loader2, ChevronUp, User as UserIcon, Activity as ActivityIcon, Phone, MessageSquare, Package } from 'lucide-react';
 import Button from './shared/Button';
+import StyledSelect from './shared/StyledSelect';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -441,45 +442,41 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Activity Type</label>
-                  <select
+                  <StyledSelect
                     value={filters.activityType}
-                    onChange={(e) => setFilters((p) => ({ ...p, activityType: e.target.value }))}
-                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                  >
-                    <option value="">All Types</option>
-                    {filterOptions.activityTypeOptions.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setFilters((p) => ({ ...p, activityType: v }))}
+                    options={[
+                      { value: '', label: 'All Types' },
+                      ...filterOptions.activityTypeOptions.map((t) => ({ value: t, label: t })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Territory</label>
-                  <select
+                  <StyledSelect
                     value={filters.territory}
-                    onChange={(e) => setFilters((p) => ({ ...p, territory: e.target.value }))}
-                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                  >
-                    <option value="">All Territories</option>
-                    {filterOptions.territoryOptions.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setFilters((p) => ({ ...p, territory: v }))}
+                    options={[
+                      { value: '', label: 'All Territories' },
+                      ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status</label>
-                  <select
+                  <StyledSelect
                     value={filters.status}
-                    onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as any }))}
-                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                  >
-                    <option value="">All (except In Queue)</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed Conversation</option>
-                    <option value="not_reachable">Unsuccessful</option>
-                    <option value="invalid_number">Unsuccessful</option>
-                  </select>
+                    onChange={(v) => setFilters((p) => ({ ...p, status: v as any }))}
+                    options={[
+                      { value: '', label: 'All (except In Queue)' },
+                      { value: 'in_progress', label: 'In Progress' },
+                      { value: 'completed', label: 'Completed Conversation' },
+                      { value: 'not_reachable', label: 'Unsuccessful' },
+                      { value: 'invalid_number', label: 'Unsuccessful' },
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -902,18 +899,12 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                  title="Rows per page"
-                >
-                  {[10, 20, 50, 100].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                <StyledSelect
+                  value={String(pageSize)}
+                  onChange={(v) => setPageSize(Number(v))}
+                  options={[10, 20, 50, 100].map((n) => ({ value: String(n), label: String(n) }))}
+                  className="min-w-[80px]"
+                />
               </div>
               <Button
                 variant="secondary"
