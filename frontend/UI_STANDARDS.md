@@ -42,7 +42,7 @@ import StyledSelect from '../shared/StyledSelect';  // adjust path as needed
 - **Multi-select with search:** `SearchableMultiSelect`
 - **Unit picker (e.g. kg, gms, lt):** `UnitDropdown`
 - **Tags / multi-tag with add:** `MultiTagSelect`
-- **Date range preset:** custom button + panel (see ActivitySamplingView, AgentHistoryView); keep panel styling consistent (white bg, `border border-slate-200`, `rounded-xl`).
+- **Date range preset:** Use the **same** date range component everywhere: one trigger button; panel with **preset buttons on the left** (Custom, Today, Yesterday, Last 7 days, etc.) and **Start date / End date inputs + Cancel/Apply on the right**. Do not use a dropdown for "Preset" inside the panel—use clickable preset buttons. Same styling: panel `border border-slate-200 rounded-xl`, inputs `min-h-12 rounded-xl border border-slate-200 focus:ring-lime-400`. Used in: ActivitySamplingView, AgentHistoryView, ActivityEmsProgressView, TaskList, CallbackRequestView, TaskDashboardView, SamplingControlView, AgentAnalyticsView.
 
 ---
 
@@ -67,3 +67,18 @@ Use these classes for consistency with dropdowns:
 | Tags / add custom| `MultiTagSelect`            | —            |
 
 When adding new screens or filters, import and use `StyledSelect` (or the other shared components above) so the app stays on-theme and consistent.
+
+---
+
+## Quick check: date range usage
+
+All of these use the **same** date range component (trigger button + panel with preset buttons left, Start/End date right). When changing date UX, update all:
+
+- `AdminDashboard/ActivitySamplingView.tsx`
+- `AdminDashboard/ActivityEmsProgressView.tsx`
+- `AgentHistoryView.tsx`
+- `AgentAnalyticsView.tsx`
+- `TaskList.tsx`
+- `TeamLeadDashboard/CallbackRequestView.tsx`
+- `TeamLeadDashboard/TaskDashboardView.tsx`
+- `TeamLeadDashboard/SamplingControlView.tsx`

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { kpiAPI, reportsAPI, type EmsProgressFilters, type EmsProgressSummary, type EmsDrilldownRow, type EmsDrilldownGroupBy } from '../../services/api';
 import {
@@ -17,6 +17,16 @@ import {
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
+
+type DateRangePreset =
+  | 'Custom'
+  | 'Today'
+  | 'Yesterday'
+  | 'This week (Sun - Today)'
+  | 'Last 7 days'
+  | 'Last week (Sun - Sat)'
+  | 'Last 28 days'
+  | 'Last 30 days';
 
 const GROUP_BY_OPTIONS: { value: EmsDrilldownGroupBy; label: string }[] = [
   { value: 'state', label: 'By State' },
@@ -39,6 +49,58 @@ function getDefaultDateRange(): { dateFrom: string; dateTo: string } {
   const start = new Date(today);
   start.setDate(start.getDate() - 29);
   return { dateFrom: toISODate(start), dateTo: toISODate(today) };
+}
+
+function getPresetRange(preset: DateRangePreset, currentFrom?: string, currentTo?: string): { start: string; end: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = today.getDay();
+  switch (preset) {
+    case 'Today':
+      return { start: toISODate(today), end: toISODate(today) };
+    case 'Yesterday': {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      return { start: toISODate(y), end: toISODate(y) };
+    }
+    case 'This week (Sun - Today)': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - day);
+      return { start: toISODate(s), end: toISODate(today) };
+    }
+    case 'Last 7 days': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 6);
+      return { start: toISODate(s), end: toISODate(today) };
+    }
+    case 'Last week (Sun - Sat)': {
+      const lastSat = new Date(today);
+      lastSat.setDate(lastSat.getDate() - (day + 1));
+      const lastSun = new Date(lastSat);
+      lastSun.setDate(lastSun.getDate() - 6);
+      return { start: toISODate(lastSun), end: toISODate(lastSat) };
+    }
+    case 'Last 28 days': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 27);
+      return { start: toISODate(s), end: toISODate(today) };
+    }
+    case 'Last 30 days': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 29);
+      return { start: toISODate(s), end: toISODate(today) };
+    }
+    case 'Custom':
+    default:
+      return { start: currentFrom || toISODate(today), end: currentTo || toISODate(today) };
+  }
+}
+
+function formatPretty(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 const ActivityEmsProgressView: React.FC = () => {
@@ -69,6 +131,30 @@ const ActivityEmsProgressView: React.FC = () => {
     bu: '',
     activityType: '',
   });
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 30 days');
+  const [draftStart, setDraftStart] = useState(defaultRange.dateFrom);
+  const [draftEnd, setDraftEnd] = useState(defaultRange.dateTo);
+  const datePickerRef = useRef<HTMLDivElement | null>(null);
+
+  const syncDraftFromFilters = useCallback(() => {
+    const start = filters.dateFrom || getPresetRange(selectedPreset, filters.dateFrom, filters.dateTo).start;
+    const end = filters.dateTo || getPresetRange(selectedPreset, filters.dateFrom, filters.dateTo).end;
+    setDraftStart(start);
+    setDraftEnd(end);
+  }, [filters.dateFrom, filters.dateTo, selectedPreset]);
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [isDatePickerOpen]);
 
   const fetchOptions = useCallback(async () => {
     setIsLoadingOptions(true);
@@ -224,26 +310,107 @@ const ActivityEmsProgressView: React.FC = () => {
       {showFilters && (
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Date From</label>
-              <input
-                type="date"
-                value={filters.dateFrom || ''}
-                onChange={(e) => applyFilter('dateFrom', e.target.value)}
-                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
-              />
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</label>
+              <div className="relative" ref={datePickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDatePickerOpen((prev) => {
+                      const next = !prev;
+                      if (!prev && next) syncDraftFromFilters();
+                      return next;
+                    });
+                  }}
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {selectedPreset}
+                    {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
+                  </span>
+                  <span className="text-slate-400 font-black">▾</span>
+                </button>
+
+                {isDatePickerOpen && (
+                  <div className="absolute z-50 mt-2 left-0 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
+                        {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days'] as DateRangePreset[]).map((p) => {
+                          const isActive = selectedPreset === p;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreset(p);
+                                const { start, end } = getPresetRange(p, filters.dateFrom, filters.dateTo);
+                                setDraftStart(start);
+                                setDraftEnd(end);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex-1 p-4">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                            <input
+                              type="date"
+                              value={draftStart}
+                              onChange={(e) => {
+                                setSelectedPreset('Custom');
+                                setDraftStart(e.target.value);
+                              }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                            <input
+                              type="date"
+                              value={draftEnd}
+                              onChange={(e) => {
+                                setSelectedPreset('Custom');
+                                setDraftEnd(e.target.value);
+                              }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsDatePickerOpen(false);
+                              syncDraftFromFilters();
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' }));
+                              setIsDatePickerOpen(false);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Date To</label>
-              <input
-                type="date"
-                value={filters.dateTo || ''}
-                onChange={(e) => applyFilter('dateTo', e.target.value)}
-                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">State</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">State</label>
               <StyledSelect
                 value={filters.state || ''}
                 onChange={(v) => applyFilter('state', v)}
@@ -252,7 +419,7 @@ const ActivityEmsProgressView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Territory</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Territory</label>
               <StyledSelect
                 value={filters.territory || ''}
                 onChange={(v) => applyFilter('territory', v)}
@@ -261,7 +428,7 @@ const ActivityEmsProgressView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Zone</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Zone</label>
               <StyledSelect
                 value={filters.zone || ''}
                 onChange={(v) => applyFilter('zone', v)}
@@ -270,7 +437,7 @@ const ActivityEmsProgressView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">BU</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">BU</label>
               <StyledSelect
                 value={filters.bu || ''}
                 onChange={(v) => applyFilter('bu', v)}
@@ -279,7 +446,7 @@ const ActivityEmsProgressView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Activity Type</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Activity Type</label>
               <StyledSelect
                 value={filters.activityType || ''}
                 onChange={(v) => applyFilter('activityType', v)}

@@ -816,81 +816,95 @@ const TaskList: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        syncDraftFromFilters();
-                        setIsDatePickerOpen((v) => !v);
+                        setIsDatePickerOpen((prev) => {
+                          const next = !prev;
+                          if (!prev && next) syncDraftFromFilters();
+                          return next;
+                        });
                       }}
-                      className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between"
+                      className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
                       title="Choose date range"
                     >
                       <span className="truncate">
-                        {selectedPreset} • {formatPretty(filters.dateFrom)} - {formatPretty(filters.dateTo)}
+                        {selectedPreset}
+                        {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
                       </span>
-                      <ChevronDown size={16} className="text-slate-400" />
+                      <span className="text-slate-400 font-black">▾</span>
                     </button>
 
                     {isDatePickerOpen && (
-                      <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset</div>
-                            <StyledSelect
-                              value={selectedPreset}
-                              onChange={(value) => {
-                                const p = value as DateRangePreset;
-                                setSelectedPreset(p);
-                                const r = getPresetRange(p);
-                                setDraftStart(r.start);
-                                setDraftEnd(r.end);
-                              }}
-                              options={(['Custom','Today','Yesterday','This week (Sun - Today)','Last 7 days','Last week (Sun - Sat)','Last 28 days','Last 30 days'] as DateRangePreset[]).map((p) => ({
-                                value: p,
-                                label: p,
-                              }))}
-                              placeholder="Select preset"
-                            />
+                      <div className="absolute z-50 mt-2 left-0 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                        <div className="flex flex-col sm:flex-row">
+                          <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
+                            {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days'] as DateRangePreset[]).map((p) => {
+                              const isActive = selectedPreset === p;
+                              return (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPreset(p);
+                                    const { start, end } = getPresetRange(p);
+                                    setDraftStart(start);
+                                    setDraftEnd(end);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                                >
+                                  {p}
+                                </button>
+                              );
+                            })}
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">From</div>
-                              <input
-                                type="date"
-                                value={draftStart}
-                                onChange={(e) => {
-                                  setSelectedPreset('Custom');
-                                  setDraftStart(e.target.value);
-                                }}
-                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
-                              />
+                          <div className="flex-1 p-4">
+                            <div className="flex items-center justify-between gap-3 mb-4">
+                              <div className="flex-1">
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                                <input
+                                  type="date"
+                                  value={draftStart}
+                                  onChange={(e) => {
+                                    setSelectedPreset('Custom');
+                                    setDraftStart(e.target.value);
+                                  }}
+                                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                                <input
+                                  type="date"
+                                  value={draftEnd}
+                                  onChange={(e) => {
+                                    setSelectedPreset('Custom');
+                                    setDraftEnd(e.target.value);
+                                  }}
+                                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                                />
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To</div>
-                              <input
-                                type="date"
-                                value={draftEnd}
-                                onChange={(e) => {
-                                  setSelectedPreset('Custom');
-                                  setDraftEnd(e.target.value);
+                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsDatePickerOpen(false);
+                                  syncDraftFromFilters();
                                 }}
-                                className="w-full min-h-12 px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
-                              />
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' }));
+                                  setIsDatePickerOpen(false);
+                                }}
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
+                              >
+                                Apply
+                              </button>
                             </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2 mt-4">
-                          <Button variant="secondary" size="sm" onClick={() => setIsDatePickerOpen(false)}>
-                            Cancel
-                          </Button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilters((prev) => ({ ...prev, dateFrom: draftStart, dateTo: draftEnd }));
-                              setIsDatePickerOpen(false);
-                            }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
-                          >
-                            Apply
-                          </button>
                         </div>
                       </div>
                     )}
