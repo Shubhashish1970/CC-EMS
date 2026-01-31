@@ -191,42 +191,82 @@ router.get(
       const wb = XLSX.utils.book_new();
       if (level === 'summary') {
         const summaryRows = rows as EmsReportSummaryRow[];
-        const sheetData = [
-          [
-            'Group',
-            'Total Attempted',
-            'Total Connected',
-            'Invalid',
-            'Identity Wrong',
-            'Not a Farmer',
-            'Yes Attended',
-            'Purchased',
-            'Willing Yes',
-            'Mobile Validity (%)',
-            'Hygiene (%)',
-            'Meeting Validity (%)',
-            'Meeting Conversion (%)',
-            'Purchase Intention (%)',
-            'EMS Score',
-          ],
-          ...summaryRows.map((r) => [
-            r.groupLabel,
-            r.totalAttempted,
-            r.totalConnected,
-            r.invalidCount,
-            r.identityWrongCount,
-            r.notAFarmerCount,
-            r.yesAttendedCount,
-            r.purchasedCount,
-            r.willingYesCount,
-            r.mobileValidityPct,
-            r.hygienePct,
-            r.meetingValidityPct,
-            r.meetingConversionPct,
-            r.purchaseIntentionPct,
-            r.emsScore,
-          ]),
+        const groupLabels = summaryRows.map((r) => r.groupLabel);
+        const nbu = summaryRows.reduce(
+          (acc, r) => ({
+            totalAttempted: acc.totalAttempted + r.totalAttempted,
+            totalConnected: acc.totalConnected + r.totalConnected,
+            disconnectedCount: acc.disconnectedCount + r.disconnectedCount,
+            incomingNACount: acc.incomingNACount + r.incomingNACount,
+            invalidCount: acc.invalidCount + r.invalidCount,
+            noAnswerCount: acc.noAnswerCount + r.noAnswerCount,
+            identityWrongCount: acc.identityWrongCount + r.identityWrongCount,
+            dontRecallCount: acc.dontRecallCount + r.dontRecallCount,
+            noMissedCount: acc.noMissedCount + r.noMissedCount,
+            notAFarmerCount: acc.notAFarmerCount + r.notAFarmerCount,
+            yesAttendedCount: acc.yesAttendedCount + r.yesAttendedCount,
+            notPurchasedCount: acc.notPurchasedCount + r.notPurchasedCount,
+            purchasedCount: acc.purchasedCount + r.purchasedCount,
+            willingMaybeCount: acc.willingMaybeCount + r.willingMaybeCount,
+            willingNoCount: acc.willingNoCount + r.willingNoCount,
+            willingYesCount: acc.willingYesCount + r.willingYesCount,
+            yesPlusPurchasedCount: acc.yesPlusPurchasedCount + r.yesPlusPurchasedCount,
+          }),
+          {
+            totalAttempted: 0,
+            totalConnected: 0,
+            disconnectedCount: 0,
+            incomingNACount: 0,
+            invalidCount: 0,
+            noAnswerCount: 0,
+            identityWrongCount: 0,
+            dontRecallCount: 0,
+            noMissedCount: 0,
+            notAFarmerCount: 0,
+            yesAttendedCount: 0,
+            notPurchasedCount: 0,
+            purchasedCount: 0,
+            willingMaybeCount: 0,
+            willingNoCount: 0,
+            willingYesCount: 0,
+            yesPlusPurchasedCount: 0,
+          }
+        );
+        const nbuMobileValidityPct = nbu.totalAttempted > 0 ? Math.round(((nbu.totalAttempted - nbu.invalidCount) / nbu.totalAttempted) * 100) : 0;
+        const nbuHygienePct = nbu.totalConnected > 0 ? Math.round(((nbu.totalConnected - nbu.identityWrongCount - nbu.notAFarmerCount) / nbu.totalConnected) * 100) : 0;
+        const nbuMeetingValidityPct = nbu.totalConnected > 0 ? Math.round((nbu.yesAttendedCount / nbu.totalConnected) * 100) : 0;
+        const nbuMeetingConversionPct = nbu.totalConnected > 0 ? Math.round((nbu.purchasedCount / nbu.totalConnected) * 100) : 0;
+        const nbuPurchaseIntentionPct = nbu.totalConnected > 0 ? Math.round((nbu.yesPlusPurchasedCount / nbu.totalConnected) * 100) : 0;
+        const nbuEmsScore = Math.round((nbuMobileValidityPct + nbuMeetingValidityPct + nbuMeetingConversionPct + nbuPurchaseIntentionPct) / 4);
+
+        const metricRows: [string, ...(string | number)[]][] = [
+          ['Connected', ...summaryRows.map((r) => r.totalConnected), nbu.totalConnected],
+          ['Disconnected', ...summaryRows.map((r) => r.disconnectedCount), nbu.disconnectedCount],
+          ['Incoming not allowed', ...summaryRows.map((r) => r.incomingNACount), nbu.incomingNACount],
+          ['Invalid', ...summaryRows.map((r) => r.invalidCount), nbu.invalidCount],
+          ['No Ans', ...summaryRows.map((r) => r.noAnswerCount), nbu.noAnswerCount],
+          ['Total calls made', ...summaryRows.map((r) => r.totalAttempted), nbu.totalAttempted],
+          ['Mobile no. validity (%)', ...summaryRows.map((r) => r.mobileValidityPct), nbuMobileValidityPct],
+          ['Identity Wrong', ...summaryRows.map((r) => r.identityWrongCount), nbu.identityWrongCount],
+          ['Maybe', ...summaryRows.map((r) => r.dontRecallCount), nbu.dontRecallCount],
+          ['No', ...summaryRows.map((r) => r.noMissedCount), nbu.noMissedCount],
+          ['Not a Farmer', ...summaryRows.map((r) => r.notAFarmerCount), nbu.notAFarmerCount],
+          ['Yes', ...summaryRows.map((r) => r.yesAttendedCount), nbu.yesAttendedCount],
+          ['Hygiene (%)', ...summaryRows.map((r) => r.hygienePct), nbuHygienePct],
+          ['Meeting validity (%)', ...summaryRows.map((r) => r.meetingValidityPct), nbuMeetingValidityPct],
+          ['Not Purchased', ...summaryRows.map((r) => r.notPurchasedCount), nbu.notPurchasedCount],
+          ['Purchased', ...summaryRows.map((r) => r.purchasedCount), nbu.purchasedCount],
+          ['Meeting conversion (%)', ...summaryRows.map((r) => r.meetingConversionPct), nbuMeetingConversionPct],
+          ['Maybe', ...summaryRows.map((r) => r.willingMaybeCount), nbu.willingMaybeCount],
+          ['No', ...summaryRows.map((r) => r.willingNoCount), nbu.willingNoCount],
+          ['Yes', ...summaryRows.map((r) => r.willingYesCount), nbu.willingYesCount],
+          ['Yes + Purchased', ...summaryRows.map((r) => r.yesPlusPurchasedCount), nbu.yesPlusPurchasedCount],
+          ['Purchase Intention (%)', ...summaryRows.map((r) => r.purchaseIntentionPct), nbuPurchaseIntentionPct],
+          ['EMS Score', ...summaryRows.map((r) => r.emsScore), nbuEmsScore],
+          ['Relative Remarks', ...summaryRows.map((r) => r.relativeRemarks), '—'],
         ];
+        const headerRow = ['', ...groupLabels, 'NBU'];
+        const sheetData = [headerRow, ...metricRows];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), 'EMS Report');
       } else {
         const lineRows = rows as EmsReportLineRow[];
