@@ -4,6 +4,13 @@ import { authenticate } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 import { getDailyReport, getPeriodReport, getTaskDetailExportRows } from '../services/reportService.js';
 import { getEmsProgress, getEmsDrilldown, type EmsDrilldownGroupBy } from '../services/kpiService.js';
+import {
+  getEmsReportSummary,
+  getEmsReportLineLevel,
+  type EmsReportGroupBy,
+  type EmsReportSummaryRow,
+  type EmsReportLineRow,
+} from '../services/emsReportService.js';
 import * as XLSX from 'xlsx';
 
 const router = express.Router();
@@ -116,6 +123,165 @@ router.get(
       const groupBy = req.query.groupBy as EmsDrilldownGroupBy;
       const rows = await getEmsDrilldown(filters, groupBy);
       res.json({ success: true, data: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const emsReportGroupByValues: EmsReportGroupBy[] = ['tm', 'fda', 'bu', 'zone', 'region', 'territory'];
+
+/**
+ * GET /api/reports/ems
+ * EMS report: summary or line-level rows grouped by TM, FDA, BU, Zone, Region, Territory.
+ * Query: groupBy (required), level=summary|line (default summary), + filters.
+ */
+router.get(
+  '/ems',
+  [
+    ...filterValidators,
+    query('groupBy').isIn(emsReportGroupByValues).withMessage('Invalid groupBy'),
+    query('level').optional().isIn(['summary', 'line']).withMessage('Invalid level'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, error: { message: 'Validation failed', errors: errors.array() } });
+      }
+      const filters = parseFilters(req);
+      const groupBy = req.query.groupBy as EmsReportGroupBy;
+      const level = (req.query.level as string) || 'summary';
+      const rows =
+        level === 'line'
+          ? await getEmsReportLineLevel(filters, groupBy)
+          : await getEmsReportSummary(filters, groupBy);
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/reports/ems/export
+ * EMS report Excel export. Query: groupBy (required), level=summary|line (default summary), + filters.
+ */
+router.get(
+  '/ems/export',
+  [
+    ...filterValidators,
+    query('groupBy').isIn(emsReportGroupByValues).withMessage('Invalid groupBy'),
+    query('level').optional().isIn(['summary', 'line']).withMessage('Invalid level'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, error: { message: 'Validation failed', errors: errors.array() } });
+      }
+      const filters = parseFilters(req);
+      const groupBy = req.query.groupBy as EmsReportGroupBy;
+      const level = (req.query.level as string) || 'summary';
+      const rows =
+        level === 'line'
+          ? await getEmsReportLineLevel(filters, groupBy)
+          : await getEmsReportSummary(filters, groupBy);
+
+      const wb = XLSX.utils.book_new();
+      if (level === 'summary') {
+        const summaryRows = rows as EmsReportSummaryRow[];
+        const sheetData = [
+          [
+            'Group',
+            'Total Attempted',
+            'Total Connected',
+            'Invalid',
+            'Identity Wrong',
+            'Not a Farmer',
+            'Yes Attended',
+            'Purchased',
+            'Willing Yes',
+            'Mobile Validity (%)',
+            'Hygiene (%)',
+            'Meeting Validity (%)',
+            'Meeting Conversion (%)',
+            'Purchase Intention (%)',
+            'EMS Score',
+          ],
+          ...summaryRows.map((r) => [
+            r.groupLabel,
+            r.totalAttempted,
+            r.totalConnected,
+            r.invalidCount,
+            r.identityWrongCount,
+            r.notAFarmerCount,
+            r.yesAttendedCount,
+            r.purchasedCount,
+            r.willingYesCount,
+            r.mobileValidityPct,
+            r.hygienePct,
+            r.meetingValidityPct,
+            r.meetingConversionPct,
+            r.purchaseIntentionPct,
+            r.emsScore,
+          ]),
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), 'EMS Report');
+      } else {
+        const lineRows = rows as EmsReportLineRow[];
+        const sheetData = [
+          [
+            'Group',
+            'Task ID',
+            'Activity Date',
+            'Farmer Name',
+            'Farmer Mobile',
+            'Officer (FDA)',
+            'TM',
+            'Territory',
+            'Zone',
+            'BU',
+            'State',
+            'Connected',
+            'Mobile Validity (%)',
+            'Hygiene (%)',
+            'Meeting Validity (%)',
+            'Meeting Conversion (%)',
+            'Purchase Intention (%)',
+            'EMS Score',
+            'Relative Remarks',
+          ],
+          ...lineRows.map((r) => [
+            r.groupLabel,
+            r.taskId,
+            r.activityDate,
+            r.farmerName,
+            r.farmerMobile,
+            r.officerName,
+            r.tmName,
+            r.territoryName,
+            r.zoneName,
+            r.buName,
+            r.state,
+            r.connected,
+            r.mobileValidityPct,
+            r.hygienePct,
+            r.meetingValidityPct,
+            r.meetingConversionPct,
+            r.purchaseIntentionPct,
+            r.emsScore,
+            r.relativeRemarks,
+          ]),
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), 'EMS Report (Line)');
+      }
+
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const filename = `ems-report-${groupBy}-${level}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buf);
     } catch (err) {
       next(err);
     }

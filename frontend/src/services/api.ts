@@ -752,6 +752,8 @@ export const adminAPI = {
 // KPI / EMS Progress API (MIS Admin)
 export type EmsDrilldownGroupBy = 'state' | 'territory' | 'zone' | 'bu' | 'activityType';
 
+export type EmsReportGroupBy = 'tm' | 'fda' | 'bu' | 'zone' | 'region' | 'territory';
+
 export interface EmsProgressFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -901,6 +903,44 @@ export const reportsAPI = {
     const contentDisposition = res.headers.get('content-disposition') || '';
     const match = contentDisposition.match(/filename="([^"]+)"/i);
     const filename = match?.[1] || 'ems-progress-report.xlsx';
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+  /** EMS report Excel: groupBy (tm|fda|bu|zone|region|territory), level summary|line, + filters */
+  downloadEmsReportExport: async (
+    groupBy: EmsReportGroupBy,
+    level: 'summary' | 'line' = 'summary',
+    filters?: EmsProgressFilters
+  ) => {
+    const params = new URLSearchParams();
+    params.append('groupBy', groupBy);
+    params.append('level', level);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    const res = await fetch(`${API_BASE_URL}/reports/ems/export?${query}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(json?.error?.message || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] || 'ems-report.xlsx';
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

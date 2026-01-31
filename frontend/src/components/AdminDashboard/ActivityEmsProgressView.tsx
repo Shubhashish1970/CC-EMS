@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { kpiAPI, reportsAPI, type EmsProgressFilters, type EmsProgressSummary, type EmsDrilldownRow, type EmsDrilldownGroupBy } from '../../services/api';
+import { kpiAPI, reportsAPI, type EmsProgressFilters, type EmsProgressSummary, type EmsDrilldownRow, type EmsDrilldownGroupBy, type EmsReportGroupBy } from '../../services/api';
 import {
   BarChart3,
   Filter,
@@ -34,6 +34,15 @@ const GROUP_BY_OPTIONS: { value: EmsDrilldownGroupBy; label: string }[] = [
   { value: 'zone', label: 'By Zone' },
   { value: 'bu', label: 'By BU' },
   { value: 'activityType', label: 'By Activity Type' },
+];
+
+const EMS_REPORT_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
+  { value: 'fda', label: 'By FDA' },
+  { value: 'territory', label: 'By Territory' },
+  { value: 'region', label: 'By Region' },
+  { value: 'zone', label: 'By Zone' },
+  { value: 'bu', label: 'By BU' },
+  { value: 'tm', label: 'By TM' },
 ];
 
 function toISODate(d: Date): string {
@@ -119,6 +128,9 @@ const ActivityEmsProgressView: React.FC = () => {
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingTaskDetails, setIsExportingTaskDetails] = useState(false);
+  const [showEmsReportModal, setShowEmsReportModal] = useState(false);
+  const [emsReportGroupBy, setEmsReportGroupBy] = useState<EmsReportGroupBy>('fda');
+  const [emsReportLevel, setEmsReportLevel] = useState<'summary' | 'line'>('summary');
   const [showFilters, setShowFilters] = useState(false);
   const [groupBy, setGroupBy] = useState<EmsDrilldownGroupBy>('state');
   const defaultRange = getDefaultDateRange();
@@ -216,11 +228,12 @@ const ActivityEmsProgressView: React.FC = () => {
     fetchDrilldown();
   }, [fetchDrilldown]);
 
-  const handleExport = async () => {
+  const handleEmsReportDownload = async () => {
     setIsExporting(true);
     try {
-      await reportsAPI.downloadExport(filters);
-      showSuccess('Summary report downloaded');
+      await reportsAPI.downloadEmsReportExport(emsReportGroupBy, emsReportLevel, filters);
+      showSuccess('EMS report downloaded');
+      setShowEmsReportModal(false);
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Export failed');
     } finally {
@@ -286,12 +299,12 @@ const ActivityEmsProgressView: React.FC = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleExport}
+            onClick={() => setShowEmsReportModal(true)}
             disabled={isExporting}
             className="flex items-center gap-2"
           >
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Summary report
+            EMS report
           </Button>
           <Button
             variant="primary"
@@ -587,6 +600,61 @@ const ActivityEmsProgressView: React.FC = () => {
       <p className="text-xs text-slate-500">
         For a detailed activity list with the same filters, use the <strong>Activity Monitoring</strong> tab and apply the same date range and filters there.
       </p>
+
+      {/* EMS Report download modal */}
+      {showEmsReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowEmsReportModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Download EMS report</h3>
+            <p className="text-sm text-slate-500 mb-4">Choose how to group the report. Current date range and filters will be applied.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Group by</label>
+                <StyledSelect
+                  value={emsReportGroupBy}
+                  onChange={(v) => setEmsReportGroupBy(v as EmsReportGroupBy)}
+                  options={EMS_REPORT_GROUP_BY_OPTIONS}
+                  placeholder="Select"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Report level</label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="emsLevel"
+                      checked={emsReportLevel === 'summary'}
+                      onChange={() => setEmsReportLevel('summary')}
+                      className="text-lime-600 focus:ring-lime-500"
+                    />
+                    <span className="text-sm text-slate-700">Summary (one row per group)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="emsLevel"
+                      checked={emsReportLevel === 'line'}
+                      onChange={() => setEmsReportLevel('line')}
+                      className="text-lime-600 focus:ring-lime-500"
+                    />
+                    <span className="text-sm text-slate-700">Line level (one row per call)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+              <Button variant="secondary" size="sm" onClick={() => setShowEmsReportModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleEmsReportDownload} disabled={isExporting} className="flex items-center gap-2">
+                {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                Download
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
