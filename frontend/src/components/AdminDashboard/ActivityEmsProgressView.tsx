@@ -297,11 +297,11 @@ const ActivityEmsProgressView: React.FC = () => {
             Refresh
           </Button>
           <Button
-            variant="secondary"
+            variant="primary"
             size="sm"
             onClick={() => setShowEmsReportModal(true)}
             disabled={isExporting}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 ring-2 ring-lime-400 ring-offset-2"
           >
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             EMS report
