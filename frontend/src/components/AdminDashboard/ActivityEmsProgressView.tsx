@@ -491,16 +491,6 @@ const ActivityEmsProgressView: React.FC = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 min-w-0">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 shrink-0">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</span>
-              <StyledSelect
-                value={groupBy}
-                onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
-                options={GROUP_BY_OPTIONS}
-                placeholder="Group by"
-                className="min-w-[120px]"
-              />
-            </div>
             <Button variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)}>
               <Filter size={16} />
               {showFilters ? 'Hide filters' : 'Filters'}
@@ -731,6 +721,20 @@ const ActivityEmsProgressView: React.FC = () => {
           ) : (
             <div className="col-span-full text-center py-8 text-slate-500">No EMS data. Adjust filters or refresh.</div>
           )}
+        </div>
+      </div>
+
+      {/* Group By - below EMS Totals */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</span>
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 shrink-0">
+          <StyledSelect
+            value={groupBy}
+            onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
+            options={GROUP_BY_OPTIONS}
+            placeholder="Group by"
+            className="min-w-[120px]"
+          />
         </div>
       </div>
 
