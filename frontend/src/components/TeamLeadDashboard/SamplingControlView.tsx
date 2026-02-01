@@ -1017,10 +1017,10 @@ const SamplingControlView: React.FC = () => {
             <div
               key={card.label}
               ref={kpiTooltipOpen === card.label ? kpiTooltipRef : undefined}
-              className="bg-slate-50 rounded-xl p-3 border border-slate-200 relative min-h-[72px]"
+              className="bg-slate-50 rounded-xl p-3 border border-slate-200 relative flex flex-col"
             >
-              <div className="flex items-start gap-1.5">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex-1 min-w-0">{card.label}</p>
+              <div className="flex items-start gap-1.5 min-h-[2.5rem] shrink-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 min-w-0 leading-tight">{card.label}</p>
                 <button
                   type="button"
                   onClick={(e) => {
