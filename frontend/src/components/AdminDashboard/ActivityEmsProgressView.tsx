@@ -724,18 +724,16 @@ const ActivityEmsProgressView: React.FC = () => {
         </div>
       </div>
 
-      {/* Group By - below EMS Totals */}
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</span>
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 shrink-0">
-          <StyledSelect
-            value={groupBy}
-            onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
-            options={GROUP_BY_OPTIONS}
-            placeholder="Group by"
-            className="min-w-[120px]"
-          />
-        </div>
+      {/* Group By - below EMS Totals, right-aligned, standard dropdown */}
+      <div className="flex items-center justify-end gap-2">
+        <label className="text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</label>
+        <StyledSelect
+          value={groupBy}
+          onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
+          options={GROUP_BY_OPTIONS}
+          placeholder="Group by"
+          className="min-w-[200px]"
+        />
       </div>
 
       {/* Call Outcome Funnel (Totals) - Recharts FunnelChart + horizontal bars for other outcomes */}
