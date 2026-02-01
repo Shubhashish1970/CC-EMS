@@ -287,14 +287,28 @@ const generateFarmerName = (index: number, language: string): string => {
   return names[index % names.length];
 };
 
-// Generate sample data with optional counts and hierarchy rows (from Excel)
+// Existing territory/TM/FDA from EMS DB – new activities use these names (no data cleared)
+interface ExistingTerritoryTmFdaRow {
+  territoryName?: string;
+  territory?: string;
+  tmName?: string;
+  officerName: string;
+  zoneName?: string;
+  buName?: string;
+}
+
+// Generate sample data with optional counts, hierarchy rows (from Excel), or existing territory/TM/FDA (append, same names)
 function generateSampleDataWithParams(
   activityCount: number,
   farmersPerActivity: number,
-  hierarchyRows?: HierarchyRow[]
+  hierarchyRows?: HierarchyRow[],
+  existingTerritoryTmFda?: ExistingTerritoryTmFdaRow[]
 ): { activitiesGenerated: number; farmersGenerated: number } {
   const ACTIVITY_COUNT = Math.max(1, Math.min(500, activityCount));
   const FARMERS_PER_ACTIVITY = Math.max(1, Math.min(50, farmersPerActivity));
+  const useExisting = Array.isArray(existingTerritoryTmFda) && existingTerritoryTmFda.length > 0;
+  const idPrefix = useExisting ? `FFA-ACT-NEW-${Date.now()}-` : 'FFA-ACT-';
+  const idOffset = useExisting ? 0 : 1000;
 
   mockActivities = [];
   mockFarmers = [];
@@ -308,9 +322,32 @@ function generateSampleDataWithParams(
   for (let i = 1; i <= ACTIVITY_COUNT; i++) {
     const activityDate = new Date();
     activityDate.setDate(activityDate.getDate() - (i * 2));
-    const { bu, zone, territory, state } = pick(i);
+    let bu: string; let zone: string; let territory: string; let state: string;
+    let officerName: string; let officerId: string; let tmName: string; let tmEmpCode: string;
+
+    if (useExisting) {
+      const row = existingTerritoryTmFda[Math.floor(Math.random() * existingTerritoryTmFda.length)];
+      territory = (row.territoryName || row.territory || 'Territory').trim();
+      zone = (row.zoneName || 'Zone').trim();
+      bu = (row.buName || 'SBU').trim();
+      state = INDIAN_STATES[i % INDIAN_STATES.length];
+      officerName = (row.officerName || '').trim() || toProperCase(INDIAN_OFFICER_NAMES[i % INDIAN_OFFICER_NAMES.length]);
+      officerId = `FDA-${String(10000 + Date.now() % 100000 + i).slice(-5)}`;
+      tmName = (row.tmName || '').trim() || toProperCase(`TM ${INDIAN_OFFICER_NAMES[(i + 7) % INDIAN_OFFICER_NAMES.length]}`);
+      tmEmpCode = `TM-${String(10000 + (Date.now() % 100000) + i).slice(-5)}`;
+    } else {
+      const picked = pick(i);
+      bu = picked.bu; zone = picked.zone; territory = picked.territory; state = picked.state;
+      const hierarchy = generateFieldSalesHierarchy(i);
+      officerName = toProperCase(hierarchy.fda.name);
+      officerId = hierarchy.fda.empCode;
+      tmName = toProperCase(hierarchy.tm.name);
+      tmEmpCode = hierarchy.tm.empCode;
+    }
+
     const language = LANGUAGES[i % LANGUAGES.length];
     const village = INDIAN_VILLAGES[i % INDIAN_VILLAGES.length];
+    const villageProper = toProperCase(village);
 
     const activityCrops = CROPS
       .sort(() => Math.random() - 0.5)
@@ -319,13 +356,12 @@ function generateSampleDataWithParams(
       .sort(() => Math.random() - 0.5)
       .slice(0, 1 + Math.floor(Math.random() * 3));
 
-    const hierarchy = generateFieldSalesHierarchy(i);
-    const officerName = toProperCase(hierarchy.fda.name);
-    const officerId = hierarchy.fda.empCode;
-    const villageProper = toProperCase(village);
+    const hierarchy = useExisting
+      ? { fda: { empCode: officerId, name: officerName }, tm: { empCode: tmEmpCode, name: tmName }, rm: { empCode: '', name: '' }, zm: { empCode: '', name: '' }, buHead: { empCode: '', name: '' }, rdm: { empCode: '', name: '' } }
+      : generateFieldSalesHierarchy(i);
 
     const activity = {
-      activityId: `FFA-ACT-${1000 + i}`,
+      activityId: `${idPrefix}${idOffset + i}`,
       type: ACTIVITY_TYPES[i % ACTIVITY_TYPES.length],
       date: formatDDMMYYYY(activityDate),
       officerId: officerId,
@@ -336,8 +372,8 @@ function generateSampleDataWithParams(
       territoryName: territory,
       zoneName: zone,
       buName: bu,
-      tmEmpCode: hierarchy.tm.empCode,
-      tmName: toProperCase(hierarchy.tm.name),
+      tmEmpCode: tmEmpCode,
+      tmName: tmName,
       fieldSalesHierarchy: hierarchy,
       crops: activityCrops,
       products: activityProducts,
@@ -427,13 +463,14 @@ async function fetchMastersFromEMS(): Promise<{ crops: string[]; products: strin
   }
 }
 
-// Seed/generate data with optional activity count, farmers per activity, and hierarchy from Excel
+// Seed/generate data with optional activity count, farmers per activity, hierarchy from Excel, or existing territory/TM/FDA (append, same names)
 app.post('/api/seed', (req: Request, res: Response) => {
   try {
     const body = req.body as {
       activityCount?: number;
       farmersPerActivity?: number;
       hierarchy?: Array<{ territoryCode?: string; territoryName?: string; regionCode?: string; region?: string; zoneCode?: string; zoneName?: string; bu?: string }>;
+      existingTerritoryTmFda?: Array<{ territoryName?: string; territory?: string; tmName?: string; officerName?: string; zoneName?: string; buName?: string }>;
     };
     const activityCount = typeof body?.activityCount === 'number' ? body.activityCount : 50;
     const farmersPerActivity = typeof body?.farmersPerActivity === 'number' ? body.farmersPerActivity : 12;
@@ -463,7 +500,23 @@ app.post('/api/seed', (req: Request, res: Response) => {
         console.log(`[Mock FFA] Using ${parsed.length} hierarchy rows from request (territories from file)`);
       }
     }
-    const result = generateSampleDataWithParams(activityCount, farmersPerActivity, hierarchyRows);
+    let existingTerritoryTmFda: ExistingTerritoryTmFdaRow[] | undefined;
+    if (Array.isArray(body?.existingTerritoryTmFda) && body.existingTerritoryTmFda.length > 0) {
+      existingTerritoryTmFda = body.existingTerritoryTmFda
+        .filter((r) => r && (r.officerName || r.territoryName || r.territory))
+        .map((r) => ({
+          territoryName: r.territoryName?.trim(),
+          territory: r.territory?.trim(),
+          tmName: r.tmName?.trim(),
+          officerName: (r.officerName || '').trim(),
+          zoneName: r.zoneName?.trim(),
+          buName: r.buName?.trim(),
+        }));
+      if (existingTerritoryTmFda.length > 0) {
+        console.log(`[Mock FFA] Using ${existingTerritoryTmFda.length} existing territory/TM/FDA combinations (append, no data cleared)`);
+      }
+    }
+    const result = generateSampleDataWithParams(activityCount, farmersPerActivity, hierarchyRows, existingTerritoryTmFda);
     res.json({
       success: true,
       message: `Generated ${result.activitiesGenerated} activities and ${result.farmersGenerated} farmers`,

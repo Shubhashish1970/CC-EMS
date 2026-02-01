@@ -120,14 +120,20 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
         />
       </button>
 
-      {/* Dropdown Menu – rendered in portal so all options are visible (not clipped by overflow) */}
+      {/* Dropdown Menu – rendered in portal; options list is scrollable when long */}
       {typeof document !== 'undefined' && isOpen && !disabled && createPortal(
         <div
           ref={dropdownRef}
-          style={dropdownStyle}
-          className="bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto overscroll-contain"
+          style={{
+            ...dropdownStyle,
+            maxHeight: 'min(280px, 60vh)',
+          }}
+          className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden flex flex-col"
         >
-          <div>
+          <div
+            className="overflow-y-auto overscroll-contain flex-1 min-h-0"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             {options.map((option) => {
               const isSelected = option.value === value;
               return (

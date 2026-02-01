@@ -790,23 +790,38 @@ router.post(
         }
       }
 
-      // When hierarchy from file is used: clear transaction data first so EMS only has hierarchy-based activities
-      if (hierarchy.length > 0) {
-        logger.info('[FFA] Clearing transaction data before seed so territories come from hierarchy file');
-        await CallTask.deleteMany({});
-        await SamplingAudit.deleteMany({});
-        await CoolingPeriod.deleteMany({});
-        await SamplingConfig.deleteMany({});
-        await SamplingRun.deleteMany({});
-        await AllocationRun.deleteMany({});
-        await InboundQuery.deleteMany({});
-        await Activity.deleteMany({});
-        await Farmer.deleteMany({});
+      // Do not clear existing data: generate more data in same territories with same TM & FDA names when possible
+      const existingRows = await Activity.aggregate<{ _id: { territoryName: string; tmName: string; officerName: string }; territory: string; zoneName: string; buName: string }>([
+        { $match: { $or: [{ territoryName: { $exists: true, $ne: '' } }, { territory: { $exists: true, $ne: '' } }] } },
+        { $project: { territoryName: { $ifNull: ['$territoryName', '$territory'] }, territory: 1, tmName: { $ifNull: ['$tmName', ''] }, officerName: 1, zoneName: { $ifNull: ['$zoneName', ''] }, buName: { $ifNull: ['$buName', ''] } } },
+        { $group: { _id: { territoryName: '$territoryName', tmName: '$tmName', officerName: '$officerName' }, territory: { $first: '$territory' }, zoneName: { $first: '$zoneName' }, buName: { $first: '$buName' } } },
+      ]).exec();
+      const existingTerritoryTmFda = existingRows.length > 0
+        ? existingRows.map((r) => {
+            const tName = (r._id?.territoryName || r.territory || '').trim();
+            const t = (r.territory || r._id?.territoryName || '').trim();
+            return {
+              territoryName: tName || t,
+              territory: t || tName,
+              tmName: (r._id?.tmName || '').trim(),
+              officerName: (r._id?.officerName || '').trim(),
+              zoneName: (r.zoneName || '').trim(),
+              buName: (r.buName || '').trim(),
+            };
+          })
+        : undefined;
+      if (existingTerritoryTmFda?.length) {
+        logger.info('[FFA] Using %d existing territory/TM/FDA combinations for new data (no data cleared)', existingTerritoryTmFda.length);
       }
 
       const baseUrl = (process.env.FFA_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
       const seedUrl = `${baseUrl}/seed`;
-      const body = { activityCount, farmersPerActivity, hierarchy: hierarchy.length > 0 ? hierarchy : undefined };
+      const body = {
+        activityCount,
+        farmersPerActivity,
+        hierarchy: hierarchy.length > 0 ? hierarchy : undefined,
+        existingTerritoryTmFda,
+      };
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const ffaToken = process.env.FFA_API_TOKEN;
@@ -834,7 +849,9 @@ router.post(
           logger.info('[FFA] Sync after seed completed', syncResult);
           return res.json({
             success: true,
-            message: 'Data generated from your hierarchy file and synced to EMS. Territories should match your Excel.',
+            message: existingTerritoryTmFda?.length
+              ? 'More data generated using existing territory/TM/FDA names and synced. No existing data was cleared.'
+              : 'Data generated from your hierarchy file and synced to EMS. No existing data was cleared.',
             data: {
               seed: seedData?.data ?? {},
               sync: syncResult ? { activitiesSynced: syncResult.activitiesSynced, farmersSynced: syncResult.farmersSynced } : undefined,
@@ -855,7 +872,9 @@ router.post(
       syncFFAData(true).catch((err) => logger.error('[FFA] Background sync after seed failed', err));
       res.json({
         success: true,
-        message: 'Data generated via Mock FFA and full sync started. Poll /api/ffa/sync-progress for progress.',
+        message: existingTerritoryTmFda?.length
+          ? 'More data generated using existing territory/TM/FDA. Full sync started. No existing data was cleared.'
+          : 'Data generated via Mock FFA and full sync started. No existing data was cleared. Poll /api/ffa/sync-progress for progress.',
         data: {
           seed: seedData?.data ?? {},
           activityCount,
