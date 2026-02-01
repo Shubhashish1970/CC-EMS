@@ -578,14 +578,17 @@ router.post(
           activityId: { $in: ids },
           $or: [{ callLog: null }, { callLog: { $exists: false } }],
         });
-        logger.info(
-          { deletedCount: taskResult.deletedCount, activityIds: ids.length },
-          'Reactivate: deleted tasks without calls'
-        );
+        logger.info('Reactivate: deleted tasks without calls', {
+          deletedCount: taskResult.deletedCount,
+          activityIds: ids.length,
+        });
       }
       if (deleteExistingAudit === true) {
         const auditResult = await SamplingAudit.deleteMany({ activityId: { $in: ids } });
-        logger.info({ count: auditResult.deletedCount, activityIds: ids.length }, 'Reactivate: deleted existing sampling audits');
+        logger.info('Reactivate: deleted existing sampling audits', {
+          count: auditResult.deletedCount,
+          activityIds: ids.length,
+        });
       }
 
       const result = await Activity.updateMany(
