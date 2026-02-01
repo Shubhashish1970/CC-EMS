@@ -620,22 +620,36 @@ router.get(
       }
       const autoRange = await getFirstSampleAutoRange(authUserId);
       if (autoRange) {
+        const matchedCount = await Activity.countDocuments({
+          firstSampleRun: { $ne: true },
+          lifecycleStatus: 'active',
+          date: { $gte: autoRange.dateFrom, $lte: autoRange.dateTo },
+          farmerIds: { $exists: true, $ne: [] },
+        });
         return res.json({
           success: true,
           data: {
             isFirstRun: false,
             dateFrom: autoRange.dateFrom.toISOString().split('T')[0],
             dateTo: autoRange.dateTo.toISOString().split('T')[0],
+            matchedCount,
           },
         });
       }
       const suggested = await getFirstSampleSuggestedRange();
+      const matchedCount = await Activity.countDocuments({
+        firstSampleRun: { $ne: true },
+        lifecycleStatus: 'active',
+        date: { $gte: suggested.dateFrom, $lte: suggested.dateTo },
+        farmerIds: { $exists: true, $ne: [] },
+      });
       return res.json({
         success: true,
         data: {
           isFirstRun: true,
           dateFrom: suggested.dateFrom.toISOString().split('T')[0],
           dateTo: suggested.dateTo.toISOString().split('T')[0],
+          matchedCount,
         },
       });
     } catch (error) {

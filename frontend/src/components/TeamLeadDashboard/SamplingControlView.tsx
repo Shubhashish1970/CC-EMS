@@ -68,7 +68,7 @@ const SamplingControlView: React.FC = () => {
 
   /** first_sample = auto date range (or manual for very first run); adhoc = user picks date range */
   const [runType, setRunType] = useState<'first_sample' | 'adhoc'>('first_sample');
-  const [firstSampleRange, setFirstSampleRange] = useState<{ dateFrom: string; dateTo: string } | null>(null);
+  const [firstSampleRange, setFirstSampleRange] = useState<{ dateFrom: string; dateTo: string; matchedCount?: number } | null>(null);
   const [isFirstSampleRun, setIsFirstSampleRun] = useState<boolean>(false);
 
   // Date range dropdown (same UX as Admin Activity Sampling)
@@ -186,13 +186,15 @@ const SamplingControlView: React.FC = () => {
   };
 
   const handleResetSelections = () => {
-    // Clear any checked rows and reset filters back to defaults
+    // Clear any checked rows and reset filters back to defaults (YTD, same as page load)
+    const ytd = getPresetRange('YTD');
     setSelectedUnassignedTaskIds(new Set());
     setBulkAssignAgentId('');
+    setSelectedPreset('YTD');
     setActivityFilters({
       lifecycleStatus: 'active',
-      dateFrom: '',
-      dateTo: '',
+      dateFrom: ytd.start,
+      dateTo: ytd.end,
     });
     toast.showSuccess('Selections cleared');
   };
@@ -218,11 +220,11 @@ const SamplingControlView: React.FC = () => {
       const d = r?.data;
       setIsFirstSampleRun(d?.isFirstRun === true);
       if (d?.dateFrom && d?.dateTo) {
-        setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
         const fromStr = typeof d.dateFrom === 'string' ? d.dateFrom.split('T')[0] : d.dateFrom;
         const toStr = typeof d.dateTo === 'string' ? d.dateTo.split('T')[0] : d.dateTo;
-        setSelectedPreset('Custom');
-        setActivityFilters((prev) => ({ ...prev, dateFrom: fromStr, dateTo: toStr }));
+        setFirstSampleRange({ dateFrom: fromStr, dateTo: toStr, matchedCount: d?.matchedCount });
+      } else {
+        setFirstSampleRange(null);
       }
     }).catch(() => { setFirstSampleRange(null); setIsFirstSampleRun(false); });
   }, [runType]);
@@ -372,11 +374,13 @@ const SamplingControlView: React.FC = () => {
         errorCount: 0,
       });
 
+      const runDateFrom = runType === 'adhoc' ? activityFilters.dateFrom : (runType === 'first_sample' ? (firstSampleRange?.dateFrom ?? activityFilters.dateFrom) : undefined);
+      const runDateTo = runType === 'adhoc' ? activityFilters.dateTo : (runType === 'first_sample' ? (firstSampleRange?.dateTo ?? activityFilters.dateTo) : undefined);
       const res: any = await samplingAPI.runSampling({
         runType,
         lifecycleStatus: activityFilters.lifecycleStatus,
-        dateFrom: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateFrom || undefined) : undefined,
-        dateTo: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateTo || undefined) : undefined,
+        dateFrom: runDateFrom || undefined,
+        dateTo: runDateTo || undefined,
       });
       if (runType === 'first_sample' && res?.data?.dateFrom && res?.data?.dateTo) {
         const fromStr = typeof res.data.dateFrom === 'string' ? res.data.dateFrom.split('T')[0] : res.data.dateFrom;
@@ -621,6 +625,10 @@ const SamplingControlView: React.FC = () => {
           {runConfirmType === 'first_sample' && (
             <>
               <p className="text-sm font-bold text-slate-800">Run Sample (auto date range)</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1 text-sm text-slate-800">
+                <p><strong>Date range for this run:</strong> {firstSampleRange?.dateFrom && firstSampleRange?.dateTo ? `${formatPretty(firstSampleRange.dateFrom)} – ${formatPretty(firstSampleRange.dateTo)}` : '(determined automatically)'}</p>
+                <p><strong>Activities that will be sampled:</strong> {firstSampleRange?.matchedCount != null ? firstSampleRange.matchedCount : '—'}</p>
+              </div>
               <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
                 <li><strong>Activities:</strong> Only <strong>Active</strong> activities that have <strong>never been sampled</strong>.</li>
                 <li><strong>Date range:</strong> Chosen automatically — first run: earliest to latest activity date; later runs: last run end date (inclusive) to today, so no activity is missed.</li>
