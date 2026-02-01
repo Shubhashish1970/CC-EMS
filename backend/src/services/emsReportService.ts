@@ -107,7 +107,8 @@ function buildRelativeRemarks(meetingValidityPct: number, meetingConversionPct: 
 
 /**
  * EMS Report summary: one row per group (TM, FDA, BU, Zone, Region, Territory).
- * Only completed tasks with callLog. Connected = connected + progressed to next stage or beyond.
+ * Includes all attempted calls: status completed (Connected), not_reachable (Disconnected/Incoming N/A/No Answer), invalid_number (Invalid).
+ * Connected = callLog.callStatus === 'Connected' and progressed to next stage or beyond.
  */
 export async function getEmsReportSummary(
   filters: EmsProgressFilters | undefined,
@@ -124,7 +125,7 @@ export async function getEmsReportSummary(
   const agg = await CallTask.aggregate([
     {
       $match: {
-        status: 'completed',
+        status: { $in: ['completed', 'not_reachable', 'invalid_number'] },
         callLog: { $exists: true, $ne: null },
         activityId: { $in: ids },
       },
@@ -281,7 +282,7 @@ export async function getEmsReportLineLevel(
   if (ids.length === 0) return [];
 
   const tasks = await CallTask.find({
-    status: 'completed',
+    status: { $in: ['completed', 'not_reachable', 'invalid_number'] },
     callLog: { $exists: true, $ne: null },
     activityId: { $in: ids },
   })
@@ -388,7 +389,7 @@ export async function getEmsReportTrends(
   const agg = await CallTask.aggregate([
     {
       $match: {
-        status: 'completed',
+        status: { $in: ['completed', 'not_reachable', 'invalid_number'] },
         callLog: { $exists: true, $ne: null },
         activityId: { $in: ids },
       },
