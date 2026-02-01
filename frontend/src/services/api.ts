@@ -478,6 +478,9 @@ export const samplingAPI = {
     defaultPercentage?: number;
     activityTypePercentages?: Record<string, number>;
     eligibleActivityTypes?: string[];
+    autoRunEnabled?: boolean;
+    autoRunThreshold?: number;
+    autoRunActivateFrom?: string | null;
   }) => {
     return apiRequest('/sampling/config', {
       method: 'PUT',

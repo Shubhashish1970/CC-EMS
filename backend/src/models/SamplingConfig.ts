@@ -10,6 +10,12 @@ export interface ISamplingConfig extends Document {
   defaultPercentage: number;
   activityTypePercentages: Record<string, number>;
   eligibleActivityTypes: string[]; // empty => all eligible
+  /** Automatic later run: enable/disable cron-triggered Run Sample when unsampled >= threshold */
+  autoRunEnabled?: boolean;
+  /** Run when unsampled (active, never sampled) activities in auto range >= this (default 200) */
+  autoRunThreshold?: number;
+  /** Cron will only trigger a run on or after this date (ISO date string); null = no restriction */
+  autoRunActivateFrom?: Date | null;
   updatedByUserId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +62,20 @@ const SamplingConfigSchema = new Schema<ISamplingConfig>(
     eligibleActivityTypes: {
       type: [String],
       default: [],
+    },
+    autoRunEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    autoRunThreshold: {
+      type: Number,
+      default: 200,
+      min: 1,
+      max: 100000,
+    },
+    autoRunActivateFrom: {
+      type: Date,
+      default: null,
     },
     updatedByUserId: {
       type: Schema.Types.ObjectId,

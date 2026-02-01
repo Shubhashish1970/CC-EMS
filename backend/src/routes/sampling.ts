@@ -63,6 +63,25 @@ const getFirstSampleSuggestedRange = async (): Promise<{ dateFrom: Date; dateTo:
   return getFirstSampleSuggestedRangeFallback();
 };
 
+/** Single place for "later run" / first_sample activity query: active, never sampled, date in range, non-empty farmerIds. Change here when sampling logic changes. */
+function buildFirstSampleRunQuery(rangeStart: Date, rangeEnd: Date, lifecycleStatus: string = 'active'): Record<string, unknown> {
+  return {
+    firstSampleRun: { $ne: true },
+    lifecycleStatus: lifecycleStatus || 'active',
+    date: { $gte: rangeStart, $lte: rangeEnd },
+    farmerIds: { $exists: true, $ne: [] },
+  };
+}
+
+/** Count of activities eligible for a later run (auto range). Returns { count, range } or { count: 0, range: null } if not a later run. */
+async function getLaterRunEligibleCount(userId: mongoose.Types.ObjectId): Promise<{ count: number; range: { dateFrom: Date; dateTo: Date } | null }> {
+  const autoRange = await getFirstSampleAutoRange(userId);
+  if (!autoRange) return { count: 0, range: null };
+  const q = buildFirstSampleRunQuery(autoRange.dateFrom, autoRange.dateTo);
+  const count = await Activity.countDocuments(q);
+  return { count, range: autoRange };
+}
+
 /** Group activities by FDA (officerId); allocate proportional target sample size per FDA. Every FDA gets at least 1 (mandatory representation). */
 type FdaGroupDoc = { _id: mongoose.Types.ObjectId; officerId: string; officerName?: string; farmerIds?: unknown[] };
 async function buildFdaGroups(
@@ -354,6 +373,9 @@ router.put(
     body('defaultPercentage').optional().isFloat({ min: 1, max: 100 }),
     body('activityTypePercentages').optional().isObject(),
     body('eligibleActivityTypes').optional().isArray(),
+    body('autoRunEnabled').optional().isBoolean(),
+    body('autoRunThreshold').optional().isInt({ min: 1, max: 100000 }),
+    body('autoRunActivateFrom').optional().isISO8601(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -370,6 +392,9 @@ router.put(
         ...req.body,
         updatedByUserId: authUserId || null,
       };
+      if (req.body.autoRunActivateFrom === '' || req.body.autoRunActivateFrom === null) {
+        update.autoRunActivateFrom = null;
+      }
 
       const config = await SamplingConfig.findOneAndUpdate(
         { key: 'default' },
@@ -618,31 +643,21 @@ router.get(
       if (!authUserId) {
         return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
       }
-      const autoRange = await getFirstSampleAutoRange(authUserId);
-      if (autoRange) {
-        const matchedCount = await Activity.countDocuments({
-          firstSampleRun: { $ne: true },
-          lifecycleStatus: 'active',
-          date: { $gte: autoRange.dateFrom, $lte: autoRange.dateTo },
-          farmerIds: { $exists: true, $ne: [] },
-        });
+      const laterRun = await getLaterRunEligibleCount(authUserId);
+      if (laterRun.range) {
         return res.json({
           success: true,
           data: {
             isFirstRun: false,
-            dateFrom: autoRange.dateFrom.toISOString().split('T')[0],
-            dateTo: autoRange.dateTo.toISOString().split('T')[0],
-            matchedCount,
+            dateFrom: laterRun.range.dateFrom.toISOString().split('T')[0],
+            dateTo: laterRun.range.dateTo.toISOString().split('T')[0],
+            matchedCount: laterRun.count,
           },
         });
       }
       const suggested = await getFirstSampleSuggestedRange();
-      const matchedCount = await Activity.countDocuments({
-        firstSampleRun: { $ne: true },
-        lifecycleStatus: 'active',
-        date: { $gte: suggested.dateFrom, $lte: suggested.dateTo },
-        farmerIds: { $exists: true, $ne: [] },
-      });
+      const qSuggested = buildFirstSampleRunQuery(suggested.dateFrom, suggested.dateTo);
+      const matchedCount = await Activity.countDocuments(qSuggested);
       return res.json({
         success: true,
         data: {
@@ -658,25 +673,72 @@ router.get(
   }
 );
 
-// @route   POST /api/sampling/run
-// @desc    Run sampling: first_sample (auto date range, firstSampleRun=false only) or adhoc (user date range, firstSampleRun=true only). Creates Unassigned tasks; sets Activity to Sampled/Inactive.
-// @access  Private (Team Lead, MIS Admin)
+// @route   POST /api/sampling/auto-run
+// @desc    Check config (enabled, activate-from date, threshold) and optionally run a later Run Sample. Used by cron/scheduler.
+// @access  Private (Team Lead, MIS Admin) – call with scheduler service account
 router.post(
-  '/run',
+  '/auto-run',
   requirePermission('config.sampling'),
-  [
-    body('runType').optional().isIn(['first_sample', 'adhoc']),
-    body('activityIds').optional().isArray(),
-    body('lifecycleStatus').optional().isIn(['active', 'sampled', 'inactive', 'not_eligible']),
-    body('dateFrom').optional().isISO8601(),
-    body('dateTo').optional().isISO8601(),
-    body('samplingPercentage').optional().isFloat({ min: 1, max: 100 }),
-    body('forceRun').optional().isBoolean(),
-    body('includeResults').optional().isBoolean(),
-  ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const errors = validationResult(req);
+      const authUserId = (req as any).user?._id;
+      if (!authUserId) {
+        return res.status(401).json({ success: false, error: { message: 'Unauthorized' } });
+      }
+      const config = await SamplingConfig.findOne({ key: 'default' }).lean();
+      const autoRunEnabled = (config as any)?.autoRunEnabled === true;
+      const autoRunThreshold = Number((config as any)?.autoRunThreshold ?? 200);
+      const autoRunActivateFrom = (config as any)?.autoRunActivateFrom ? new Date((config as any).autoRunActivateFrom) : null;
+
+      if (!autoRunEnabled) {
+        return res.json({ success: true, ran: false, reason: 'auto_run_disabled' });
+      }
+      if (autoRunActivateFrom) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const activateStart = new Date(autoRunActivateFrom);
+        activateStart.setHours(0, 0, 0, 0);
+        if (today < activateStart) {
+          return res.json({ success: true, ran: false, reason: 'before_activate_date', activateFrom: autoRunActivateFrom.toISOString().split('T')[0] });
+        }
+      }
+      const { count, range } = await getLaterRunEligibleCount(authUserId);
+      if (!range || count === 0) {
+        return res.json({ success: true, ran: false, reason: 'first_run_or_no_eligible', unsampledCount: count });
+      }
+      if (count < autoRunThreshold) {
+        return res.json({ success: true, ran: false, reason: 'below_threshold', unsampledCount: count, threshold: autoRunThreshold });
+      }
+      const alreadyRunning = await SamplingRun.findOne({
+        createdByUserId: authUserId,
+        runType: 'first_sample',
+        status: 'running',
+      }).lean();
+      if (alreadyRunning) {
+        return res.json({ success: true, ran: false, reason: 'run_already_in_progress' });
+      }
+      req.body = { runType: 'first_sample' };
+      return runSamplingHandler(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+const runSamplingRunValidators = [
+  body('runType').optional().isIn(['first_sample', 'adhoc']),
+  body('activityIds').optional().isArray(),
+  body('lifecycleStatus').optional().isIn(['active', 'sampled', 'inactive', 'not_eligible']),
+  body('dateFrom').optional().isISO8601(),
+  body('dateTo').optional().isISO8601(),
+  body('samplingPercentage').optional().isFloat({ min: 1, max: 100 }),
+  body('forceRun').optional().isBoolean(),
+  body('includeResults').optional().isBoolean(),
+];
+
+async function runSamplingHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
@@ -719,12 +781,7 @@ router.post(
         }
         resolvedDateFrom = rangeStart.toISOString().split('T')[0];
         resolvedDateTo = rangeEnd.toISOString().split('T')[0];
-        const q: any = {
-          firstSampleRun: { $ne: true },
-          lifecycleStatus: lifecycleStatus || 'active',
-          date: { $gte: rangeStart, $lte: rangeEnd },
-          farmerIds: { $exists: true, $ne: [] },
-        };
+        const q: any = buildFirstSampleRunQuery(rangeStart, rangeEnd, lifecycleStatus || 'active');
         matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
           .select('_id officerId officerName farmerIds')
@@ -1007,10 +1064,19 @@ router.get(
           },
         },
       });
-    } catch (error) {
-      next(error);
-    }
+  } catch (error) {
+    next(error);
   }
+}
+
+// @route   POST /api/sampling/run
+// @desc    Run sampling: first_sample (auto date range, firstSampleRun=false only) or adhoc (user date range, firstSampleRun=true only). Creates Unassigned tasks; sets Activity to Sampled/Inactive.
+// @access  Private (Team Lead, MIS Admin)
+router.post(
+  '/run',
+  requirePermission('config.sampling'),
+  runSamplingRunValidators,
+  runSamplingHandler
 );
 
 export default router;

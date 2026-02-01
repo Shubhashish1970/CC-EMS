@@ -56,6 +56,9 @@ const SamplingControlView: React.FC = () => {
   const [activityCoolingDays, setActivityCoolingDays] = useState<number>(5);
   const [farmerCoolingDays, setFarmerCoolingDays] = useState<number>(30);
   const [defaultPercentage, setDefaultPercentage] = useState<number>(10);
+  const [autoRunEnabled, setAutoRunEnabled] = useState<boolean>(false);
+  const [autoRunThreshold, setAutoRunThreshold] = useState<number>(200);
+  const [autoRunActivateFrom, setAutoRunActivateFrom] = useState<string>('');
 
   const [activityFilters, setActivityFilters] = useState(() => {
     const ytd = getPresetRange('YTD');
@@ -156,6 +159,9 @@ const SamplingControlView: React.FC = () => {
     setActivityCoolingDays(Number(cfg?.activityCoolingDays ?? 5));
     setFarmerCoolingDays(Number(cfg?.farmerCoolingDays ?? 30));
     setDefaultPercentage(Number(cfg?.defaultPercentage ?? 10));
+    setAutoRunEnabled(!!cfg?.autoRunEnabled);
+    setAutoRunThreshold(Number(cfg?.autoRunThreshold ?? 200));
+    setAutoRunActivateFrom(cfg?.autoRunActivateFrom ? (typeof cfg.autoRunActivateFrom === 'string' ? cfg.autoRunActivateFrom.split('T')[0] : new Date(cfg.autoRunActivateFrom).toISOString().split('T')[0]) : '');
   };
 
   const loadStats = async () => {
@@ -337,6 +343,9 @@ const SamplingControlView: React.FC = () => {
         activityCoolingDays,
         farmerCoolingDays,
         defaultPercentage,
+        autoRunEnabled,
+        autoRunThreshold,
+        autoRunActivateFrom: autoRunActivateFrom || null,
       });
       // Requirement: if a type is not selected, activities of that type should move to Not Eligible.
       await samplingAPI.applyEligibility(eligibleTypes);
@@ -823,6 +832,42 @@ const SamplingControlView: React.FC = () => {
                 })}
               </div>
               <p className="text-xs text-slate-500 mt-2">Current: {eligibleSummary}</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Automatic later run (cron)</p>
+              <p className="text-xs text-slate-600">When the scheduler calls POST /api/sampling/auto-run, it will run a later Run Sample only if enabled, on or after the activate-from date, and when unsampled activities ≥ threshold.</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoRunEnabled}
+                  onChange={(e) => setAutoRunEnabled(e.target.checked)}
+                  className="rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                />
+                <span className="text-sm font-bold text-slate-800">Enable auto-run</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run when unsampled ≥</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={autoRunThreshold}
+                    onChange={(e) => setAutoRunThreshold(Number(e.target.value) || 200)}
+                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Activate from date</label>
+                  <input
+                    type="date"
+                    value={autoRunActivateFrom}
+                    onChange={(e) => setAutoRunActivateFrom(e.target.value)}
+                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Leave empty to allow runs immediately when enabled</p>
+                </div>
+              </div>
             </div>
           </div>
 
