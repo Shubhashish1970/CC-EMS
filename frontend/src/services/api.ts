@@ -754,6 +754,39 @@ export type EmsDrilldownGroupBy = 'state' | 'territory' | 'zone' | 'bu' | 'activ
 
 export type EmsReportGroupBy = 'tm' | 'fda' | 'bu' | 'zone' | 'region' | 'territory';
 
+export type EmsTrendBucket = 'daily' | 'weekly' | 'monthly';
+
+export interface EmsTrendRow {
+  period: string;
+  totalAttempted: number;
+  totalConnected: number;
+  emsScore: number;
+  mobileValidityPct: number;
+  meetingValidityPct: number;
+  meetingConversionPct: number;
+  purchaseIntentionPct: number;
+}
+
+export interface EmsReportSummaryRow {
+  groupKey: string;
+  groupLabel: string;
+  totalAttempted: number;
+  totalConnected: number;
+  invalidCount: number;
+  identityWrongCount: number;
+  notAFarmerCount: number;
+  yesAttendedCount: number;
+  purchasedCount: number;
+  willingYesCount: number;
+  mobileValidityPct: number;
+  hygienePct: number;
+  meetingValidityPct: number;
+  meetingConversionPct: number;
+  purchaseIntentionPct: number;
+  emsScore: number;
+  relativeRemarks: string;
+}
+
 export interface EmsProgressFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -911,6 +944,39 @@ export const reportsAPI = {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
+  },
+  /** EMS report JSON: groupBy, level summary|line, + filters */
+  getEmsReport: async (
+    groupBy: EmsReportGroupBy,
+    level: 'summary' | 'line' = 'summary',
+    filters?: EmsProgressFilters
+  ) => {
+    const params = new URLSearchParams();
+    params.append('groupBy', groupBy);
+    params.append('level', level);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: EmsReportSummaryRow[] }>(`/reports/ems?${query}`);
+  },
+  /** EMS trends: bucket daily|weekly|monthly, + filters */
+  getEmsTrends: async (bucket: EmsTrendBucket, filters?: EmsProgressFilters) => {
+    const params = new URLSearchParams();
+    params.append('bucket', bucket);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters?.state) params.append('state', filters.state);
+    if (filters?.territory) params.append('territory', filters.territory);
+    if (filters?.zone) params.append('zone', filters.zone);
+    if (filters?.bu) params.append('bu', filters.bu);
+    if (filters?.activityType) params.append('activityType', filters.activityType);
+    const query = params.toString();
+    return apiRequest<{ success: boolean; data: EmsTrendRow[] }>(`/reports/ems/trends?${query}`);
   },
   /** EMS report Excel: groupBy (tm|fda|bu|zone|region|territory), level summary|line, + filters */
   downloadEmsReportExport: async (

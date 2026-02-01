@@ -7,9 +7,11 @@ import { getEmsProgress, getEmsDrilldown, type EmsDrilldownGroupBy } from '../se
 import {
   getEmsReportSummary,
   getEmsReportLineLevel,
+  getEmsReportTrends,
   type EmsReportGroupBy,
   type EmsReportSummaryRow,
   type EmsReportLineRow,
+  type EmsTrendBucket,
 } from '../services/emsReportService.js';
 import * as XLSX from 'xlsx';
 
@@ -156,6 +158,32 @@ router.get(
         level === 'line'
           ? await getEmsReportLineLevel(filters, groupBy)
           : await getEmsReportSummary(filters, groupBy);
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/reports/ems/trends
+ * EMS trends: time-series by period. Query: bucket=daily|weekly|monthly (required), + filters.
+ */
+router.get(
+  '/ems/trends',
+  [
+    ...filterValidators,
+    query('bucket').isIn(['daily', 'weekly', 'monthly']).withMessage('Invalid bucket'),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, error: { message: 'Validation failed', errors: errors.array() } });
+      }
+      const filters = parseFilters(req);
+      const bucket = req.query.bucket as EmsTrendBucket;
+      const rows = await getEmsReportTrends(filters, bucket);
       res.json({ success: true, data: rows });
     } catch (err) {
       next(err);

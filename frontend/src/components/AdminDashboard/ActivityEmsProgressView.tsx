@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { kpiAPI, reportsAPI, type EmsProgressFilters, type EmsProgressSummary, type EmsDrilldownRow, type EmsDrilldownGroupBy, type EmsReportGroupBy } from '../../services/api';
+import {
+  kpiAPI,
+  reportsAPI,
+  type EmsProgressFilters,
+  type EmsProgressSummary,
+  type EmsReportGroupBy,
+  type EmsReportSummaryRow,
+  type EmsTrendRow,
+  type EmsTrendBucket,
+} from '../../services/api';
 import {
   BarChart3,
   Filter,
@@ -12,8 +21,14 @@ import {
   Clock,
   Target,
   Loader2,
-  ChevronDown,
   List,
+  TrendingUp,
+  Phone,
+  PhoneOff,
+  MessageCircle,
+  ShoppingCart,
+  FileBarChart,
+  Calendar,
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
@@ -28,20 +43,23 @@ type DateRangePreset =
   | 'Last 28 days'
   | 'Last 30 days';
 
-const GROUP_BY_OPTIONS: { value: EmsDrilldownGroupBy; label: string }[] = [
-  { value: 'state', label: 'By State' },
-  { value: 'territory', label: 'By Territory' },
-  { value: 'zone', label: 'By Zone' },
-  { value: 'bu', label: 'By BU' },
-  { value: 'activityType', label: 'By Activity Type' },
-];
-
 const EMS_REPORT_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
   { value: 'fda', label: 'By FDA' },
   { value: 'territory', label: 'By Territory' },
   { value: 'region', label: 'By Region' },
   { value: 'zone', label: 'By Zone' },
   { value: 'bu', label: 'By BU' },
+  { value: 'tm', label: 'By TM' },
+];
+
+const TREND_BUCKET_OPTIONS: { value: EmsTrendBucket; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+const DETAIL_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
+  { value: 'fda', label: 'By FDA' },
   { value: 'tm', label: 'By TM' },
 ];
 
@@ -115,7 +133,12 @@ function formatPretty(iso: string): string {
 const ActivityEmsProgressView: React.FC = () => {
   const { showError, showSuccess } = useToast();
   const [summary, setSummary] = useState<EmsProgressSummary | null>(null);
-  const [drilldown, setDrilldown] = useState<EmsDrilldownRow[]>([]);
+  const [emsDetailRows, setEmsDetailRows] = useState<EmsReportSummaryRow[]>([]);
+  const [emsTrends, setEmsTrends] = useState<EmsTrendRow[]>([]);
+  const [trendBucket, setTrendBucket] = useState<EmsTrendBucket>('weekly');
+  const [detailGroupBy, setDetailGroupBy] = useState<EmsReportGroupBy>('fda');
+  const [isLoadingEmsDetail, setIsLoadingEmsDetail] = useState(false);
+  const [isLoadingEmsTrends, setIsLoadingEmsTrends] = useState(false);
   const [filterOptions, setFilterOptions] = useState<{
     stateOptions: string[];
     territoryOptions: string[];
@@ -124,7 +147,6 @@ const ActivityEmsProgressView: React.FC = () => {
     activityTypeOptions: string[];
   }>({ stateOptions: [], territoryOptions: [], zoneOptions: [], buOptions: [], activityTypeOptions: [] });
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [isLoadingDrilldown, setIsLoadingDrilldown] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingTaskDetails, setIsExportingTaskDetails] = useState(false);
@@ -132,7 +154,6 @@ const ActivityEmsProgressView: React.FC = () => {
   const [emsReportGroupBy, setEmsReportGroupBy] = useState<EmsReportGroupBy>('fda');
   const [emsReportLevel, setEmsReportLevel] = useState<'summary' | 'line'>('summary');
   const [showFilters, setShowFilters] = useState(false);
-  const [groupBy, setGroupBy] = useState<EmsDrilldownGroupBy>('state');
   const defaultRange = getDefaultDateRange();
   const [filters, setFilters] = useState<EmsProgressFilters>({
     dateFrom: defaultRange.dateFrom,
@@ -202,19 +223,33 @@ const ActivityEmsProgressView: React.FC = () => {
     }
   }, [filters, showError]);
 
-  const fetchDrilldown = useCallback(async () => {
-    setIsLoadingDrilldown(true);
+  const fetchEmsDetail = useCallback(async () => {
+    setIsLoadingEmsDetail(true);
     try {
-      const res = await kpiAPI.getEmsDrilldown(groupBy, filters);
-      if (res.success && res.data) setDrilldown(res.data);
-      else setDrilldown([]);
+      const res = await reportsAPI.getEmsReport(detailGroupBy, 'summary', filters);
+      if (res.success && res.data) setEmsDetailRows(res.data);
+      else setEmsDetailRows([]);
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Failed to load drilldown');
-      setDrilldown([]);
+      showError(e instanceof Error ? e.message : 'Failed to load EMS detail');
+      setEmsDetailRows([]);
     } finally {
-      setIsLoadingDrilldown(false);
+      setIsLoadingEmsDetail(false);
     }
-  }, [groupBy, filters, showError]);
+  }, [detailGroupBy, filters, showError]);
+
+  const fetchEmsTrends = useCallback(async () => {
+    setIsLoadingEmsTrends(true);
+    try {
+      const res = await reportsAPI.getEmsTrends(trendBucket, filters);
+      if (res.success && res.data) setEmsTrends(res.data);
+      else setEmsTrends([]);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to load trends');
+      setEmsTrends([]);
+    } finally {
+      setIsLoadingEmsTrends(false);
+    }
+  }, [trendBucket, filters, showError]);
 
   useEffect(() => {
     fetchOptions();
@@ -225,8 +260,12 @@ const ActivityEmsProgressView: React.FC = () => {
   }, [fetchSummary]);
 
   useEffect(() => {
-    fetchDrilldown();
-  }, [fetchDrilldown]);
+    fetchEmsDetail();
+  }, [fetchEmsDetail]);
+
+  useEffect(() => {
+    fetchEmsTrends();
+  }, [fetchEmsTrends]);
 
   const handleEmsReportDownload = async () => {
     setIsExporting(true);
@@ -289,11 +328,11 @@ const ActivityEmsProgressView: React.FC = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => { fetchSummary(); fetchDrilldown(); fetchOptions(); }}
-            disabled={isLoadingSummary || isLoadingDrilldown}
+            onClick={() => { fetchSummary(); fetchEmsDetail(); fetchEmsTrends(); fetchOptions(); }}
+            disabled={isLoadingSummary || isLoadingEmsDetail || isLoadingEmsTrends}
             className="flex items-center gap-2"
           >
-            {isLoadingSummary || isLoadingDrilldown ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {isLoadingSummary || isLoadingEmsDetail || isLoadingEmsTrends ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Refresh
           </Button>
           <Button
@@ -307,14 +346,14 @@ const ActivityEmsProgressView: React.FC = () => {
             EMS report
           </Button>
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             onClick={handleExportTaskDetails}
             disabled={isExportingTaskDetails}
             className="flex items-center gap-2"
           >
             {isExportingTaskDetails ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Export task details (Excel)
+            Export Task Details
           </Button>
         </div>
       </div>
@@ -471,65 +510,73 @@ const ActivityEmsProgressView: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {/* Visual KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {isLoadingSummary ? (
           <div className="col-span-full flex items-center justify-center py-12">
             <Loader2 className="animate-spin text-lime-600" size={32} />
           </div>
         ) : summary ? (
           <>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <ActivityIcon size={16} />
-                <span className="text-xs font-medium">Activities</span>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <ActivityIcon className="text-slate-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-slate-800">{summary.activities.total}</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Sampled: {summary.activities.sampledCount} · Not: {summary.activities.notSampledCount} · Partial: {summary.activities.partialCount}
-              </p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Activities</p>
+                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.activities.total}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Sampled: {summary.activities.sampledCount} · Partial: {summary.activities.partialCount}</p>
+              </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <Target size={16} />
-                <span className="text-xs font-medium">Tasks</span>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                <Target className="text-blue-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-slate-800">{summary.tasks.total}</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Completed: {summary.tasks.completed} · Queue: {(summary.tasks.sampled_in_queue || 0) + (summary.tasks.unassigned || 0)}
-              </p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tasks</p>
+                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.total}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Completed: {summary.tasks.completed} · Queue: {(summary.tasks.sampled_in_queue || 0) + (summary.tasks.unassigned || 0)}</p>
+              </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <CheckCircle size={16} />
-                <span className="text-xs font-medium">Completion</span>
+            <div className="bg-white rounded-xl border border-slate-200 border-l-4 border-l-lime-500 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-lime-50 flex items-center justify-center shrink-0">
+                <CheckCircle className="text-lime-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-lime-600">{summary.tasks.completionRatePct}%</p>
-              <p className="text-xs text-slate-400 mt-1">Task completion rate</p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completion</p>
+                <p className="text-2xl font-bold text-lime-600 mt-0.5">{summary.tasks.completionRatePct}%</p>
+                <p className="text-[11px] text-slate-400 mt-1">Task completion rate</p>
+              </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <Users size={16} />
-                <span className="text-xs font-medium">Farmers</span>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                <Users className="text-amber-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-slate-800">{summary.farmers.totalInActivities}</p>
-              <p className="text-xs text-slate-400 mt-1">Sampled: {summary.farmers.sampled}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Farmers</p>
+                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.farmers.totalInActivities}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Sampled: {summary.farmers.sampled}</p>
+              </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <Clock size={16} />
-                <span className="text-xs font-medium">In Progress</span>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+                <Clock className="text-violet-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-slate-800">{summary.tasks.in_progress}</p>
-              <p className="text-xs text-slate-400 mt-1">Tasks in progress</p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">In Progress</p>
+                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.in_progress}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Tasks in progress</p>
+              </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-500 mb-1">
-                <List size={16} />
-                <span className="text-xs font-medium">Unassigned</span>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <List className="text-slate-600" size={20} />
               </div>
-              <p className="text-2xl font-bold text-slate-800">{summary.tasks.unassigned || 0}</p>
-              <p className="text-xs text-slate-400 mt-1">Awaiting allocation</p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Unassigned</p>
+                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.unassigned || 0}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Awaiting allocation</p>
+              </div>
             </div>
           </>
         ) : (
@@ -537,58 +584,137 @@ const ActivityEmsProgressView: React.FC = () => {
         )}
       </div>
 
-      {/* Drill-down - no overflow-hidden so Group by dropdown shows all options (not clipped) */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+      {/* Trend: shift in the needle */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-200 bg-slate-50">
-          <h3 className="font-semibold text-slate-800">Drill-down</h3>
-          <div className="flex items-center gap-2 relative z-10">
-            <span className="text-sm text-slate-500">Group by</span>
-            <div className="min-w-[240px] w-64">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="text-lime-600" size={20} />
+            <h3 className="font-semibold text-slate-800">Trend over time</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {TREND_BUCKET_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setTrendBucket(opt.value)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  trendBucket === opt.value ? 'bg-lime-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-4">
+          {isLoadingEmsTrends ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin text-lime-600" size={28} />
+            </div>
+          ) : emsTrends.length === 0 ? (
+            <p className="text-center py-8 text-slate-500 text-sm">No trend data for current filters. Complete some calls in the date range.</p>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <FileBarChart size={14} /> EMS Score
+                </p>
+                <div className="flex items-end gap-1 h-24">
+                  {emsTrends.map((r) => {
+                    const max = Math.max(...emsTrends.map((x) => x.emsScore), 1);
+                    const h = max > 0 ? (r.emsScore / max) * 80 : 0;
+                    return (
+                      <div key={r.period} className="flex-1 min-w-0 flex flex-col items-center gap-1" title={`${r.period}: ${r.emsScore}`}>
+                        <div className="w-full bg-lime-100 rounded-t flex-1 min-h-[4px] flex flex-col justify-end">
+                          <div className="bg-lime-500 rounded-t transition-all" style={{ height: `${h}px` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-500 truncate w-full text-center">{r.period}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Phone size={14} /> Connected calls
+                </p>
+                <div className="flex items-end gap-1 h-20">
+                  {emsTrends.map((r) => {
+                    const max = Math.max(...emsTrends.map((x) => x.totalConnected), 1);
+                    const h = max > 0 ? (r.totalConnected / max) * 64 : 0;
+                    return (
+                      <div key={r.period} className="flex-1 min-w-0 flex flex-col items-center gap-1" title={`${r.period}: ${r.totalConnected}`}>
+                        <div className="w-full bg-blue-100 rounded-t flex-1 min-h-[4px] flex flex-col justify-end">
+                          <div className="bg-blue-500 rounded-t transition-all" style={{ height: `${h}px` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-500 truncate w-full text-center">{r.period}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* EMS metrics detail – drill by FDA / TM */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="text-slate-600" size={20} />
+            <h3 className="font-semibold text-slate-800">EMS metrics detail</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500">Drill by</span>
+            <div className="min-w-[160px]">
               <StyledSelect
-                value={groupBy}
-                onChange={(v) => setGroupBy(v as EmsDrilldownGroupBy)}
-                options={GROUP_BY_OPTIONS}
-                placeholder="Group by"
+                value={detailGroupBy}
+                onChange={(v) => setDetailGroupBy(v as EmsReportGroupBy)}
+                options={DETAIL_GROUP_BY_OPTIONS}
+                placeholder="Drill by"
               />
             </div>
           </div>
         </div>
         <div className="overflow-x-auto">
-          {isLoadingDrilldown ? (
+          {isLoadingEmsDetail ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-lime-600" size={28} />
             </div>
-          ) : drilldown.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">No drill-down data for current filters.</div>
+          ) : emsDetailRows.length === 0 ? (
+            <p className="text-center py-12 text-slate-500 text-sm">No EMS detail for current filters. Apply filters and ensure completed calls exist.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-100 text-left text-slate-600 font-medium">
                   <th className="px-4 py-3">Group</th>
-                  <th className="px-4 py-3 text-right">Activities</th>
-                  <th className="px-4 py-3 text-right">Sampled</th>
-                  <th className="px-4 py-3 text-right">Tasks</th>
-                  <th className="px-4 py-3 text-right">Completed</th>
-                  <th className="px-4 py-3 text-right">Completion %</th>
-                  <th className="px-4 py-3 text-right">Farmers</th>
-                  <th className="px-4 py-3 text-right">Farmers Sampled</th>
+                  <th className="px-4 py-3 text-right">Attempted</th>
+                  <th className="px-4 py-3 text-right">Connected</th>
+                  <th className="px-4 py-3 text-right">Mobile validity %</th>
+                  <th className="px-4 py-3 text-right">Meeting validity %</th>
+                  <th className="px-4 py-3 text-right">Meeting conversion %</th>
+                  <th className="px-4 py-3 text-right">Purchase intention %</th>
+                  <th className="px-4 py-3 text-right">EMS Score</th>
+                  <th className="px-4 py-3 max-w-[200px]">Relative remarks</th>
                 </tr>
               </thead>
               <tbody>
-                {drilldown.map((row) => (
-                  <tr key={row.key} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">{row.label || '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.activitiesTotal}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.activitiesSampled}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.tasksTotal}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.tasksCompleted}</td>
+                {emsDetailRows.map((row) => (
+                  <tr key={row.groupKey} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">{row.groupLabel || '—'}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.totalAttempted}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.totalConnected}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.mobileValidityPct}%</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.meetingValidityPct}%</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.meetingConversionPct}%</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{row.purchaseIntentionPct}%</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={row.completionRatePct >= 70 ? 'text-lime-600 font-medium' : row.completionRatePct >= 40 ? 'text-amber-600' : 'text-slate-600'}>
-                        {row.completionRatePct}%
+                      <span className={row.emsScore >= 70 ? 'text-lime-600 font-semibold' : row.emsScore >= 50 ? 'text-amber-600' : 'text-slate-700'}>
+                        {row.emsScore}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.farmersTotal}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.farmersSampled}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs max-w-[200px] truncate" title={row.relativeRemarks}>{row.relativeRemarks || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -598,7 +724,7 @@ const ActivityEmsProgressView: React.FC = () => {
       </div>
 
       <p className="text-xs text-slate-500">
-        For a detailed activity list with the same filters, use the <strong>Activity Monitoring</strong> tab and apply the same date range and filters there.
+        For a detailed activity list with the same filters, use the <strong>Activity Monitoring</strong> tab. Use <strong>EMS report</strong> to export by FDA, Territory, Region, Zone, BU, or TM.
       </p>
 
       {/* EMS Report download modal */}

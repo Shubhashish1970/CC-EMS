@@ -353,3 +353,127 @@ export async function getEmsReportLineLevel(
 
   return rows;
 }
+
+export type EmsTrendBucket = 'daily' | 'weekly' | 'monthly';
+
+export interface EmsTrendRow {
+  period: string;
+  totalAttempted: number;
+  totalConnected: number;
+  emsScore: number;
+  mobileValidityPct: number;
+  meetingValidityPct: number;
+  meetingConversionPct: number;
+  purchaseIntentionPct: number;
+}
+
+/**
+ * EMS trends: time-series of NBU-level metrics by period (daily, weekly, monthly).
+ * Uses activity.date for bucketing. Same filters as EMS report.
+ */
+export async function getEmsReportTrends(
+  filters: EmsProgressFilters | undefined,
+  bucket: EmsTrendBucket
+): Promise<EmsTrendRow[]> {
+  const activityMatch = buildActivityMatch(filters);
+  const activityCollection = Activity.collection.name;
+
+  const activityIds = await Activity.find(activityMatch as any).select('_id').lean();
+  const ids = activityIds.map((a: any) => a._id);
+  if (ids.length === 0) return [];
+
+  const dateFormat =
+    bucket === 'monthly' ? '%Y-%m' : bucket === 'weekly' ? '%G-W%V' : '%Y-%m-%d';
+
+  const agg = await CallTask.aggregate([
+    {
+      $match: {
+        status: 'completed',
+        callLog: { $exists: true, $ne: null },
+        activityId: { $in: ids },
+      },
+    },
+    {
+      $lookup: {
+        from: activityCollection,
+        localField: 'activityId',
+        foreignField: '_id',
+        as: 'activity',
+      },
+    },
+    { $unwind: '$activity' },
+    {
+      $addFields: {
+        __period: { $dateToString: { format: dateFormat, date: '$activity.date' } },
+        __isConnected: {
+          $and: [
+            { $eq: ['$callLog.callStatus', 'Connected'] },
+            {
+              $or: [
+                { $and: [{ $ne: ['$callLog.didAttend', null] }, { $ne: [{ $type: '$callLog.didAttend' }, 'missing'] }] },
+                { $eq: ['$callLog.hasPurchased', true] },
+                { $eq: ['$callLog.willingToPurchase', true] },
+              ],
+            },
+          ],
+        },
+        __isInvalid: { $in: ['$callLog.callStatus', ['Invalid', 'Invalid Number']] },
+        __identityWrong: { $eq: ['$callLog.didAttend', 'Identity Wrong'] },
+        __notAFarmer: { $eq: ['$callLog.didAttend', 'Not a Farmer'] },
+        __yesAttended: { $eq: ['$callLog.didAttend', 'Yes, I attended'] },
+        __purchased: { $eq: ['$callLog.hasPurchased', true] },
+        __willingYes: { $eq: ['$callLog.willingToPurchase', true] },
+      },
+    },
+    {
+      $group: {
+        _id: '$__period',
+        totalAttempted: { $sum: 1 },
+        totalConnected: { $sum: { $cond: ['$__isConnected', 1, 0] } },
+        invalidCount: { $sum: { $cond: ['$__isInvalid', 1, 0] } },
+        identityWrongCount: { $sum: { $cond: ['$__identityWrong', 1, 0] } },
+        notAFarmerCount: { $sum: { $cond: ['$__notAFarmer', 1, 0] } },
+        yesAttendedCount: { $sum: { $cond: ['$__yesAttended', 1, 0] } },
+        purchasedCount: { $sum: { $cond: ['$__purchased', 1, 0] } },
+        willingYesCount: { $sum: { $cond: ['$__willingYes', 1, 0] } },
+      },
+    },
+  ]).exec();
+
+  const rows: EmsTrendRow[] = [];
+  for (const row of agg) {
+    const period = row._id != null ? String(row._id) : '—';
+    const totalAttempted = Number(row.totalAttempted || 0);
+    const totalConnected = Number(row.totalConnected || 0);
+    const invalidCount = Number(row.invalidCount || 0);
+    const identityWrongCount = Number(row.identityWrongCount || 0);
+    const notAFarmerCount = Number(row.notAFarmerCount || 0);
+    const yesAttendedCount = Number(row.yesAttendedCount || 0);
+    const purchasedCount = Number(row.purchasedCount || 0);
+    const willingYesCount = Number(row.willingYesCount || 0);
+
+    const mobileValidityPct =
+      totalAttempted > 0 ? Math.round(((totalAttempted - invalidCount) / totalAttempted) * 100) : 0;
+    const meetingValidityPct = totalConnected > 0 ? Math.round((yesAttendedCount / totalConnected) * 100) : 0;
+    const meetingConversionPct = totalConnected > 0 ? Math.round((purchasedCount / totalConnected) * 100) : 0;
+    const purchaseIntentionPct =
+      totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
+    const emsScore = Math.round(
+      (mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4
+    );
+
+    rows.push({
+      period,
+      totalAttempted,
+      totalConnected,
+      emsScore,
+      mobileValidityPct,
+      meetingValidityPct,
+      meetingConversionPct,
+      purchaseIntentionPct,
+    });
+  }
+
+  rows.sort((a, b) => a.period.localeCompare(b.period));
+  return rows;
+}
