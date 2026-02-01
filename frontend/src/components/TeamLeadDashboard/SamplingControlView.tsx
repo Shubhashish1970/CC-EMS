@@ -55,10 +55,13 @@ const SamplingControlView: React.FC = () => {
   const [farmerCoolingDays, setFarmerCoolingDays] = useState<number>(30);
   const [defaultPercentage, setDefaultPercentage] = useState<number>(10);
 
-  const [activityFilters, setActivityFilters] = useState({
-    lifecycleStatus: 'active' as LifecycleStatus,
-    dateFrom: '',
-    dateTo: '',
+  const [activityFilters, setActivityFilters] = useState(() => {
+    const ytd = getPresetRange('YTD');
+    return {
+      lifecycleStatus: 'active' as LifecycleStatus,
+      dateFrom: ytd.start,
+      dateTo: ytd.end,
+    };
   });
 
   /** first_sample = auto date range (or manual for very first run); adhoc = user picks date range */
@@ -69,12 +72,23 @@ const SamplingControlView: React.FC = () => {
   // Date range dropdown (same UX as Admin Activity Sampling)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Custom');
+  const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('YTD');
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
 
   const getRange = (preset: DateRangePreset) =>
     getPresetRange(preset, activityFilters.dateFrom || undefined, activityFilters.dateTo || undefined);
+
+  /** When Run Sample (auto) is selected and no date range is set, use YTD so KPIs and table show YTD data. */
+  const effectiveDateRange = useMemo(() => {
+    if (runType === 'first_sample' && (!activityFilters.dateFrom || !activityFilters.dateTo)) {
+      return getPresetRange('YTD');
+    }
+    return {
+      start: activityFilters.dateFrom || '',
+      end: activityFilters.dateTo || '',
+    };
+  }, [runType, activityFilters.dateFrom, activityFilters.dateTo]);
 
   const syncDraftFromFilters = () => {
     setDraftStart(activityFilters.dateFrom || '');
@@ -144,8 +158,8 @@ const SamplingControlView: React.FC = () => {
 
   const loadStats = async () => {
     const res: any = await samplingAPI.getStats({
-      dateFrom: activityFilters.dateFrom || undefined,
-      dateTo: activityFilters.dateTo || undefined,
+      dateFrom: effectiveDateRange.start || undefined,
+      dateTo: effectiveDateRange.end || undefined,
     });
     setStats(res?.data || null);
   };
@@ -203,7 +217,10 @@ const SamplingControlView: React.FC = () => {
       setIsFirstSampleRun(d?.isFirstRun === true);
       if (d?.dateFrom && d?.dateTo) {
         setFirstSampleRange({ dateFrom: d.dateFrom, dateTo: d.dateTo });
-        setActivityFilters((prev) => ({ ...prev, dateFrom: d.dateFrom, dateTo: d.dateTo }));
+        const fromStr = typeof d.dateFrom === 'string' ? d.dateFrom.split('T')[0] : d.dateFrom;
+        const toStr = typeof d.dateTo === 'string' ? d.dateTo.split('T')[0] : d.dateTo;
+        setSelectedPreset('Custom');
+        setActivityFilters((prev) => ({ ...prev, dateFrom: fromStr, dateTo: toStr }));
       }
     }).catch(() => { setFirstSampleRange(null); setIsFirstSampleRun(false); });
   }, [runType]);
@@ -292,7 +309,7 @@ const SamplingControlView: React.FC = () => {
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo]);
+  }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo, runType]);
 
   // When switching to Run Sample (auto), close the date picker so Lifecycle/Date Range are clearly Ad-hoc only
   useEffect(() => {
@@ -359,6 +376,12 @@ const SamplingControlView: React.FC = () => {
         dateFrom: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateFrom || undefined) : undefined,
         dateTo: (runType === 'adhoc' || runType === 'first_sample') ? (activityFilters.dateTo || undefined) : undefined,
       });
+      if (runType === 'first_sample' && res?.data?.dateFrom && res?.data?.dateTo) {
+        const fromStr = typeof res.data.dateFrom === 'string' ? res.data.dateFrom.split('T')[0] : res.data.dateFrom;
+        const toStr = typeof res.data.dateTo === 'string' ? res.data.dateTo.split('T')[0] : res.data.dateTo;
+        setSelectedPreset('Custom');
+        setActivityFilters((prev) => ({ ...prev, dateFrom: fromStr, dateTo: toStr }));
+      }
       toast.showSuccess(
         `Sampling done. Matched: ${res?.data?.matched ?? 0}, Processed: ${res?.data?.processed ?? 0}, Tasks created: ${res?.data?.tasksCreatedTotal ?? 0}`
       );
@@ -375,6 +398,12 @@ const SamplingControlView: React.FC = () => {
           for (let i = 0; i < 180; i++) { // ~6 minutes max
             const run = await loadLatestRunStatus();
             if (run && run.status !== 'running') {
+              if (run.runType === 'first_sample' && run.filters?.dateFrom != null && run.filters?.dateTo != null) {
+                const fromStr = typeof run.filters.dateFrom === 'string' ? run.filters.dateFrom.split('T')[0] : new Date(run.filters.dateFrom).toISOString().split('T')[0];
+                const toStr = typeof run.filters.dateTo === 'string' ? run.filters.dateTo.split('T')[0] : new Date(run.filters.dateTo).toISOString().split('T')[0];
+                setSelectedPreset('Custom');
+                setActivityFilters((prev) => ({ ...prev, dateFrom: fromStr, dateTo: toStr }));
+              }
               await loadStats();
               await loadUnassigned();
               return;
@@ -729,8 +758,8 @@ const SamplingControlView: React.FC = () => {
             <h3 className="text-lg font-black text-slate-900">Sampling Dashboard</h3>
             <p className="text-sm text-slate-600 break-words">
               Quick view by activity type for the selected date range
-              {activityFilters.dateFrom && activityFilters.dateTo
-                ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
+              {effectiveDateRange.start && effectiveDateRange.end
+                ? ` • ${formatPretty(effectiveDateRange.start)} - ${formatPretty(effectiveDateRange.end)}`
                 : ''}
             </p>
           </div>
@@ -832,7 +861,27 @@ const SamplingControlView: React.FC = () => {
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run type</label>
             <StyledSelect
               value={runType}
-              onChange={(value) => setRunType(value as 'first_sample' | 'adhoc')}
+              onChange={(value) => {
+                const next = value as 'first_sample' | 'adhoc';
+                setRunType(next);
+                const ytd = getPresetRange('YTD');
+                setSelectedPreset('YTD');
+                if (next === 'first_sample') {
+                  setActivityFilters((prev) => ({
+                    ...prev,
+                    lifecycleStatus: 'active',
+                    dateFrom: ytd.start,
+                    dateTo: ytd.end,
+                  }));
+                } else {
+                  setActivityFilters((prev) => ({
+                    ...prev,
+                    lifecycleStatus: 'sampled',
+                    dateFrom: ytd.start,
+                    dateTo: ytd.end,
+                  }));
+                }
+              }}
               options={[
                 { value: 'first_sample', label: isFirstSampleRun ? 'First sample (auto date range)' : 'Run Sample (auto date range)' },
                 { value: 'adhoc', label: 'Ad-hoc (pick date range)' },
@@ -890,9 +939,11 @@ const SamplingControlView: React.FC = () => {
                 `}
               >
                 <span className="truncate text-sm font-medium text-slate-900">
-                  {selectedPreset}
-                  {activityFilters.dateFrom && activityFilters.dateTo
-                    ? ` • ${formatPretty(activityFilters.dateFrom)} - ${formatPretty(activityFilters.dateTo)}`
+                  {runType === 'first_sample' && (!activityFilters.dateFrom || !activityFilters.dateTo)
+                    ? 'YTD'
+                    : selectedPreset}
+                  {effectiveDateRange.start && effectiveDateRange.end
+                    ? ` • ${formatPretty(effectiveDateRange.start)} - ${formatPretty(effectiveDateRange.end)}`
                     : ''}
                 </span>
                 <ChevronDown
