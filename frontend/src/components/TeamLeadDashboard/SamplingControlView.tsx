@@ -631,24 +631,26 @@ const SamplingControlView: React.FC = () => {
               </div>
               <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
                 <li><strong>Activities:</strong> Only <strong>Active</strong> activities that have <strong>never been sampled</strong>.</li>
-                <li><strong>Date range:</strong> Chosen automatically — first run: earliest to latest activity date; later runs: last run end date (inclusive) to today, so no activity is missed.</li>
-                <li>Lifecycle and date are fixed by the system; you do not select them.</li>
-                <li>Tasks are created only for farmers not already sampled for that activity (same farmer is not sampled again).</li>
+                <li><strong>Date range:</strong> Chosen automatically — first run: earliest to latest activity date; later runs: last run end date (inclusive) to today.</li>
+                <li><strong>Lifecycle:</strong> Fixed by the system; you do not select it.</li>
+                <li><strong>Tasks:</strong> Created only for farmers not already sampled for that activity (same farmer is not sampled again).</li>
               </ul>
             </>
           )}
           {runConfirmType === 'adhoc' && (
             <>
               <p className="text-sm font-bold text-slate-800">Run Ad-hoc sample</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1 text-sm text-slate-800">
+                <p><strong>Date range for this run:</strong> {formatPretty(activityFilters.dateFrom)} – {formatPretty(activityFilters.dateTo)}</p>
+                <p><strong>Activities that will be sampled:</strong> {totalMatchingByLifecycle}</p>
+                <p><strong>Lifecycle:</strong> {activityFilters.lifecycleStatus}</p>
+              </div>
               <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
                 <li><strong>Activities:</strong> All activities in your selected <strong>Lifecycle</strong> and <strong>Date range</strong> (Active, Sampled, Inactive, or Not Eligible). Already-sampled activities are included.</li>
                 <li><strong>Date range:</strong> Your selected start and end date.</li>
                 <li><strong>Lifecycle:</strong> Your selected lifecycle.</li>
-                <li>Tasks are created only for farmers who do not already have a task for that activity (same farmer is not sampled again).</li>
+                <li><strong>Tasks:</strong> Created only for farmers not already sampled for that activity (same farmer is not sampled again).</li>
               </ul>
-              <p className="text-xs text-slate-600">
-                Current: <strong>{activityFilters.lifecycleStatus}</strong> • {formatPretty(activityFilters.dateFrom)} – {formatPretty(activityFilters.dateTo)} • <strong>{totalMatchingByLifecycle}</strong> in range
-              </p>
             </>
           )}
           <div className="flex items-center justify-end gap-3 pt-2">
