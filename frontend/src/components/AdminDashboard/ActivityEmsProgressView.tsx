@@ -478,35 +478,30 @@ const ActivityEmsProgressView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center">
+      {/* Header - aligned with Activity Monitoring layout and controls */}
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm min-w-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center shrink-0">
               <BarChart3 className="text-slate-600" size={22} />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-black text-slate-900 mb-1">Activity EMS Dashboard</h2>
               <p className="text-sm text-slate-600">Visual EMS metrics, drill-down by group, and trends (Totals)</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 shrink-0">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</label>
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 shrink-0">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</span>
               <StyledSelect
                 value={groupBy}
                 onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
                 options={GROUP_BY_OPTIONS}
                 placeholder="Group by"
-                className="min-w-[140px]"
+                className="min-w-[120px]"
               />
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2"
-            >
+            <Button variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)}>
               <Filter size={16} />
               {showFilters ? 'Hide filters' : 'Filters'}
             </Button>
@@ -515,7 +510,6 @@ const ActivityEmsProgressView: React.FC = () => {
               size="sm"
               onClick={() => { fetchEmsDetail(); fetchEmsTrends(); fetchOptions(); }}
               disabled={isLoadingEmsDetail || isLoadingEmsTrends}
-              className="flex items-center gap-2"
             >
               {isLoadingEmsDetail || isLoadingEmsTrends ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
               Refresh
@@ -525,21 +519,14 @@ const ActivityEmsProgressView: React.FC = () => {
               size="sm"
               onClick={() => setShowEmsReportModal(true)}
               disabled={isExporting}
-              className="flex items-center gap-2"
             >
-            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            EMS report
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportTaskDetails}
-            disabled={isExportingTaskDetails}
-            className="flex items-center gap-2"
-          >
-            {isExportingTaskDetails ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Export Task Details
-          </Button>
+              {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              EMS report
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExportTaskDetails} disabled={isExportingTaskDetails}>
+              {isExportingTaskDetails ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Export Task Details
+            </Button>
           </div>
         </div>
       </div>
@@ -702,28 +689,28 @@ const ActivityEmsProgressView: React.FC = () => {
                 <div
                   key={label}
                   ref={kpiTooltipOpen === label ? kpiTooltipRef : undefined}
-                  className={`rounded-xl border p-3 flex items-stretch gap-3 hover:shadow-md transition-shadow text-left min-h-[88px] relative ${cardBg}`}
+                  className={`rounded-xl border p-3 flex items-stretch gap-2 hover:shadow-md transition-shadow text-left min-h-[80px] relative ${cardBg}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl border shrink-0 flex items-center justify-center self-start ${iconBg}`}>
-                    <Icon className={iconColor} size={18} />
+                  <div className={`w-7 h-7 rounded-lg border shrink-0 flex items-center justify-center self-start ${iconBg}`}>
+                    <Icon className={iconColor} size={14} />
                   </div>
                   <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
-                    <div className="h-[1.75rem] flex items-center gap-1 shrink-0">
-                      <p className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-1 flex-nowrap min-w-0 ${labelColor}`}>
-                        <span className="truncate">{label}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setKpiTooltipOpen((prev) => (prev === label ? null : label));
-                          }}
-                          className="shrink-0 p-0.5 rounded-full border-0 bg-transparent cursor-pointer text-inherit hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
-                          aria-label={`Formula: ${formula}`}
-                          aria-expanded={kpiTooltipOpen === label}
-                        >
-                          <Info className={detailColor} size={11} />
-                        </button>
+                    <div className="h-[2.5rem] flex items-start gap-1.5 shrink-0">
+                      <p className={`text-[11px] font-black uppercase tracking-widest leading-tight line-clamp-2 break-words flex-1 min-w-0 ${labelColor}`}>
+                        {label}
                       </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setKpiTooltipOpen((prev) => (prev === label ? null : label));
+                        }}
+                        className="shrink-0 p-0.5 rounded-full border-0 bg-transparent cursor-pointer text-inherit hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 mt-0.5"
+                        aria-label={`Formula: ${formula}`}
+                        aria-expanded={kpiTooltipOpen === label}
+                      >
+                        <Info className={detailColor} size={10} />
+                      </button>
                     </div>
                     <p className={`text-xl font-black leading-none mt-1 ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
                   </div>
