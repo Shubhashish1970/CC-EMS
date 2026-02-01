@@ -868,6 +868,22 @@ const SamplingControlView: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-1">Leave empty to allow runs immediately when enabled</p>
                 </div>
               </div>
+              <p className="text-sm text-slate-700 mt-2">
+                <strong>Last auto-run:</strong>{' '}
+                {config?.lastAutoRunAt ? (
+                  <>
+                    {new Date(config.lastAutoRunAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {typeof config.lastAutoRunMatched === 'number' && (
+                      <> • Ran <strong>{config.lastAutoRunMatched}</strong> activities</>
+                    )}
+                    {typeof config.lastAutoRunTasksCreated === 'number' && (
+                      <> • <strong>{config.lastAutoRunTasksCreated}</strong> tasks created</>
+                    )}
+                  </>
+                ) : (
+                  'Never'
+                )}
+              </p>
             </div>
           </div>
 

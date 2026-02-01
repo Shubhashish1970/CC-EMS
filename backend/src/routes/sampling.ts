@@ -717,7 +717,7 @@ router.post(
       if (alreadyRunning) {
         return res.json({ success: true, ran: false, reason: 'run_already_in_progress' });
       }
-      req.body = { runType: 'first_sample' };
+      req.body = { runType: 'first_sample', trigger: 'scheduled' };
       return runSamplingHandler(req, res, next);
     } catch (error) {
       next(error);
@@ -970,6 +970,22 @@ async function runSamplingHandler(req: Request, res: Response, next: NextFunctio
           },
         }
       );
+
+      if ((req.body as any)?.trigger === 'scheduled') {
+        await SamplingConfig.findOneAndUpdate(
+          { key: 'default' },
+          {
+            $set: {
+              lastAutoRunAt: new Date(),
+              lastAutoRunRunId: runId,
+              lastAutoRunMatched: matchedCount,
+              lastAutoRunProcessed: processed,
+              lastAutoRunTasksCreated: tasksCreatedTotal,
+            },
+          },
+          { upsert: true }
+        );
+      }
 
       res.json({
         success: true,

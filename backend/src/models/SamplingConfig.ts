@@ -16,6 +16,12 @@ export interface ISamplingConfig extends Document {
   autoRunThreshold?: number;
   /** Cron will only trigger a run on or after this date (ISO date string); null = no restriction */
   autoRunActivateFrom?: Date | null;
+  /** Last time POST /api/sampling/auto-run actually triggered a run (set when ran: true) */
+  lastAutoRunAt?: Date | null;
+  lastAutoRunRunId?: string | null;
+  lastAutoRunMatched?: number;
+  lastAutoRunProcessed?: number;
+  lastAutoRunTasksCreated?: number;
   updatedByUserId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +83,11 @@ const SamplingConfigSchema = new Schema<ISamplingConfig>(
       type: Date,
       default: null,
     },
+    lastAutoRunAt: { type: Date, default: null },
+    lastAutoRunRunId: { type: String, default: null },
+    lastAutoRunMatched: { type: Number, default: null },
+    lastAutoRunProcessed: { type: Number, default: null },
+    lastAutoRunTasksCreated: { type: Number, default: null },
     updatedByUserId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
