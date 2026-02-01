@@ -40,6 +40,14 @@ const SamplingControlView: React.FC = () => {
   const [config, setConfig] = useState<any>(null);
   const [latestRun, setLatestRun] = useState<LatestRun | null>(null);
   const [isReactivateConfirmOpen, setIsReactivateConfirmOpen] = useState(false);
+  const [deleteTasksOnReactivate, setDeleteTasksOnReactivate] = useState<boolean>(false);
+  const [reactivatePreview, setReactivatePreview] = useState<{
+    matchingActivityCount: number;
+    totalTasks: number;
+    tasksWithCalls: number;
+    tasksWithoutCalls: number;
+  } | null>(null);
+  const [reactivatePreviewLoading, setReactivatePreviewLoading] = useState(false);
   const [byTypeSort, setByTypeSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
@@ -286,6 +294,11 @@ const SamplingControlView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityFilters.lifecycleStatus, activityFilters.dateFrom, activityFilters.dateTo]);
 
+  // When switching to Run Sample (auto), close the date picker so Lifecycle/Date Range are clearly Ad-hoc only
+  useEffect(() => {
+    if (runType === 'first_sample') setIsDatePickerOpen(false);
+  }, [runType]);
+
   // Note: Activities selection removed. Sampling runs on ALL activities matching current filters.
 
   const toggleEligibilityType = (type: string) => {
@@ -385,6 +398,22 @@ const SamplingControlView: React.FC = () => {
       return;
     }
     setIsReactivateConfirmOpen(true);
+    setReactivatePreview(null);
+    setReactivatePreviewLoading(true);
+    try {
+      const res: any = await samplingAPI.getReactivatePreview({
+        fromStatus: activityFilters.lifecycleStatus,
+        dateFrom: activityFilters.dateFrom || undefined,
+        dateTo: activityFilters.dateTo || undefined,
+      });
+      if (res?.success && res?.data) {
+        setReactivatePreview(res.data);
+      }
+    } catch {
+      setReactivatePreview(null);
+    } finally {
+      setReactivatePreviewLoading(false);
+    }
   };
 
   const confirmReactivate = async () => {
@@ -396,8 +425,8 @@ const SamplingControlView: React.FC = () => {
         fromStatus: activityFilters.lifecycleStatus,
         dateFrom: activityFilters.dateFrom || undefined,
         dateTo: activityFilters.dateTo || undefined,
-        deleteExistingTasks: false,
-        deleteExistingAudit: false,
+        deleteExistingTasks: deleteTasksOnReactivate,
+        deleteExistingAudit: deleteTasksOnReactivate,
       });
       toast.showSuccess('Reactivated activities');
       await loadStats();
@@ -537,9 +566,54 @@ const SamplingControlView: React.FC = () => {
             Reactivate <span className="font-black">{totalMatchingByLifecycle}</span> matching activities to{' '}
             <span className="font-black">Active</span>?
           </p>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs text-amber-900 font-bold">
-              This will delete existing tasks and sampling audit for the matching activities before reactivating.
+          {reactivatePreviewLoading ? (
+            <p className="text-xs text-slate-500">Loading task counts…</p>
+          ) : reactivatePreview ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1 text-sm text-slate-700">
+              <p className="font-bold text-slate-800">Tasks for these activities</p>
+              {reactivatePreview.totalTasks === 0 ? (
+                <p>No existing tasks for these activities.</p>
+              ) : (
+                <p>
+                  <span className="font-semibold">{reactivatePreview.totalTasks}</span> total task(s).
+                  {reactivatePreview.tasksWithCalls > 0 && (
+                    <> <span className="font-semibold">{reactivatePreview.tasksWithCalls}</span> have call(s) made and will <span className="font-bold text-green-700">not</span> be deleted.</>
+                  )}
+                  {reactivatePreview.tasksWithoutCalls > 0 && (
+                    <> <span className="font-semibold">{reactivatePreview.tasksWithoutCalls}</span> have no call and can be deleted if you choose Yes below.</>
+                  )}
+                </p>
+              )}
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-slate-700">Delete tasks</p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="deleteTasksOnReactivate"
+                  checked={!deleteTasksOnReactivate}
+                  onChange={() => setDeleteTasksOnReactivate(false)}
+                  className="rounded-full border-slate-300 text-slate-900 focus:ring-lime-400"
+                />
+                <span className="text-sm font-medium text-slate-800">No</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="deleteTasksOnReactivate"
+                  checked={deleteTasksOnReactivate}
+                  onChange={() => setDeleteTasksOnReactivate(true)}
+                  className="rounded-full border-slate-300 text-slate-900 focus:ring-lime-400"
+                />
+                <span className="text-sm font-medium text-slate-800">Yes</span>
+              </label>
+            </div>
+            <p className="text-xs text-slate-500">
+              {deleteTasksOnReactivate
+                ? 'Only tasks with no call made will be deleted. Tasks with calls are always kept. Sampling audit will be removed for these activities.'
+                : 'Existing tasks and sampling audit are kept; activities are only set back to Active.'}
             </p>
           </div>
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -767,7 +841,12 @@ const SamplingControlView: React.FC = () => {
             />
           </div>
           <div className="min-w-0">
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+              Lifecycle
+              {runType === 'first_sample' && (
+                <span className="normal-case font-normal text-slate-500 ml-1">(Ad-hoc only)</span>
+              )}
+            </label>
             <StyledSelect
               value={activityFilters.lifecycleStatus}
               onChange={(value) => setActivityFilters((p) => ({ ...p, lifecycleStatus: value as LifecycleStatus }))}
@@ -778,33 +857,36 @@ const SamplingControlView: React.FC = () => {
                 { value: 'sampled', label: 'Sampled' },
               ]}
               placeholder="Select lifecycle"
+              disabled={runType === 'first_sample'}
             />
           </div>
           <div className="min-w-0">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
               Date Range
-              {runType === 'first_sample' && (
-                <span className="normal-case font-normal text-slate-500 ml-1">(auto, editable)</span>
-              )}
+              {runType === 'first_sample' ? (
+                <span className="normal-case font-normal text-slate-500 ml-1">(Ad-hoc only)</span>
+              ) : null}
             </label>
             <div className="relative" ref={datePickerRef}>
               <button
                 type="button"
+                disabled={runType === 'first_sample'}
                 onClick={() => {
-                  setIsDatePickerOpen((prev) => {
-                    const next = !prev;
-                    if (!prev && next) {
-                      syncDraftFromFilters();
-                    }
-                    return next;
-                  });
+                  if (runType === 'adhoc') {
+                    setIsDatePickerOpen((prev) => {
+                      const next = !prev;
+                      if (!prev && next) {
+                        syncDraftFromFilters();
+                      }
+                      return next;
+                    });
+                  }
                 }}
                 className={`
                   w-full min-h-12 px-4 py-3 rounded-xl border bg-white text-left flex items-center justify-between gap-2
                   transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400
-                  ${isDatePickerOpen
-                    ? 'border-lime-400 ring-2 ring-lime-400/20'
-                    : 'border-slate-200 hover:border-lime-300'}
+                  ${runType === 'first_sample' ? 'opacity-60 cursor-not-allowed border-slate-200 bg-slate-50' : ''}
+                  ${runType === 'adhoc' && isDatePickerOpen ? 'border-lime-400 ring-2 ring-lime-400/20' : runType === 'adhoc' ? 'border-slate-200 hover:border-lime-300' : ''}
                 `}
               >
                 <span className="truncate text-sm font-medium text-slate-900">

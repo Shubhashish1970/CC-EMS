@@ -522,10 +522,24 @@ export const samplingAPI = {
       body: JSON.stringify({ eligibleActivityTypes }),
     }, undefined, 60000);
   },
+  getReactivatePreview: async (filters: {
+    fromStatus?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters.fromStatus) params.append('fromStatus', filters.fromStatus);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/sampling/reactivate-preview${query ? `?${query}` : ''}`);
+  },
   reactivate: async (payload: {
     confirm: 'YES';
     activityIds?: string[];
     fromStatus?: 'inactive' | 'not_eligible' | 'sampled';
+    dateFrom?: string;
+    dateTo?: string;
     deleteExistingTasks?: boolean;
     deleteExistingAudit?: boolean;
   }) => {

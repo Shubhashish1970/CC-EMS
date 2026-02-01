@@ -453,6 +453,74 @@ router.post(
   }
 );
 
+// @route   GET /api/sampling/reactivate-preview
+// @desc    Preview counts for reactivation (matching activities, tasks with/without calls) for Confirm modal
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/reactivate-preview',
+  requirePermission('config.sampling'),
+  [
+    query('fromStatus').optional().isIn(['inactive', 'not_eligible', 'sampled']),
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { fromStatus, dateFrom, dateTo } = req.query as any;
+      const filter: any = {};
+      if (fromStatus) filter.lifecycleStatus = fromStatus;
+      if (dateFrom || dateTo) {
+        filter.date = {};
+        if (dateFrom) filter.date.$gte = new Date(dateFrom);
+        if (dateTo) filter.date.$lte = new Date(dateTo);
+      }
+
+      const activities = await Activity.find(filter).select('_id').lean();
+      const activityIds = activities.map((a) => a._id);
+
+      if (activityIds.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            matchingActivityCount: 0,
+            totalTasks: 0,
+            tasksWithCalls: 0,
+            tasksWithoutCalls: 0,
+          },
+        });
+      }
+
+      const [totalTasks, tasksWithCalls] = await Promise.all([
+        CallTask.countDocuments({ activityId: { $in: activityIds } }),
+        CallTask.countDocuments({
+          activityId: { $in: activityIds },
+          callLog: { $exists: true, $ne: null },
+        }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          matchingActivityCount: activityIds.length,
+          totalTasks,
+          tasksWithCalls,
+          tasksWithoutCalls: totalTasks - tasksWithCalls,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   POST /api/sampling/reactivate
 // @desc    Bulk reactivate activities (set to active) with confirmation; optionally clears existing tasks/audit
 // @access  Private (Team Lead, MIS Admin)
@@ -496,8 +564,29 @@ router.post(
       const activities = await Activity.find(query).select('_id').lean();
       const ids = activities.map((a) => a._id);
 
-      // Do not delete any tasks or audits: leave previous tasks exactly the same (first-time, ad-hoc, and Reactivate)
-      // deleteExistingTasks and deleteExistingAudit are ignored; Reactivate only updates lifecycle to active.
+      if (ids.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No activities to reactivate',
+          data: { count: 0, modifiedCount: 0 },
+        });
+      }
+
+      if (deleteExistingTasks === true) {
+        // Delete only tasks that have no call made (no callLog). Tasks with calls are kept.
+        const taskResult = await CallTask.deleteMany({
+          activityId: { $in: ids },
+          $or: [{ callLog: null }, { callLog: { $exists: false } }],
+        });
+        logger.info(
+          { deletedCount: taskResult.deletedCount, activityIds: ids.length },
+          'Reactivate: deleted tasks without calls'
+        );
+      }
+      if (deleteExistingAudit === true) {
+        const auditResult = await SamplingAudit.deleteMany({ activityId: { $in: ids } });
+        logger.info({ count: auditResult.deletedCount, activityIds: ids.length }, 'Reactivate: deleted existing sampling audits');
+      }
 
       const result = await Activity.updateMany(
         { _id: { $in: ids } },
