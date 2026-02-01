@@ -736,7 +736,7 @@ const runSamplingRunValidators = [
   body('includeResults').optional().isBoolean(),
 ];
 
-async function runSamplingHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+async function runSamplingHandler(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   try {
     const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -990,11 +990,10 @@ async function runSamplingHandler(req: Request, res: Response, next: NextFunctio
           ...(shouldIncludeResults ? { results } : {}),
         },
       });
-    } catch (error) {
-      next(error);
-    }
+  } catch (error) {
+    next(error);
   }
-);
+}
 
 // @route   GET /api/sampling/run-status/latest
 // @desc    Latest sampling run status for the current user (for UI polling)
@@ -1064,10 +1063,11 @@ router.get(
           },
         },
       });
-  } catch (error) {
-    next(error);
+    } catch (error) {
+      next(error);
+    }
   }
-}
+);
 
 // @route   POST /api/sampling/run
 // @desc    Run sampling: first_sample (auto date range, firstSampleRun=false only) or adhoc (user date range, firstSampleRun=true only). Creates Unassigned tasks; sets Activity to Sampled/Inactive.
