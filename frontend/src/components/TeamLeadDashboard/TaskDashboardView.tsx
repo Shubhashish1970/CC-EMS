@@ -6,17 +6,7 @@ import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
-
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'This week (Sun - Today)'
-  | 'Last 7 days'
-  | 'Last week (Sun - Sat)'
-  | 'Last 28 days'
-  | 'Last 30 days'
-  | 'YTD (1 Apr LY - Today)';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
 const LANGUAGE_ORDER = [
   'Hindi',
@@ -51,84 +41,8 @@ const TaskDashboardView: React.FC = () => {
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
 
-  // Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
-  const toLocalISO = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const formatPretty = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return iso;
-    }
-  };
-
-  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-
-    const startOfWeekSunday = (dt: Date) => {
-      const d = new Date(dt);
-      const day = d.getDay();
-      d.setDate(d.getDate() - day);
-      d.setHours(0, 0, 0, 0);
-      return d;
-    };
-
-    switch (preset) {
-      case 'Today':
-        return { start: toLocalISO(today), end: toLocalISO(today) };
-      case 'Yesterday': {
-        const y = new Date(today);
-        y.setDate(y.getDate() - 1);
-        return { start: toLocalISO(y), end: toLocalISO(y) };
-      }
-      case 'This week (Sun - Today)': {
-        const s = startOfWeekSunday(today);
-        return { start: toLocalISO(s), end: toLocalISO(today) };
-      }
-      case 'Last 7 days': {
-        // Last 7 days including today: today and the previous 6 days
-        start.setDate(start.getDate() - 6);
-        return { start: toLocalISO(start), end: toLocalISO(today) };
-      }
-      case 'Last week (Sun - Sat)': {
-        const thisSun = startOfWeekSunday(today);
-        const lastSun = new Date(thisSun);
-        lastSun.setDate(lastSun.getDate() - 7);
-        lastSun.setHours(0, 0, 0, 0);
-        const lastSat = new Date(thisSun);
-        lastSat.setDate(lastSat.getDate() - 1);
-        lastSat.setHours(0, 0, 0, 0);
-        return { start: toLocalISO(lastSun), end: toLocalISO(lastSat) };
-      }
-      case 'Last 28 days': {
-        // Last 28 days including today: today and the previous 27 days
-        start.setDate(start.getDate() - 27);
-        return { start: toLocalISO(start), end: toLocalISO(today) };
-      }
-      case 'Last 30 days': {
-        // Last 30 days including today: today and the previous 29 days
-        start.setDate(start.getDate() - 29);
-        return { start: toLocalISO(start), end: toLocalISO(today) };
-      }
-      case 'YTD (1 Apr LY - Today)': {
-        // 1st April last year to current date
-        const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
-        apr1LY.setHours(0, 0, 0, 0);
-        return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
-      }
-      case 'Custom':
-      default:
-        return { start: filters.dateFrom || '', end: filters.dateTo || '' };
-    }
-  };
+  const getRange = (preset: DateRangePreset) =>
+    getPresetRange(preset, filters.dateFrom || undefined, filters.dateTo || undefined);
 
   const syncDraftFromFilters = () => {
     setDraftStart(filters.dateFrom || '');
@@ -497,7 +411,7 @@ const TaskDashboardView: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSelectedPreset(p);
-                              const { start, end } = getPresetRange(p);
+                              const { start, end } = getRange(p);
                               setDraftStart(start);
                               setDraftEnd(end);
                             }}

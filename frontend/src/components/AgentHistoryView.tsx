@@ -4,17 +4,7 @@ import Button from './shared/Button';
 import StyledSelect from './shared/StyledSelect';
 import { tasksAPI } from '../services/api';
 import { useToast } from '../context/ToastContext';
-
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'This week (Sun - Today)'
-  | 'Last 7 days'
-  | 'Last week (Sun - Sat)'
-  | 'Last 28 days'
-  | 'Last 30 days'
-  | 'YTD (1 Apr LY - Today)';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../utils/dateRangeUtils';
 
 type HistoryStatus = '' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
 
@@ -37,14 +27,6 @@ const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
   updated: 140,
 };
 
-// Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
-const toLocalISO = (d: Date): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 // Get initials from name for avatar display
 const getInitials = (name: string): string => {
   if (!name) return '?';
@@ -54,71 +36,6 @@ const getInitials = (name: string): string => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-};
-
-const formatPretty = (iso: string) => {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch {
-    return iso;
-  }
-};
-
-const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(today);
-  const end = new Date(today);
-  const day = today.getDay();
-
-  switch (preset) {
-    case 'Today':
-      return { start: toLocalISO(today), end: toLocalISO(today) };
-    case 'Yesterday': {
-      const y = new Date(today);
-      y.setDate(y.getDate() - 1);
-      return { start: toLocalISO(y), end: toLocalISO(y) };
-    }
-    case 'This week (Sun - Today)': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - day);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'Last 7 days': {
-      // Last 7 days including today: today and the previous 6 days
-      const s = new Date(today);
-      s.setDate(s.getDate() - 6);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'Last week (Sun - Sat)': {
-      const lastSat = new Date(today);
-      lastSat.setDate(lastSat.getDate() - (day + 1));
-      const lastSun = new Date(lastSat);
-      lastSun.setDate(lastSun.getDate() - 6);
-      return { start: toLocalISO(lastSun), end: toLocalISO(lastSat) };
-    }
-    case 'Last 28 days': {
-      // Last 28 days including today: today and the previous 27 days
-      const s = new Date(today);
-      s.setDate(s.getDate() - 27);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'Last 30 days': {
-      // Last 30 days including today: today and the previous 29 days
-      const s = new Date(today);
-      s.setDate(s.getDate() - 29);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'YTD (1 Apr LY - Today)': {
-      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
-      return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
-    }
-    case 'Custom':
-    default:
-      return { start: '', end: '' };
-  }
 };
 
 const outcomeLabel = (status: string) => {
@@ -214,9 +131,12 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   const [draftEnd, setDraftEnd] = useState(defaultDateRange.end);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
 
+  const getRange = (preset: DateRangePreset) =>
+    getPresetRange(preset, filters.dateFrom || undefined, filters.dateTo || undefined);
+
   const syncDraftFromFilters = () => {
-    const start = filters.dateFrom || getPresetRange(selectedPreset).start;
-    const end = filters.dateTo || getPresetRange(selectedPreset).end;
+    const start = filters.dateFrom || getRange(selectedPreset).start;
+    const end = filters.dateTo || getRange(selectedPreset).end;
     setDraftStart(start);
     setDraftEnd(end);
   };
@@ -543,7 +463,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                                   type="button"
                                   onClick={() => {
                                     setSelectedPreset(p);
-                                    const { start, end } = getPresetRange(p);
+                                    const { start, end } = getRange(p);
                                     setDraftStart(start);
                                     setDraftEnd(end);
                                   }}

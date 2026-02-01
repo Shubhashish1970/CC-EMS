@@ -4,14 +4,7 @@ import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'Last 7 days'
-  | 'Last 14 days'
-  | 'Last 30 days';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
 interface CallbackTask {
   _id: string;
@@ -51,61 +44,6 @@ interface Agent {
 
 const PAGE_SIZE = 30;
 
-// Format date to YYYY-MM-DD in local timezone
-const toLocalISO = (d: Date): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const formatPretty = (iso: string) => {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch {
-    return iso;
-  }
-};
-
-const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  switch (preset) {
-    case 'Today':
-      return { start: toLocalISO(today), end: toLocalISO(today) };
-    case 'Yesterday': {
-      const y = new Date(today);
-      y.setDate(y.getDate() - 1);
-      return { start: toLocalISO(y), end: toLocalISO(y) };
-    }
-    case 'Last 7 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 6);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'Last 14 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 13);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'Last 30 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 29);
-      return { start: toLocalISO(s), end: toLocalISO(today) };
-    }
-    case 'YTD (1 Apr LY - Today)': {
-      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
-      return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
-    }
-    case 'Custom':
-    default:
-      return { start: '', end: '' };
-  }
-};
-
 const formatDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
@@ -144,14 +82,17 @@ const CallbackRequestView: React.FC = () => {
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
   const datePickerRef = useRef<HTMLDivElement | null>(null);
-  
+
+  const getRange = (preset: DateRangePreset) =>
+    getPresetRange(preset, filters.dateFrom || undefined, filters.dateTo || undefined);
+
   // Infinite scroll refs
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize date range
   useEffect(() => {
-    const r = getPresetRange('Last 7 days');
+    const r = getRange('Last 7 days');
     setFilters(f => ({ ...f, dateFrom: r.start, dateTo: r.end }));
     setDraftStart(r.start);
     setDraftEnd(r.end);
@@ -367,7 +308,7 @@ const CallbackRequestView: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setSelectedPreset(p);
-                            const { start, end } = getPresetRange(p);
+                            const { start, end } = getRange(p);
                             setDraftStart(start);
                             setDraftEnd(end);
                           }}

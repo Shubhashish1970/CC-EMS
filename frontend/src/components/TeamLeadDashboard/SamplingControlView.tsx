@@ -4,20 +4,11 @@ import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
 import StyledSelect from '../shared/StyledSelect';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
 
 const ALL_ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'] as const;
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'This week (Sun - Today)'
-  | 'Last 7 days'
-  | 'Last week (Sun - Sat)'
-  | 'Last 28 days'
-  | 'Last 30 days'
-  | 'YTD (1 Apr LY - Today)';
 
 type SamplingRunStatus = 'running' | 'completed' | 'failed';
 type LatestRun = {
@@ -74,75 +65,8 @@ const SamplingControlView: React.FC = () => {
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
 
-  const toISO = (d: Date) => d.toISOString().split('T')[0];
-
-  const formatPretty = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return iso;
-    }
-  };
-
-  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
-    const today = new Date();
-    const end = new Date(today);
-    const start = new Date(today);
-
-    const startOfWeekSunday = (dt: Date) => {
-      const d = new Date(dt);
-      const day = d.getDay(); // 0=Sun
-      d.setDate(d.getDate() - day);
-      return d;
-    };
-
-    switch (preset) {
-      case 'Today': {
-        return { start: toISO(today), end: toISO(today) };
-      }
-      case 'Yesterday': {
-        const y = new Date(today);
-        y.setDate(y.getDate() - 1);
-        return { start: toISO(y), end: toISO(y) };
-      }
-      case 'This week (Sun - Today)': {
-        const s = startOfWeekSunday(today);
-        return { start: toISO(s), end: toISO(today) };
-      }
-      case 'Last 7 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 6);
-        return { start: toISO(s), end: toISO(today) };
-      }
-      case 'Last week (Sun - Sat)': {
-        const thisSun = startOfWeekSunday(today);
-        const lastSun = new Date(thisSun);
-        lastSun.setDate(lastSun.getDate() - 7);
-        const lastSat = new Date(thisSun);
-        lastSat.setDate(lastSat.getDate() - 1);
-        return { start: toISO(lastSun), end: toISO(lastSat) };
-      }
-      case 'Last 28 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 27);
-        return { start: toISO(s), end: toISO(today) };
-      }
-      case 'Last 30 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 29);
-        return { start: toISO(s), end: toISO(today) };
-      }
-      case 'YTD (1 Apr LY - Today)': {
-        const apr1LY = new Date(today.getFullYear() - 1, 3, 1); // April 1, last year
-        return { start: toISO(apr1LY), end: toISO(today) };
-      }
-      case 'Custom':
-      default: {
-        return { start: activityFilters.dateFrom || '', end: activityFilters.dateTo || '' };
-      }
-    }
-  };
+  const getRange = (preset: DateRangePreset) =>
+    getPresetRange(preset, activityFilters.dateFrom || undefined, activityFilters.dateTo || undefined);
 
   const syncDraftFromFilters = () => {
     setDraftStart(activityFilters.dateFrom || '');
@@ -917,7 +841,7 @@ const SamplingControlView: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSelectedPreset(p);
-                              const { start, end } = getPresetRange(p);
+                              const { start, end } = getRange(p);
                               setDraftStart(start);
                               setDraftEnd(end);
                             }}
@@ -1002,8 +926,8 @@ const SamplingControlView: React.FC = () => {
             { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0, description: 'Number of activities in the selected date range and filters.' },
             { label: 'Active', value: stats?.totals?.active ?? 0, description: 'Activities with lifecycle Active (eligible for first-time sampling).' },
             { label: 'Sampled', value: stats?.totals?.sampled ?? 0, description: 'Activities that have been sampled (first-time or ad-hoc).' },
-            { label: 'Inactive', value: stats?.totals?.inactive ?? 0, description: 'Activities marked inactive.' },
-            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0, description: 'Activities marked not eligible for sampling.' },
+            { label: 'Inactive', value: stats?.totals?.inactive ?? 0, description: 'Inactive: An activity is marked Inactive when a sampling run processed it but no farmers were selected (e.g. all farmers were in cooling or already sampled).' },
+            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0, description: 'Not Eligible: An activity is Not Eligible when its type is excluded from sampling in Sampling Control (eligible activity types). Team Lead configures which types can be sampled.' },
             { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0, description: 'Total farmers linked to these activities.' },
             { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0, description: 'Distinct farmers who have at least one call task (first-time + ad-hoc).' },
             { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0, description: 'Total call tasks created for these activities.' },

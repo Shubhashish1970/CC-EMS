@@ -53,6 +53,7 @@ import {
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
+import { type DateRangePreset, getPresetRange, formatPretty, toISODateLocal } from '../../utils/dateRangeUtils';
 
 /** Totals row derived from EMS summary rows (same formulas as backend) */
 export type EmsTotals = {
@@ -79,17 +80,6 @@ export type EmsTotals = {
   validIdentity: number;
 };
 
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'This week (Sun - Today)'
-  | 'Last 7 days'
-  | 'Last week (Sun - Sat)'
-  | 'Last 28 days'
-  | 'Last 30 days'
-  | 'YTD (1 Apr LY - Today)';
-
 const EMS_REPORT_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
   { value: 'fda', label: 'By FDA' },
   { value: 'territory', label: 'By Territory' },
@@ -114,75 +104,12 @@ const GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
   { value: 'bu', label: 'BU' },
 ];
 
-function toISODate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 function getDefaultDateRange(): { dateFrom: string; dateTo: string } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(today);
   start.setDate(start.getDate() - 29);
-  return { dateFrom: toISODate(start), dateTo: toISODate(today) };
-}
-
-function getPresetRange(preset: DateRangePreset, currentFrom?: string, currentTo?: string): { start: string; end: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const day = today.getDay();
-  switch (preset) {
-    case 'Today':
-      return { start: toISODate(today), end: toISODate(today) };
-    case 'Yesterday': {
-      const y = new Date(today);
-      y.setDate(y.getDate() - 1);
-      return { start: toISODate(y), end: toISODate(y) };
-    }
-    case 'This week (Sun - Today)': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - day);
-      return { start: toISODate(s), end: toISODate(today) };
-    }
-    case 'Last 7 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 6);
-      return { start: toISODate(s), end: toISODate(today) };
-    }
-    case 'Last week (Sun - Sat)': {
-      const lastSat = new Date(today);
-      lastSat.setDate(lastSat.getDate() - (day + 1));
-      const lastSun = new Date(lastSat);
-      lastSun.setDate(lastSun.getDate() - 6);
-      return { start: toISODate(lastSun), end: toISODate(lastSat) };
-    }
-    case 'Last 28 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 27);
-      return { start: toISODate(s), end: toISODate(today) };
-    }
-    case 'Last 30 days': {
-      const s = new Date(today);
-      s.setDate(s.getDate() - 29);
-      return { start: toISODate(s), end: toISODate(today) };
-    }
-    case 'YTD (1 Apr LY - Today)': {
-      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
-      return { start: toISODate(apr1LY), end: toISODate(today) };
-    }
-    case 'Custom':
-    default:
-      return { start: currentFrom || toISODate(today), end: currentTo || toISODate(today) };
-  }
-}
-
-function formatPretty(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return { dateFrom: toISODateLocal(start), dateTo: toISODateLocal(today) };
 }
 
 function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {

@@ -8,17 +8,7 @@ import StyledSelect from './shared/StyledSelect';
 import TaskDetail from './TaskDetail';
 import ReassignModal from './ReassignModal';
 import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
-
-type DateRangePreset =
-  | 'Custom'
-  | 'Today'
-  | 'Yesterday'
-  | 'This week (Sun - Today)'
-  | 'Last 7 days'
-  | 'Last week (Sun - Sat)'
-  | 'Last 28 days'
-  | 'Last 30 days'
-  | 'YTD (1 Apr LY - Today)';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../utils/dateRangeUtils';
 
 interface Task {
   _id: string;
@@ -146,75 +136,11 @@ const TaskList: React.FC = () => {
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   // Export dropdown removed (Excel download moved to stats header)
 
-  const toISODate = (d: Date) => {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  const formatPretty = (iso: string) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  const getPresetRange = (preset: DateRangePreset): { start: string; end: string } => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const end = new Date(today);
-    const start = new Date(today);
-    const day = today.getDay(); // 0=Sun
-
-    switch (preset) {
-      case 'Today':
-        return { start: toISODate(today), end: toISODate(today) };
-      case 'Yesterday': {
-        const y = new Date(today);
-        y.setDate(y.getDate() - 1);
-        return { start: toISODate(y), end: toISODate(y) };
-      }
-      case 'This week (Sun - Today)': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - day);
-        return { start: toISODate(s), end: toISODate(today) };
-      }
-      case 'Last 7 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 6);
-        return { start: toISODate(s), end: toISODate(today) };
-      }
-      case 'Last week (Sun - Sat)': {
-        const lastSat = new Date(today);
-        lastSat.setDate(lastSat.getDate() - (day + 1));
-        const lastSun = new Date(lastSat);
-        lastSun.setDate(lastSun.getDate() - 6);
-        return { start: toISODate(lastSun), end: toISODate(lastSat) };
-      }
-      case 'Last 28 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 27);
-        return { start: toISODate(s), end: toISODate(today) };
-      }
-      case 'Last 30 days': {
-        const s = new Date(today);
-        s.setDate(s.getDate() - 29);
-        return { start: toISODate(s), end: toISODate(today) };
-      }
-      case 'YTD (1 Apr LY - Today)': {
-        const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
-        apr1LY.setHours(0, 0, 0, 0);
-        return { start: toISODate(apr1LY), end: toISODate(today) };
-      }
-      case 'Custom':
-      default:
-        return { start: filters.dateFrom || toISODate(start), end: filters.dateTo || toISODate(end) };
-    }
-  };
+  const getRange = (preset: DateRangePreset) =>
+    getPresetRange(preset, filters.dateFrom || undefined, filters.dateTo || undefined);
 
   const syncDraftFromFilters = () => {
-    const range = getPresetRange(selectedPreset);
+    const range = getRange(selectedPreset);
     const start = filters.dateFrom || range.start;
     const end = filters.dateTo || range.end;
     setDraftStart(start);
@@ -850,7 +776,7 @@ const TaskList: React.FC = () => {
                                   type="button"
                                   onClick={() => {
                                     setSelectedPreset(p);
-                                    const { start, end } = getPresetRange(p);
+                                    const { start, end } = getRange(p);
                                     setDraftStart(start);
                                     setDraftEnd(end);
                                   }}
