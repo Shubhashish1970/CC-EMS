@@ -16,7 +16,7 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-/** Compute auto date range for next first-sample run: (day after last first_sample run's dateTo) to today. If no previous first_sample run, returns null (caller should use manual range). */
+/** Compute auto date range for next first-sample run: (last run's dateTo inclusive) to today so late-arriving activities are not missed. If no previous first_sample run, returns null. */
 const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise<{ dateFrom: Date; dateTo: Date } | null> => {
   const lastFirst = await SamplingRun.findOne({
     createdByUserId: userId,
@@ -28,12 +28,11 @@ const getFirstSampleAutoRange = async (userId: mongoose.Types.ObjectId): Promise
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   if (lastFirst?.filters?.dateTo) {
-    const dayAfter = new Date(lastFirst.filters.dateTo);
-    dayAfter.setDate(dayAfter.getDate() + 1);
-    dayAfter.setHours(0, 0, 0, 0);
-    return { dateFrom: dayAfter, dateTo: today };
+    const rangeStart = new Date(lastFirst.filters.dateTo);
+    rangeStart.setHours(0, 0, 0, 0);
+    return { dateFrom: rangeStart, dateTo: today };
   }
-  return null; // no previous first-sample run → user must select date range manually
+  return null; // no previous first-sample run → use suggested range
 };
 
 /** Fallback when no activities exist: last 30 days. */
@@ -730,10 +729,10 @@ router.post(
         resolvedDateFrom = dateFrom;
         resolvedDateTo = dateTo;
         const q: any = {
-          firstSampleRun: true,
           date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
           farmerIds: { $exists: true, $ne: [] },
         };
+        if (lifecycleStatus) q.lifecycleStatus = lifecycleStatus;
         matchedCount = await Activity.countDocuments(q);
         const docs = await Activity.find(q)
           .select('_id officerId officerName farmerIds')

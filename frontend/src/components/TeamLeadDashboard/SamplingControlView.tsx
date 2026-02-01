@@ -48,6 +48,8 @@ const SamplingControlView: React.FC = () => {
     tasksWithoutCalls: number;
   } | null>(null);
   const [reactivatePreviewLoading, setReactivatePreviewLoading] = useState(false);
+  const [isRunConfirmOpen, setIsRunConfirmOpen] = useState(false);
+  const [runConfirmType, setRunConfirmType] = useState<'first_sample' | 'adhoc' | null>(null);
   const [byTypeSort, setByTypeSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
@@ -582,8 +584,84 @@ const SamplingControlView: React.FC = () => {
     return byTypeSort.dir === 'asc' ? ' ▲' : ' ▼';
   };
 
+  const openRunConfirm = () => {
+    if (runType === 'adhoc') {
+      if (!activityFilters.dateFrom || !activityFilters.dateTo) {
+        toast.showError('Select date range for ad-hoc run');
+        return;
+      }
+      if (totalMatchingByLifecycle === 0) {
+        toast.showError('No activities match the current filters');
+        return;
+      }
+    }
+    if (runType === 'first_sample' && isFirstSampleRun && (!activityFilters.dateFrom || !activityFilters.dateTo)) {
+      toast.showError('Select date range for first sample run');
+      return;
+    }
+    setRunConfirmType(runType);
+    setIsRunConfirmOpen(true);
+  };
+
+  const confirmRunSampling = async () => {
+    setIsRunConfirmOpen(false);
+    setRunConfirmType(null);
+    await handleRunSampling();
+  };
+
   return (
     <div className="space-y-6 min-w-0 overflow-x-hidden">
+      <Modal
+        isOpen={isRunConfirmOpen}
+        onClose={() => { setIsRunConfirmOpen(false); setRunConfirmType(null); }}
+        title={runConfirmType === 'adhoc' ? 'Confirm Ad-hoc sample' : 'Confirm Run Sample'}
+        size="md"
+      >
+        <div className="space-y-4">
+          {runConfirmType === 'first_sample' && (
+            <>
+              <p className="text-sm font-bold text-slate-800">Run Sample (auto date range)</p>
+              <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
+                <li><strong>Activities:</strong> Only <strong>Active</strong> activities that have <strong>never been sampled</strong>.</li>
+                <li><strong>Date range:</strong> Chosen automatically — first run: earliest to latest activity date; later runs: last run end date (inclusive) to today, so no activity is missed.</li>
+                <li>Lifecycle and date are fixed by the system; you do not select them.</li>
+                <li>Tasks are created only for farmers not already sampled for that activity (same farmer is not sampled again).</li>
+              </ul>
+            </>
+          )}
+          {runConfirmType === 'adhoc' && (
+            <>
+              <p className="text-sm font-bold text-slate-800">Run Ad-hoc sample</p>
+              <ul className="text-sm text-slate-700 space-y-2 list-disc list-inside">
+                <li><strong>Activities:</strong> All activities in your selected <strong>Lifecycle</strong> and <strong>Date range</strong> (Active, Sampled, Inactive, or Not Eligible). Already-sampled activities are included.</li>
+                <li><strong>Date range:</strong> Your selected start and end date.</li>
+                <li><strong>Lifecycle:</strong> Your selected lifecycle.</li>
+                <li>Tasks are created only for farmers who do not already have a task for that activity (same farmer is not sampled again).</li>
+              </ul>
+              <p className="text-xs text-slate-600">
+                Current: <strong>{activityFilters.lifecycleStatus}</strong> • {formatPretty(activityFilters.dateFrom)} – {formatPretty(activityFilters.dateTo)} • <strong>{totalMatchingByLifecycle}</strong> in range
+              </p>
+            </>
+          )}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => { setIsRunConfirmOpen(false); setRunConfirmType(null); }}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-black"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmRunSampling}
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         isOpen={isReactivateConfirmOpen}
         onClose={() => setIsReactivateConfirmOpen(false)}
@@ -774,7 +852,7 @@ const SamplingControlView: React.FC = () => {
               Reset
             </button>
             <button
-              onClick={handleRunSampling}
+              onClick={openRunConfirm}
               disabled={
                 isLoading ||
                 isSamplingRunning ||
@@ -855,8 +933,8 @@ const SamplingControlView: React.FC = () => {
           )}
         </div>
 
-        {/* Run type + Filters */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 min-w-0">
+        {/* Run type + Filters (Lifecycle & Date Range shown only for Ad-hoc) */}
+        <div className={`mt-4 grid grid-cols-1 gap-3 min-w-0 ${runType === 'adhoc' ? 'md:grid-cols-3' : ''}`}>
           <div className="min-w-0">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Run type</label>
             <StyledSelect
@@ -889,68 +967,53 @@ const SamplingControlView: React.FC = () => {
               placeholder="Run type"
             />
           </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
-              Lifecycle
-              {runType === 'first_sample' && (
-                <span className="normal-case font-normal text-slate-500 ml-1">(Ad-hoc only)</span>
-              )}
-            </label>
-            <StyledSelect
-              value={activityFilters.lifecycleStatus}
-              onChange={(value) => setActivityFilters((p) => ({ ...p, lifecycleStatus: value as LifecycleStatus }))}
-              options={[
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' },
-                { value: 'not_eligible', label: 'Not Eligible' },
-                { value: 'sampled', label: 'Sampled' },
-              ]}
-              placeholder="Select lifecycle"
-              disabled={runType === 'first_sample'}
-            />
-          </div>
-          <div className="min-w-0">
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
-              Date Range
-              {runType === 'first_sample' ? (
-                <span className="normal-case font-normal text-slate-500 ml-1">(Ad-hoc only)</span>
-              ) : null}
-            </label>
-            <div className="relative" ref={datePickerRef}>
-              <button
-                type="button"
-                disabled={runType === 'first_sample'}
-                onClick={() => {
-                  if (runType === 'adhoc') {
-                    setIsDatePickerOpen((prev) => {
-                      const next = !prev;
-                      if (!prev && next) {
-                        syncDraftFromFilters();
-                      }
-                      return next;
-                    });
-                  }
-                }}
-                className={`
-                  w-full min-h-12 px-4 py-3 rounded-xl border bg-white text-left flex items-center justify-between gap-2
-                  transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400
-                  ${runType === 'first_sample' ? 'opacity-60 cursor-not-allowed border-slate-200 bg-slate-50' : ''}
-                  ${runType === 'adhoc' && isDatePickerOpen ? 'border-lime-400 ring-2 ring-lime-400/20' : runType === 'adhoc' ? 'border-slate-200 hover:border-lime-300' : ''}
-                `}
-              >
-                <span className="truncate text-sm font-medium text-slate-900">
-                  {runType === 'first_sample' && (!activityFilters.dateFrom || !activityFilters.dateTo)
-                    ? 'YTD'
-                    : selectedPreset}
-                  {effectiveDateRange.start && effectiveDateRange.end
-                    ? ` • ${formatPretty(effectiveDateRange.start)} - ${formatPretty(effectiveDateRange.end)}`
-                    : ''}
-                </span>
-                <ChevronDown
-                  size={18}
-                  className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180' : ''}`}
+          {runType === 'adhoc' && (
+            <>
+              <div className="min-w-0">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Lifecycle</label>
+                <StyledSelect
+                  value={activityFilters.lifecycleStatus}
+                  onChange={(value) => setActivityFilters((p) => ({ ...p, lifecycleStatus: value as LifecycleStatus }))}
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                    { value: 'not_eligible', label: 'Not Eligible' },
+                    { value: 'sampled', label: 'Sampled' },
+                  ]}
+                  placeholder="Select lifecycle"
                 />
-              </button>
+              </div>
+              <div className="min-w-0">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDatePickerOpen((prev) => {
+                        const next = !prev;
+                        if (!prev && next) {
+                          syncDraftFromFilters();
+                        }
+                        return next;
+                      });
+                    }}
+                    className={`
+                      w-full min-h-12 px-4 py-3 rounded-xl border bg-white text-left flex items-center justify-between gap-2
+                      transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400
+                      ${isDatePickerOpen ? 'border-lime-400 ring-2 ring-lime-400/20' : 'border-slate-200 hover:border-lime-300'}
+                    `}
+                  >
+                    <span className="truncate text-sm font-medium text-slate-900">
+                      {selectedPreset}
+                      {effectiveDateRange.start && effectiveDateRange.end
+                        ? ` • ${formatPretty(effectiveDateRange.start)} - ${formatPretty(effectiveDateRange.end)}`
+                        : ''}
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
 
               {isDatePickerOpen && (
                 <div className="absolute z-50 mt-2 right-0 left-0 sm:left-auto w-[45vw] min-w-[280px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
@@ -1051,7 +1114,9 @@ const SamplingControlView: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
