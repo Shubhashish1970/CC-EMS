@@ -708,9 +708,9 @@ const ActivityEmsProgressView: React.FC = () => {
                     <Icon className={iconColor} size={18} />
                   </div>
                   <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
-                    <div className="min-h-[2.25rem] flex items-center gap-1 shrink-0">
-                      <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-1 flex-wrap ${labelColor}`}>
-                        {label}
+                    <div className="h-[1.75rem] flex items-center gap-1 shrink-0">
+                      <p className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-1 flex-nowrap min-w-0 ${labelColor}`}>
+                        <span className="truncate">{label}</span>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -721,11 +721,11 @@ const ActivityEmsProgressView: React.FC = () => {
                           aria-label={`Formula: ${formula}`}
                           aria-expanded={kpiTooltipOpen === label}
                         >
-                          <Info className={detailColor} size={12} />
+                          <Info className={detailColor} size={11} />
                         </button>
                       </p>
                     </div>
-                    <p className={`text-xl font-black leading-none mt-0.5 ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
+                    <p className={`text-xl font-black leading-none mt-1 ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
                   </div>
                   {kpiTooltipOpen === label && (
                     <div
