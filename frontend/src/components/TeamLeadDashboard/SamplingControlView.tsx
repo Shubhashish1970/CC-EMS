@@ -455,8 +455,8 @@ const SamplingControlView: React.FC = () => {
         fromStatus: activityFilters.lifecycleStatus,
         dateFrom: activityFilters.dateFrom || undefined,
         dateTo: activityFilters.dateTo || undefined,
-        deleteExistingTasks: true,
-        deleteExistingAudit: true,
+        deleteExistingTasks: false,
+        deleteExistingAudit: false,
       });
       toast.showSuccess('Reactivated activities');
       await loadStats();

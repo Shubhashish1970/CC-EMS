@@ -201,13 +201,23 @@ export const sampleAndCreateTasks = async (
       config.defaultPercentage;
 
     // Get eligible farmers (not in cooling period)
-    const eligibleFarmerIds = await getEligibleFarmers(
+    let eligibleFarmerIds = await getEligibleFarmers(
       activity.farmerIds as mongoose.Types.ObjectId[],
       config.farmerCoolingDays
     );
 
+    // Ad-hoc run: exclude farmers already sampled for this activity (first-time sampling already created tasks for them)
+    if (options?.setFirstSampleRun === false) {
+      const existingTaskFarmerIds = await CallTask.find({ activityId: activity._id }).select('farmerId').lean();
+      const alreadySampledSet = new Set(existingTaskFarmerIds.map((t) => t.farmerId?.toString()).filter(Boolean));
+      eligibleFarmerIds = eligibleFarmerIds.filter((id) => !alreadySampledSet.has(id.toString()));
+      if (alreadySampledSet.size > 0) {
+        logger.debug(`Ad-hoc activity ${activityId}: excluding ${alreadySampledSet.size} already-sampled farmers, ${eligibleFarmerIds.length} remaining eligible`);
+      }
+    }
+
     if (eligibleFarmerIds.length === 0) {
-      logger.warn(`No eligible farmers for activity ${activityId} (all in farmer cooling window)`);
+      logger.warn(`No eligible farmers for activity ${activityId} (all in farmer cooling window${options?.setFirstSampleRun === false ? ' or already sampled' : ''})`);
     }
 
     // Calculate sample size
@@ -258,26 +268,29 @@ export const sampleAndCreateTasks = async (
     }
     await activity.save();
 
-    // Log sampling audit
-    // We keep "latest audit per activity" to support manual resampling without schema/index migrations.
-    await SamplingAudit.deleteOne({ activityId: activity._id });
-    await SamplingAudit.create({
-      activityId: activity._id,
-      samplingPercentage: percentage,
-      totalFarmers,
-      sampledCount: sampledFarmerIds.length,
-      algorithm: 'Reservoir Sampling',
-      metadata: {
-        eligibleFarmers: eligibleFarmerIds.length,
-        tasksCreated,
-        activityType: activity.type,
-        activityCoolingDays: config.activityCoolingDays,
-        farmerCoolingDays: config.farmerCoolingDays,
-        eligibleActivityTypes: config.eligibleActivityTypes,
-        scheduledDate,
-        runByUserId: options?.runByUserId || null,
+    // Log sampling audit (upsert: do not delete previous audit; overwrite in place)
+    await SamplingAudit.findOneAndUpdate(
+      { activityId: activity._id },
+      {
+        $set: {
+          samplingPercentage: percentage,
+          totalFarmers,
+          sampledCount: sampledFarmerIds.length,
+          algorithm: 'Reservoir Sampling',
+          metadata: {
+            eligibleFarmers: eligibleFarmerIds.length,
+            tasksCreated,
+            activityType: activity.type,
+            activityCoolingDays: config.activityCoolingDays,
+            farmerCoolingDays: config.farmerCoolingDays,
+            eligibleActivityTypes: config.eligibleActivityTypes,
+            scheduledDate,
+            runByUserId: options?.runByUserId || null,
+          },
+        },
       },
-    });
+      { upsert: true, new: true }
+    );
 
     logger.info(
       `Sampling completed for activity ${activityId}: ${sampledFarmerIds.length}/${eligibleFarmerIds.length} sampled (${percentage}%), ${tasksCreated} tasks created (unassigned)`

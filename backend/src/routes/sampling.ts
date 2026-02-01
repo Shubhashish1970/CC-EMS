@@ -490,12 +490,8 @@ router.post(
       const activities = await Activity.find(query).select('_id').lean();
       const ids = activities.map((a) => a._id);
 
-      if (deleteExistingTasks) {
-        await CallTask.deleteMany({ activityId: { $in: ids } });
-      }
-      if (deleteExistingAudit) {
-        await SamplingAudit.deleteMany({ activityId: { $in: ids } });
-      }
+      // Do not delete any tasks or audits: leave previous tasks exactly the same (first-time, ad-hoc, and Reactivate)
+      // deleteExistingTasks and deleteExistingAudit are ignored; Reactivate only updates lifecycle to active.
 
       const result = await Activity.updateMany(
         { _id: { $in: ids } },
@@ -693,14 +689,7 @@ router.post(
       let processed = 0;
 
       const processOne = async (id: string, opts: { maxFarmersToSample?: number; minFarmersToSample?: number }) => {
-        if (effectiveRunType === 'adhoc') {
-          await CallTask.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
-          await SamplingAudit.deleteMany({ activityId: new mongoose.Types.ObjectId(id) });
-          await Activity.updateOne(
-            { _id: new mongoose.Types.ObjectId(id) },
-            { $set: { lifecycleStatus: 'active', lifecycleUpdatedAt: new Date() } }
-          );
-        }
+        // Ad-hoc: do not delete existing tasks; sampleAndCreateTasks will exclude already-sampled farmers
         return sampleAndCreateTasks(id, samplingPercentage, {
           runByUserId: authUserId,
           forceRun: !!forceRun,
