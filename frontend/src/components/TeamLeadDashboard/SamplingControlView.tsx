@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square, ChevronDown } from 'lucide-react';
+import { Calendar, RefreshCw, Save, Play, RotateCcw, Filter, CheckSquare, Square, ChevronDown, Info } from 'lucide-react';
 import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
@@ -168,6 +168,18 @@ const SamplingControlView: React.FC = () => {
   const [selectedUnassignedTaskIds, setSelectedUnassignedTaskIds] = useState<Set<string>>(new Set());
   const [agents, setAgents] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [bulkAssignAgentId, setBulkAssignAgentId] = useState<string>('');
+  const [kpiTooltipOpen, setKpiTooltipOpen] = useState<string | null>(null);
+  const kpiTooltipRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (kpiTooltipOpen != null && kpiTooltipRef.current && !kpiTooltipRef.current.contains(e.target as Node)) {
+        setKpiTooltipOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [kpiTooltipOpen]);
 
   const totalActivities = Number(stats?.totals?.totalActivities || 0);
   const totalMatchingByLifecycle = useMemo(() => {
@@ -987,18 +999,46 @@ const SamplingControlView: React.FC = () => {
 
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {[
-            { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0 },
-            { label: 'Active', value: stats?.totals?.active ?? 0 },
-            { label: 'Sampled', value: stats?.totals?.sampled ?? 0 },
-            { label: 'Inactive', value: stats?.totals?.inactive ?? 0 },
-            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0 },
-            { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0 },
-            { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0 },
-            { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0 },
+            { label: 'Total Activities', value: stats?.totals?.totalActivities ?? 0, description: 'Number of activities in the selected date range and filters.' },
+            { label: 'Active', value: stats?.totals?.active ?? 0, description: 'Activities with lifecycle Active (eligible for first-time sampling).' },
+            { label: 'Sampled', value: stats?.totals?.sampled ?? 0, description: 'Activities that have been sampled (first-time or ad-hoc).' },
+            { label: 'Inactive', value: stats?.totals?.inactive ?? 0, description: 'Activities marked inactive.' },
+            { label: 'Not Eligible', value: stats?.totals?.notEligible ?? 0, description: 'Activities marked not eligible for sampling.' },
+            { label: 'Farmers Total', value: stats?.totals?.farmersTotal ?? 0, description: 'Total farmers linked to these activities.' },
+            { label: 'Farmers Sampled', value: stats?.totals?.sampledFarmers ?? 0, description: 'Distinct farmers who have at least one call task (first-time + ad-hoc).' },
+            { label: 'Tasks Created', value: stats?.totals?.tasksCreated ?? 0, description: 'Total call tasks created for these activities.' },
           ].map((card) => (
-            <div key={card.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
+            <div
+              key={card.label}
+              ref={kpiTooltipOpen === card.label ? kpiTooltipRef : undefined}
+              className="bg-slate-50 rounded-xl p-3 border border-slate-200 relative min-h-[72px]"
+            >
+              <div className="flex items-start gap-1.5">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex-1 min-w-0">{card.label}</p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setKpiTooltipOpen((prev) => (prev === card.label ? null : card.label));
+                  }}
+                  className="shrink-0 p-0.5 rounded-full border-0 bg-transparent cursor-pointer text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
+                  aria-label={card.description}
+                  aria-expanded={kpiTooltipOpen === card.label}
+                >
+                  <Info className="text-slate-500" size={10} />
+                </button>
+              </div>
               <p className="text-xl font-black text-slate-900">{card.value}</p>
+              {kpiTooltipOpen === card.label && (
+                <div
+                  className="absolute left-3 right-3 top-full z-50 mt-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-xs font-medium text-white shadow-lg"
+                  role="tooltip"
+                  id={`sampling-kpi-${card.label.replace(/\s+/g, '-')}`}
+                >
+                  <span className="absolute left-5 -top-1.5 h-0 w-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-slate-700" aria-hidden />
+                  <span className="block text-slate-100">{card.description}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
