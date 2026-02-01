@@ -49,6 +49,7 @@ import {
   Users,
   Target,
   X,
+  Info,
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
@@ -688,16 +689,18 @@ const ActivityEmsProgressView: React.FC = () => {
               return (
                 <div
                   key={label}
-                  className={`rounded-xl border p-3 flex items-start gap-3 hover:shadow-md transition-shadow cursor-pointer text-left ${cardBg}`}
+                  className={`rounded-xl border p-3 flex items-start gap-3 hover:shadow-md transition-shadow cursor-help text-left min-h-[88px] ${cardBg}`}
                   title={formula}
                 >
                   <div className={`w-9 h-9 rounded-xl border shrink-0 flex items-center justify-center ${iconBg}`}>
                     <Icon className={iconColor} size={18} />
                   </div>
-                  <div className="min-w-0 flex-1 overflow-visible">
-                    <p className={`text-xs font-black uppercase tracking-widest mb-0.5 ${labelColor}`}>{label}</p>
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <p className={`text-xs font-black uppercase tracking-widest mb-0.5 flex items-center gap-1 ${labelColor}`}>
+                      {label}
+                      <Info className={`shrink-0 ${detailColor}`} size={12} aria-hidden title={formula} />
+                    </p>
                     <p className={`text-xl font-black ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
-                    <p className={`text-xs mt-1 text-left break-words leading-tight ${detailColor}`} title={formula}>{formula}</p>
                   </div>
                 </div>
               );
@@ -718,6 +721,7 @@ const ActivityEmsProgressView: React.FC = () => {
           { name: 'Attended Meeting', value: totals.yesAttendedCount, fill: '#93c5fd' },
           { name: 'Purchased', value: totals.purchasedCount, fill: '#86efac' },
         ].filter((d) => d.value != null && d.value >= 0);
+        const hasFunnelValues = funnelData.length > 0 && funnelData.some((d) => (d.value ?? 0) > 0);
         const otherOutcomesData = [
           { name: 'Disconnected', value: totals.disconnectedCount, fill: '#64748b' },
           { name: 'Incoming Not Allowed', value: totals.incomingNACount, fill: '#94a3b8' },
@@ -732,23 +736,27 @@ const ActivityEmsProgressView: React.FC = () => {
               <p className="text-xs text-slate-500 mt-1">Funnel: Recharts FunnelChart · Other outcomes: horizontal bars (BarChart)</p>
             </div>
             <div className="p-6 flex flex-wrap gap-8">
-              <div className="flex-1 min-w-[280px]" style={{ minHeight: 320 }}>
+              <div className="flex-1 min-w-[280px] w-full" style={{ height: 320 }}>
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Funnel</p>
-                {funnelData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <FunnelChart data={funnelData} margin={{ top: 12, right: 24, left: 24, bottom: 12 }}>
-                      <Tooltip formatter={(value: number, name: string, props: { payload?: { name: string } }) => [value, props?.payload?.name ?? name]} />
-                      <Funnel dataKey="value" nameKey="name" isAnimationActive>
-                        <LabelList dataKey="name" position="center" fill="#0f172a" fontSize={12} fontWeight={600} />
-                        <LabelList dataKey="value" position="center" fill="#0f172a" fontSize={11} offset={12} />
-                        {funnelData.map((entry, index) => (
-                          <Cell key={`funnel-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
-                        ))}
-                      </Funnel>
-                    </FunnelChart>
-                  </ResponsiveContainer>
+                {!hasFunnelValues ? (
+                  <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center" style={{ height: 280 }}>
+                    <p className="text-sm text-slate-600 px-4">No call data yet. The funnel will appear when you have call attempts in the selected period.</p>
+                  </div>
                 ) : (
-                  <p className="text-sm text-slate-500 py-8">No funnel data.</p>
+                  <div style={{ width: '100%', height: 300 }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <FunnelChart data={funnelData} margin={{ top: 12, right: 24, left: 24, bottom: 12 }}>
+                        <Tooltip formatter={(value: number, name: string, props: { payload?: { name: string } }) => [value, props?.payload?.name ?? name]} />
+                        <Funnel data={funnelData} dataKey="value" nameKey="name" isAnimationActive>
+                          <LabelList dataKey="name" position="center" fill="#0f172a" fontSize={12} fontWeight={600} />
+                          <LabelList dataKey="value" position="center" fill="#0f172a" fontSize={11} offset={12} />
+                          {funnelData.map((entry, index) => (
+                            <Cell key={`funnel-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
+                          ))}
+                        </Funnel>
+                      </FunnelChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </div>
               <div className="flex-1 min-w-[260px]">
