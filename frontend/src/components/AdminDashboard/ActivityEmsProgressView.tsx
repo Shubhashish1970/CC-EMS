@@ -270,6 +270,18 @@ const ActivityEmsProgressView: React.FC = () => {
   const [tableFilterText, setTableFilterText] = useState<string>('');
   type FilterDimensionKey = keyof Pick<EmsProgressFilters, 'state' | 'territory' | 'zone' | 'bu' | 'activityType'>;
   const [filterDimension, setFilterDimension] = useState<FilterDimensionKey | 'region'>('state');
+  const [kpiTooltipOpen, setKpiTooltipOpen] = useState<string | null>(null);
+  const kpiTooltipRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (kpiTooltipOpen != null && kpiTooltipRef.current && !kpiTooltipRef.current.contains(e.target as Node)) {
+        setKpiTooltipOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [kpiTooltipOpen]);
 
   const totals = useMemo(() => computeEmsTotals(emsDetailRows), [emsDetailRows]);
 
@@ -689,19 +701,42 @@ const ActivityEmsProgressView: React.FC = () => {
               return (
                 <div
                   key={label}
-                  className={`rounded-xl border p-3 flex items-start gap-3 hover:shadow-md transition-shadow cursor-help text-left min-h-[88px] ${cardBg}`}
-                  title={formula}
+                  ref={kpiTooltipOpen === label ? kpiTooltipRef : undefined}
+                  className={`rounded-xl border p-3 flex items-stretch gap-3 hover:shadow-md transition-shadow text-left min-h-[88px] relative ${cardBg}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl border shrink-0 flex items-center justify-center ${iconBg}`}>
+                  <div className={`w-9 h-9 rounded-xl border shrink-0 flex items-center justify-center self-start ${iconBg}`}>
                     <Icon className={iconColor} size={18} />
                   </div>
-                  <div className="min-w-0 flex-1 overflow-hidden">
-                    <p className={`text-xs font-black uppercase tracking-widest mb-0.5 flex items-center gap-1 ${labelColor}`}>
-                      {label}
-                      <Info className={`shrink-0 ${detailColor}`} size={12} aria-hidden title={formula} />
-                    </p>
-                    <p className={`text-xl font-black ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
+                  <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+                    <div className="min-h-[2.25rem] flex items-center gap-1 shrink-0">
+                      <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-1 flex-wrap ${labelColor}`}>
+                        {label}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setKpiTooltipOpen((prev) => (prev === label ? null : label));
+                          }}
+                          className="shrink-0 p-0.5 rounded-full border-0 bg-transparent cursor-pointer text-inherit hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
+                          aria-label={`Formula: ${formula}`}
+                          aria-expanded={kpiTooltipOpen === label}
+                        >
+                          <Info className={detailColor} size={12} />
+                        </button>
+                      </p>
+                    </div>
+                    <p className={`text-xl font-black leading-none mt-0.5 ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
                   </div>
+                  {kpiTooltipOpen === label && (
+                    <div
+                      className="absolute left-3 right-3 top-full z-50 mt-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-xs font-medium text-white shadow-lg"
+                      role="tooltip"
+                      id={`kpi-formula-${label.replace(/\s+/g, '-')}`}
+                    >
+                      <span className="absolute left-5 -top-1.5 h-0 w-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-slate-700" aria-hidden />
+                      <span className="block text-slate-100">{formula}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
