@@ -27,6 +27,9 @@ import {
   Scatter,
   ZAxis,
   ReferenceLine,
+  FunnelChart,
+  Funnel,
+  LabelList,
 } from 'recharts';
 import {
   BarChart3,
@@ -706,42 +709,72 @@ const ActivityEmsProgressView: React.FC = () => {
         </div>
       </div>
 
-      {/* Call Outcome Funnel (Totals) */}
-      {totals && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-black text-slate-900">Call Outcome Funnel (Totals)</h3>
-          </div>
-          <div className="p-6 flex flex-wrap gap-6">
-            <div className="flex-1 min-w-[200px]">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Funnel</p>
-              <div className="space-y-2">
-                {[
-                  { label: 'Total Calls Attempted', value: totals.totalAttempted, color: 'bg-slate-600 text-white border-slate-600' },
-                  { label: 'Connected', value: totals.totalConnected, color: 'bg-slate-500 text-white border-slate-500' },
-                  { label: 'Valid Identity', value: totals.validIdentity, color: 'bg-slate-400 text-slate-900 border-slate-400' },
-                  { label: 'Attended Meeting', value: totals.yesAttendedCount, color: 'bg-blue-100 text-blue-800 border border-blue-200' },
-                  { label: 'Purchased', value: totals.purchasedCount, color: 'bg-green-100 text-green-800 border border-green-200' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <div className={`w-20 h-9 rounded-xl border flex items-center justify-center text-sm font-black ${color}`}>{value}</div>
-                    <span className="text-sm font-medium text-slate-700">{label}</span>
-                  </div>
-                ))}
+      {/* Call Outcome Funnel (Totals) - Recharts FunnelChart + horizontal bars for other outcomes */}
+      {totals && (() => {
+        const funnelData = [
+          { name: 'Total Calls Attempted', value: totals.totalAttempted, fill: '#475569' },
+          { name: 'Connected', value: totals.totalConnected, fill: '#64748b' },
+          { name: 'Valid Identity', value: totals.validIdentity, fill: '#94a3b8' },
+          { name: 'Attended Meeting', value: totals.yesAttendedCount, fill: '#93c5fd' },
+          { name: 'Purchased', value: totals.purchasedCount, fill: '#86efac' },
+        ].filter((d) => d.value != null && d.value >= 0);
+        const otherOutcomesData = [
+          { name: 'Disconnected', value: totals.disconnectedCount, fill: '#64748b' },
+          { name: 'Incoming Not Allowed', value: totals.incomingNACount, fill: '#94a3b8' },
+          { name: 'No Answer', value: totals.noAnswerCount, fill: '#cbd5e1' },
+          { name: 'Invalid', value: totals.invalidCount, fill: '#f87171' },
+        ].filter((d) => (d.value ?? 0) > 0);
+        const maxOther = Math.max(1, ...otherOutcomesData.map((d) => d.value));
+        return (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+              <h3 className="text-lg font-black text-slate-900">Call Outcome Funnel (Totals)</h3>
+              <p className="text-xs text-slate-500 mt-1">Funnel: Recharts FunnelChart · Other outcomes: horizontal bars (BarChart)</p>
+            </div>
+            <div className="p-6 flex flex-wrap gap-8">
+              <div className="flex-1 min-w-[280px]" style={{ minHeight: 320 }}>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Funnel</p>
+                {funnelData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <FunnelChart data={funnelData} margin={{ top: 12, right: 24, left: 24, bottom: 12 }}>
+                      <Tooltip formatter={(value: number, name: string, props: { payload?: { name: string } }) => [value, props?.payload?.name ?? name]} />
+                      <Funnel dataKey="value" nameKey="name" isAnimationActive>
+                        <LabelList dataKey="name" position="center" fill="#0f172a" fontSize={12} fontWeight={600} />
+                        <LabelList dataKey="value" position="center" fill="#0f172a" fontSize={11} offset={12} />
+                        {funnelData.map((entry, index) => (
+                          <Cell key={`funnel-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
+                        ))}
+                      </Funnel>
+                    </FunnelChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-slate-500 py-8">No funnel data.</p>
+                )}
+              </div>
+              <div className="flex-1 min-w-[260px]">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Other outcomes (horizontal bars)</p>
+                {otherOutcomesData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={Math.max(120, otherOutcomesData.length * 44)}>
+                    <BarChart data={otherOutcomesData} layout="vertical" margin={{ top: 8, right: 32, left: 100, bottom: 8 }} barSize={24} barCategoryGap={12}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                      <XAxis type="number" domain={[0, maxOther]} allowDataOverflow tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(value: number) => [value, '']} />
+                      <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]} isAnimationActive>
+                        {otherOutcomesData.map((entry, index) => (
+                          <Cell key={`other-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-slate-500 py-4">No other outcomes (all zero).</p>
+                )}
               </div>
             </div>
-            <div className="flex-1 min-w-[180px]">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Other outcomes</p>
-              <ul className="text-sm text-slate-700 space-y-1.5">
-                <li>Disconnected: <strong className="font-bold text-slate-900">{totals.disconnectedCount}</strong></li>
-                <li>Incoming Not Allowed: <strong className="font-bold text-slate-900">{totals.incomingNACount}</strong></li>
-                <li>No Answer: <strong className="font-bold text-slate-900">{totals.noAnswerCount}</strong></li>
-                <li>Invalid: <strong className="font-bold text-slate-900">{totals.invalidCount}</strong></li>
-              </ul>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Meeting Attendance Quality (100% stacked bar by group) */}
       {emsDetailRows.length > 0 && (
