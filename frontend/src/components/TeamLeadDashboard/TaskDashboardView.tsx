@@ -15,7 +15,8 @@ type DateRangePreset =
   | 'Last 7 days'
   | 'Last week (Sun - Sat)'
   | 'Last 28 days'
-  | 'Last 30 days';
+  | 'Last 30 days'
+  | 'YTD (1 Apr LY - Today)';
 
 const LANGUAGE_ORDER = [
   'Hindi',
@@ -116,6 +117,12 @@ const TaskDashboardView: React.FC = () => {
         // Last 30 days including today: today and the previous 29 days
         start.setDate(start.getDate() - 29);
         return { start: toLocalISO(start), end: toLocalISO(today) };
+      }
+      case 'YTD (1 Apr LY - Today)': {
+        // 1st April last year to current date
+        const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
+        apr1LY.setHours(0, 0, 0, 0);
+        return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
       }
       case 'Custom':
       default:
@@ -481,6 +488,7 @@ const TaskDashboardView: React.FC = () => {
                         'Last week (Sun - Sat)',
                         'Last 28 days',
                         'Last 30 days',
+                        'YTD (1 Apr LY - Today)',
                       ] as DateRangePreset[]).map((p) => {
                         const isActive = selectedPreset === p;
                         return (

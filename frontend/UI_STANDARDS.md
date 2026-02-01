@@ -42,7 +42,7 @@ import StyledSelect from '../shared/StyledSelect';  // adjust path as needed
 - **Multi-select with search:** `SearchableMultiSelect`
 - **Unit picker (e.g. kg, gms, lt):** `UnitDropdown`
 - **Tags / multi-tag with add:** `MultiTagSelect`
-- **Date range preset:** Use the **same** date range component everywhere: one trigger button; panel with **preset buttons on the left** (Custom, Today, Yesterday, Last 7 days, etc.) and **Start date / End date inputs + Cancel/Apply on the right**. Do not use a dropdown for "Preset" inside the panel—use clickable preset buttons. Same styling: panel `border border-slate-200 rounded-xl`, inputs `min-h-12 rounded-xl border border-slate-200 focus:ring-lime-400`. Used in: ActivitySamplingView, AgentHistoryView, ActivityEmsProgressView, TaskList, CallbackRequestView, TaskDashboardView, SamplingControlView, AgentAnalyticsView.
+- **Date range preset:** Use the **same** date range component everywhere: one trigger button; panel with **preset buttons on the left** (Custom, Today, Yesterday, Last 7 days, Last 28 days, Last 30 days, **YTD (1 Apr LY - Today)** = 1st April last year to current date, etc.) and **Start date / End date inputs + Cancel/Apply on the right**. Do not use a dropdown for "Preset" inside the panel—use clickable preset buttons. Same styling: panel `border border-slate-200 rounded-xl`, inputs `min-h-12 rounded-xl border border-slate-200 focus:ring-lime-400`. Used in: ActivitySamplingView, AgentHistoryView, ActivityEmsProgressView, TaskList, CallbackRequestView, TaskDashboardView, SamplingControlView, AgentAnalyticsView.
 
 ---
 

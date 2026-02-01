@@ -141,8 +141,9 @@ export const sampleAndCreateTasks = async (
       throw new Error('Activity not found');
     }
 
-    // Only sample Active activities
-    if (activity.lifecycleStatus && activity.lifecycleStatus !== 'active') {
+    // First-sample: only sample Active activities. Ad-hoc: allow Sampled activities (we add more farmers to already-sampled activities).
+    const isAdhoc = options?.setFirstSampleRun === false;
+    if (activity.lifecycleStatus && activity.lifecycleStatus !== 'active' && !(isAdhoc && activity.lifecycleStatus === 'sampled')) {
       return {
         skipped: true,
         skipReason: `Provide only Active activities for sampling (current: ${activity.lifecycleStatus})`,

@@ -14,7 +14,8 @@ type DateRangePreset =
   | 'Last week (Sun - Sat)'
   | 'Last 28 days'
   | 'Last 30 days'
-  | 'Last 90 days';
+  | 'Last 90 days'
+  | 'YTD (1 Apr LY - Today)';
 
 // Format date to YYYY-MM-DD in local timezone (not UTC) to avoid timezone conversion issues
 const toLocalISO = (d: Date): string => {
@@ -78,6 +79,10 @@ const getPresetRange = (preset: DateRangePreset): { start: string; end: string }
       const s = new Date(today);
       s.setDate(s.getDate() - 89);
       return { start: toLocalISO(s), end: toLocalISO(today) };
+    }
+    case 'YTD (1 Apr LY - Today)': {
+      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
+      return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
     }
     case 'Custom':
     default:
@@ -257,6 +262,7 @@ const AgentAnalyticsView: React.FC = () => {
                           'Last 28 days',
                           'Last 30 days',
                           'Last 90 days',
+                          'YTD (1 Apr LY - Today)',
                         ] as DateRangePreset[]).map((p) => {
                           const isActive = selectedPreset === p;
                           return (

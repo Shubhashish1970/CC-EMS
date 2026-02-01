@@ -16,7 +16,8 @@ type DateRangePreset =
   | 'Last 7 days'
   | 'Last week (Sun - Sat)'
   | 'Last 28 days'
-  | 'Last 30 days';
+  | 'Last 30 days'
+  | 'YTD (1 Apr LY - Today)';
 
 type SamplingRunStatus = 'running' | 'completed' | 'failed';
 type LatestRun = {
@@ -131,6 +132,10 @@ const SamplingControlView: React.FC = () => {
         const s = new Date(today);
         s.setDate(s.getDate() - 29);
         return { start: toISO(s), end: toISO(today) };
+      }
+      case 'YTD (1 Apr LY - Today)': {
+        const apr1LY = new Date(today.getFullYear() - 1, 3, 1); // April 1, last year
+        return { start: toISO(apr1LY), end: toISO(today) };
       }
       case 'Custom':
       default: {
@@ -891,6 +896,7 @@ const SamplingControlView: React.FC = () => {
                         'Last week (Sun - Sat)',
                         'Last 28 days',
                         'Last 30 days',
+                        'YTD (1 Apr LY - Today)',
                       ] as DateRangePreset[]).map((p) => {
                         const isActive = selectedPreset === p;
                         return (

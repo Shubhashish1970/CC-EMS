@@ -13,7 +13,8 @@ type DateRangePreset =
   | 'Last 7 days'
   | 'Last week (Sun - Sat)'
   | 'Last 28 days'
-  | 'Last 30 days';
+  | 'Last 30 days'
+  | 'YTD (1 Apr LY - Today)';
 
 type HistoryStatus = '' | 'in_progress' | 'completed' | 'not_reachable' | 'invalid_number';
 
@@ -109,6 +110,10 @@ const getPresetRange = (preset: DateRangePreset): { start: string; end: string }
       const s = new Date(today);
       s.setDate(s.getDate() - 29);
       return { start: toLocalISO(s), end: toLocalISO(today) };
+    }
+    case 'YTD (1 Apr LY - Today)': {
+      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
+      return { start: toLocalISO(apr1LY), end: toLocalISO(today) };
     }
     case 'Custom':
     default:
@@ -529,6 +534,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                               'Last week (Sun - Sat)',
                               'Last 28 days',
                               'Last 30 days',
+                              'YTD (1 Apr LY - Today)',
                             ] as DateRangePreset[]).map((p) => {
                               const isActive = selectedPreset === p;
                               return (

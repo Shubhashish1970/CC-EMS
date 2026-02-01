@@ -87,7 +87,8 @@ type DateRangePreset =
   | 'Last 7 days'
   | 'Last week (Sun - Sat)'
   | 'Last 28 days'
-  | 'Last 30 days';
+  | 'Last 30 days'
+  | 'YTD (1 Apr LY - Today)';
 
 const EMS_REPORT_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
   { value: 'fda', label: 'By FDA' },
@@ -166,6 +167,10 @@ function getPresetRange(preset: DateRangePreset, currentFrom?: string, currentTo
       const s = new Date(today);
       s.setDate(s.getDate() - 29);
       return { start: toISODate(s), end: toISODate(today) };
+    }
+    case 'YTD (1 Apr LY - Today)': {
+      const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
+      return { start: toISODate(apr1LY), end: toISODate(today) };
     }
     case 'Custom':
     default:
@@ -550,7 +555,7 @@ const ActivityEmsProgressView: React.FC = () => {
                   <div className="absolute z-50 mt-2 left-0 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                     <div className="flex flex-col sm:flex-row">
                       <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
-                        {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days'] as DateRangePreset[]).map((p) => {
+                        {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days', 'YTD (1 Apr LY - Today)'] as DateRangePreset[]).map((p) => {
                           const isActive = selectedPreset === p;
                           return (
                             <button

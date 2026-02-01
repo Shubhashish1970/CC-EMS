@@ -169,7 +169,8 @@ const ActivitySamplingView: React.FC = () => {
     | 'Last 7 days'
     | 'Last week (Sun - Sat)'
     | 'Last 28 days'
-    | 'Last 30 days';
+    | 'Last 30 days'
+    | 'YTD (1 Apr LY - Today)';
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
@@ -234,6 +235,10 @@ const ActivitySamplingView: React.FC = () => {
         const s = new Date(today);
         s.setDate(s.getDate() - 29);
         return { start: toISODate(s), end: toISODate(today) };
+      }
+      case 'YTD (1 Apr LY - Today)': {
+        const apr1LY = new Date(today.getFullYear() - 1, 3, 1);
+        return { start: toISODate(apr1LY), end: toISODate(today) };
       }
       case 'Custom':
       default:
@@ -1101,6 +1106,7 @@ const ActivitySamplingView: React.FC = () => {
                             'Last week (Sun - Sat)',
                             'Last 28 days',
                             'Last 30 days',
+                            'YTD (1 Apr LY - Today)',
                           ] as DateRangePreset[]).map((p) => {
                             const isActive = selectedPreset === p;
                             return (
