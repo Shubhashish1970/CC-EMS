@@ -772,12 +772,53 @@ export interface EmsReportSummaryRow {
   groupLabel: string;
   totalAttempted: number;
   totalConnected: number;
+  disconnectedCount: number;
+  incomingNACount: number;
   invalidCount: number;
+  noAnswerCount: number;
   identityWrongCount: number;
+  dontRecallCount: number;
+  noMissedCount: number;
   notAFarmerCount: number;
   yesAttendedCount: number;
+  notPurchasedCount: number;
   purchasedCount: number;
+  willingMaybeCount: number;
+  willingNoCount: number;
   willingYesCount: number;
+  yesPlusPurchasedCount: number;
+  mobileValidityPct: number;
+  hygienePct: number;
+  meetingValidityPct: number;
+  meetingConversionPct: number;
+  purchaseIntentionPct: number;
+  emsScore: number;
+  relativeRemarks: string;
+}
+
+/** One row per call for drill-down; from GET /reports/ems?level=line */
+export interface EmsReportLineRow {
+  taskId: string;
+  groupKey: string;
+  groupLabel: string;
+  activityId: string;
+  activityDate: string;
+  farmerName: string;
+  farmerMobile: string;
+  officerName: string;
+  tmName: string;
+  territoryName: string;
+  zoneName: string;
+  buName: string;
+  state: string;
+  totalAttempted: 1;
+  connected: 0 | 1;
+  invalid: 0 | 1;
+  identityWrong: 0 | 1;
+  notAFarmer: 0 | 1;
+  yesAttended: 0 | 1;
+  purchased: 0 | 1;
+  willingYes: 0 | 1;
   mobileValidityPct: number;
   hygienePct: number;
   meetingValidityPct: number;
@@ -950,7 +991,7 @@ export const reportsAPI = {
     groupBy: EmsReportGroupBy,
     level: 'summary' | 'line' = 'summary',
     filters?: EmsProgressFilters
-  ) => {
+  ): Promise<{ success: boolean; data: EmsReportSummaryRow[] | EmsReportLineRow[] }> => {
     const params = new URLSearchParams();
     params.append('groupBy', groupBy);
     params.append('level', level);
@@ -962,7 +1003,7 @@ export const reportsAPI = {
     if (filters?.bu) params.append('bu', filters.bu);
     if (filters?.activityType) params.append('activityType', filters.activityType);
     const query = params.toString();
-    return apiRequest<{ success: boolean; data: EmsReportSummaryRow[] }>(`/reports/ems?${query}`);
+    return apiRequest<{ success: boolean; data: EmsReportSummaryRow[] | EmsReportLineRow[] }>(`/reports/ems?${query}`);
   },
   /** EMS trends: bucket daily|weekly|monthly, + filters */
   getEmsTrends: async (bucket: EmsTrendBucket, filters?: EmsProgressFilters) => {

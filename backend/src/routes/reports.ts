@@ -293,7 +293,7 @@ router.get(
           ['EMS Score', ...summaryRows.map((r) => r.emsScore), nbuEmsScore],
           ['Relative Remarks', ...summaryRows.map((r) => r.relativeRemarks), '—'],
         ];
-        const headerRow = ['', ...groupLabels, 'NBU'];
+        const headerRow = ['', ...groupLabels, 'Totals'];
         const sheetData = [headerRow, ...metricRows];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), 'EMS Report');
       } else {

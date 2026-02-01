@@ -1,37 +1,79 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useToast } from '../../context/ToastContext';
 import {
   kpiAPI,
   reportsAPI,
   type EmsProgressFilters,
-  type EmsProgressSummary,
   type EmsReportGroupBy,
   type EmsReportSummaryRow,
+  type EmsReportLineRow,
   type EmsTrendRow,
   type EmsTrendBucket,
 } from '../../services/api';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  ComposedChart,
+  Cell,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  ReferenceLine,
+} from 'recharts';
 import {
   BarChart3,
   Filter,
   RefreshCw,
   Download,
   Activity as ActivityIcon,
-  Users,
-  CheckCircle,
-  Clock,
-  Target,
   Loader2,
-  List,
   TrendingUp,
   Phone,
-  PhoneOff,
   MessageCircle,
   ShoppingCart,
   FileBarChart,
   Calendar,
+  Smartphone,
+  UserCheck,
+  Users,
+  Target,
+  X,
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
+
+/** Totals row derived from EMS summary rows (same formulas as backend) */
+export type EmsTotals = {
+  totalAttempted: number;
+  totalConnected: number;
+  disconnectedCount: number;
+  incomingNACount: number;
+  invalidCount: number;
+  noAnswerCount: number;
+  identityWrongCount: number;
+  dontRecallCount: number;
+  noMissedCount: number;
+  notAFarmerCount: number;
+  yesAttendedCount: number;
+  purchasedCount: number;
+  willingYesCount: number;
+  yesPlusPurchasedCount: number;
+  mobileValidityPct: number;
+  hygienePct: number;
+  meetingValidityPct: number;
+  meetingConversionPct: number;
+  purchaseIntentionPct: number;
+  emsScore: number;
+  validIdentity: number;
+};
 
 type DateRangePreset =
   | 'Custom'
@@ -58,9 +100,13 @@ const TREND_BUCKET_OPTIONS: { value: EmsTrendBucket; label: string }[] = [
   { value: 'monthly', label: 'Monthly' },
 ];
 
-const DETAIL_GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
-  { value: 'fda', label: 'By FDA' },
-  { value: 'tm', label: 'By TM' },
+const GROUP_BY_OPTIONS: { value: EmsReportGroupBy; label: string }[] = [
+  { value: 'tm', label: 'TM' },
+  { value: 'fda', label: 'FDA' },
+  { value: 'territory', label: 'Territory' },
+  { value: 'zone', label: 'Zone' },
+  { value: 'region', label: 'Region' },
+  { value: 'bu', label: 'BU' },
 ];
 
 function toISODate(d: Date): string {
@@ -130,13 +176,56 @@ function formatPretty(iso: string): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
+  if (!rows.length) return null;
+  const r0 = rows[0];
+  const hasCounts = 'disconnectedCount' in r0 && (r0 as EmsReportSummaryRow).disconnectedCount != null;
+  let totalAttempted = 0, totalConnected = 0, disconnectedCount = 0, incomingNACount = 0, invalidCount = 0, noAnswerCount = 0;
+  let identityWrongCount = 0, dontRecallCount = 0, noMissedCount = 0, notAFarmerCount = 0, yesAttendedCount = 0;
+  let notPurchasedCount = 0, purchasedCount = 0, willingMaybeCount = 0, willingNoCount = 0, willingYesCount = 0, yesPlusPurchasedCount = 0;
+  for (const r of rows) {
+    totalAttempted += r.totalAttempted;
+    totalConnected += r.totalConnected;
+    invalidCount += r.invalidCount;
+    identityWrongCount += (r as EmsReportSummaryRow & { identityWrongCount?: number }).identityWrongCount ?? 0;
+    notAFarmerCount += r.notAFarmerCount;
+    yesAttendedCount += r.yesAttendedCount;
+    purchasedCount += r.purchasedCount;
+    willingYesCount += r.willingYesCount;
+    if (hasCounts) {
+      disconnectedCount += (r as EmsReportSummaryRow).disconnectedCount ?? 0;
+      incomingNACount += (r as EmsReportSummaryRow).incomingNACount ?? 0;
+      noAnswerCount += (r as EmsReportSummaryRow).noAnswerCount ?? 0;
+      dontRecallCount += (r as EmsReportSummaryRow).dontRecallCount ?? 0;
+      noMissedCount += (r as EmsReportSummaryRow).noMissedCount ?? 0;
+      notPurchasedCount += (r as EmsReportSummaryRow).notPurchasedCount ?? 0;
+      willingMaybeCount += (r as EmsReportSummaryRow).willingMaybeCount ?? 0;
+      willingNoCount += (r as EmsReportSummaryRow).willingNoCount ?? 0;
+      yesPlusPurchasedCount += (r as EmsReportSummaryRow).yesPlusPurchasedCount ?? 0;
+    }
+  }
+  if (!hasCounts) yesPlusPurchasedCount = willingYesCount + purchasedCount;
+  const mobileValidityPct = totalAttempted > 0 ? Math.round(((totalAttempted - invalidCount) / totalAttempted) * 100) : 0;
+  const hygienePct = totalConnected > 0 ? Math.round(((totalConnected - identityWrongCount - notAFarmerCount) / totalConnected) * 100) : 0;
+  const meetingValidityPct = totalConnected > 0 ? Math.round((yesAttendedCount / totalConnected) * 100) : 0;
+  const meetingConversionPct = totalConnected > 0 ? Math.round((purchasedCount / totalConnected) * 100) : 0;
+  const purchaseIntentionPct = totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
+  const emsScore = Math.round((mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4);
+  const validIdentity = totalConnected - identityWrongCount - notAFarmerCount;
+  return {
+    totalAttempted, totalConnected, disconnectedCount, incomingNACount, invalidCount, noAnswerCount,
+    identityWrongCount, dontRecallCount, noMissedCount, notAFarmerCount, yesAttendedCount,
+    notPurchasedCount, purchasedCount, willingMaybeCount, willingNoCount, willingYesCount, yesPlusPurchasedCount,
+    mobileValidityPct, hygienePct, meetingValidityPct, meetingConversionPct, purchaseIntentionPct, emsScore, validIdentity,
+  };
+}
+
 const ActivityEmsProgressView: React.FC = () => {
   const { showError, showSuccess } = useToast();
-  const [summary, setSummary] = useState<EmsProgressSummary | null>(null);
   const [emsDetailRows, setEmsDetailRows] = useState<EmsReportSummaryRow[]>([]);
   const [emsTrends, setEmsTrends] = useState<EmsTrendRow[]>([]);
   const [trendBucket, setTrendBucket] = useState<EmsTrendBucket>('weekly');
-  const [detailGroupBy, setDetailGroupBy] = useState<EmsReportGroupBy>('fda');
+  const [groupBy, setGroupBy] = useState<EmsReportGroupBy>('fda');
   const [isLoadingEmsDetail, setIsLoadingEmsDetail] = useState(false);
   const [isLoadingEmsTrends, setIsLoadingEmsTrends] = useState(false);
   const [filterOptions, setFilterOptions] = useState<{
@@ -146,7 +235,6 @@ const ActivityEmsProgressView: React.FC = () => {
     buOptions: string[];
     activityTypeOptions: string[];
   }>({ stateOptions: [], territoryOptions: [], zoneOptions: [], buOptions: [], activityTypeOptions: [] });
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingTaskDetails, setIsExportingTaskDetails] = useState(false);
@@ -169,6 +257,40 @@ const ActivityEmsProgressView: React.FC = () => {
   const [draftStart, setDraftStart] = useState(defaultRange.dateFrom);
   const [draftEnd, setDraftEnd] = useState(defaultRange.dateTo);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
+  const [drillDownGroupKey, setDrillDownGroupKey] = useState<string | null>(null);
+  const [drillDownLabel, setDrillDownLabel] = useState<string>('');
+  const [lineRows, setLineRows] = useState<EmsReportLineRow[]>([]);
+  const [isLoadingLine, setIsLoadingLine] = useState(false);
+  const [tableSortKey, setTableSortKey] = useState<string>('');
+  const [tableSortDir, setTableSortDir] = useState<'asc' | 'desc'>('asc');
+  const [tableFilterText, setTableFilterText] = useState<string>('');
+
+  const totals = useMemo(() => computeEmsTotals(emsDetailRows), [emsDetailRows]);
+
+  const tableRows = useMemo(() => {
+    let rows = emsDetailRows;
+    if (tableFilterText.trim()) {
+      const q = tableFilterText.trim().toLowerCase();
+      rows = rows.filter((r) => (r.groupLabel || r.groupKey).toLowerCase().includes(q));
+    }
+    if (tableSortKey) {
+      rows = [...rows].sort((a, b) => {
+        const av = (a as Record<string, unknown>)[tableSortKey] as number | string;
+        const bv = (b as Record<string, unknown>)[tableSortKey] as number | string;
+        const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+        return tableSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return rows;
+  }, [emsDetailRows, tableFilterText, tableSortKey, tableSortDir]);
+
+  const toggleSort = (key: string) => {
+    if (tableSortKey === key) setTableSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setTableSortKey(key);
+      setTableSortDir('asc');
+    }
+  };
 
   const syncDraftFromFilters = useCallback(() => {
     const start = filters.dateFrom || getPresetRange(selectedPreset, filters.dateFrom, filters.dateTo).start;
@@ -209,25 +331,11 @@ const ActivityEmsProgressView: React.FC = () => {
     }
   }, [filters.dateFrom, filters.dateTo, filters.state, filters.territory, filters.zone, filters.bu, filters.activityType, showError]);
 
-  const fetchSummary = useCallback(async () => {
-    setIsLoadingSummary(true);
-    try {
-      const res = await kpiAPI.getEmsProgress(filters);
-      if (res.success && res.data) setSummary(res.data);
-      else setSummary(null);
-    } catch (e) {
-      showError(e instanceof Error ? e.message : 'Failed to load EMS progress');
-      setSummary(null);
-    } finally {
-      setIsLoadingSummary(false);
-    }
-  }, [filters, showError]);
-
   const fetchEmsDetail = useCallback(async () => {
     setIsLoadingEmsDetail(true);
     try {
-      const res = await reportsAPI.getEmsReport(detailGroupBy, 'summary', filters);
-      if (res.success && res.data) setEmsDetailRows(res.data);
+      const res = await reportsAPI.getEmsReport(groupBy, 'summary', filters);
+      if (res.success && res.data) setEmsDetailRows(res.data as EmsReportSummaryRow[]);
       else setEmsDetailRows([]);
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Failed to load EMS detail');
@@ -235,7 +343,23 @@ const ActivityEmsProgressView: React.FC = () => {
     } finally {
       setIsLoadingEmsDetail(false);
     }
-  }, [detailGroupBy, filters, showError]);
+  }, [groupBy, filters, showError]);
+
+  const fetchLineLevel = useCallback(async (groupKey: string) => {
+    setIsLoadingLine(true);
+    try {
+      const res = await reportsAPI.getEmsReport(groupBy, 'line', filters);
+      if (res.success && res.data) {
+        const lines = (res.data as EmsReportLineRow[]).filter((r) => r.groupKey === groupKey);
+        setLineRows(lines);
+      } else setLineRows([]);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to load call details');
+      setLineRows([]);
+    } finally {
+      setIsLoadingLine(false);
+    }
+  }, [groupBy, filters, showError]);
 
   const fetchEmsTrends = useCallback(async () => {
     setIsLoadingEmsTrends(true);
@@ -256,16 +380,21 @@ const ActivityEmsProgressView: React.FC = () => {
   }, [fetchOptions]);
 
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
-  useEffect(() => {
     fetchEmsDetail();
   }, [fetchEmsDetail]);
 
   useEffect(() => {
     fetchEmsTrends();
   }, [fetchEmsTrends]);
+
+  useEffect(() => {
+    if (drillDownGroupKey != null) {
+      setDrillDownLabel(drillDownGroupKey);
+      fetchLineLevel(drillDownGroupKey);
+    } else {
+      setLineRows([]);
+    }
+  }, [drillDownGroupKey, fetchLineLevel]);
 
   const handleEmsReportDownload = async () => {
     setIsExporting(true);
@@ -311,8 +440,8 @@ const ActivityEmsProgressView: React.FC = () => {
             <BarChart3 className="text-lime-600" size={22} />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Activity EMS Progress</h2>
-            <p className="text-sm text-slate-500">Holistic view of activities, tasks, and completion with filters and drill-down</p>
+            <h2 className="text-lg font-bold text-slate-800">Activity EMS Dashboard</h2>
+            <p className="text-sm text-slate-500">Visual EMS metrics, drill-down by group, and trends (Totals)</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -328,11 +457,11 @@ const ActivityEmsProgressView: React.FC = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => { fetchSummary(); fetchEmsDetail(); fetchEmsTrends(); fetchOptions(); }}
-            disabled={isLoadingSummary || isLoadingEmsDetail || isLoadingEmsTrends}
+            onClick={() => { fetchEmsDetail(); fetchEmsTrends(); fetchOptions(); }}
+            disabled={isLoadingEmsDetail || isLoadingEmsTrends}
             className="flex items-center gap-2"
           >
-            {isLoadingSummary || isLoadingEmsDetail || isLoadingEmsTrends ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {isLoadingEmsDetail || isLoadingEmsTrends ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Refresh
           </Button>
           <Button
@@ -361,7 +490,16 @@ const ActivityEmsProgressView: React.FC = () => {
       {/* Filters */}
       {showFilters && (
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Group By</label>
+              <StyledSelect
+                value={groupBy}
+                onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
+                options={GROUP_BY_OPTIONS}
+                placeholder="Group by"
+              />
+            </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</label>
               <div className="relative" ref={datePickerRef}>
@@ -510,86 +648,193 @@ const ActivityEmsProgressView: React.FC = () => {
         </div>
       )}
 
-      {/* Visual KPI Cards */}
+      {/* Executive KPI Scorecards (Totals) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {isLoadingSummary ? (
+        {isLoadingEmsDetail ? (
           <div className="col-span-full flex items-center justify-center py-12">
             <Loader2 className="animate-spin text-lime-600" size={32} />
           </div>
-        ) : summary ? (
+        ) : totals ? (
           <>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <ActivityIcon className="text-slate-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Activities</p>
-                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.activities.total}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Sampled: {summary.activities.sampledCount} · Partial: {summary.activities.partialCount}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <Target className="text-blue-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tasks</p>
-                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.total}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Completed: {summary.tasks.completed} · Queue: {(summary.tasks.sampled_in_queue || 0) + (summary.tasks.unassigned || 0)}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 border-l-4 border-l-lime-500 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-lime-50 flex items-center justify-center shrink-0">
-                <CheckCircle className="text-lime-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completion</p>
-                <p className="text-2xl font-bold text-lime-600 mt-0.5">{summary.tasks.completionRatePct}%</p>
-                <p className="text-[11px] text-slate-400 mt-1">Task completion rate</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                <Users className="text-amber-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Farmers</p>
-                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.farmers.totalInActivities}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Sampled: {summary.farmers.sampled}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                <Clock className="text-violet-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">In Progress</p>
-                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.in_progress}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Tasks in progress</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <List className="text-slate-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Unassigned</p>
-                <p className="text-2xl font-bold text-slate-800 mt-0.5">{summary.tasks.unassigned || 0}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Awaiting allocation</p>
-              </div>
-            </div>
+            {[
+              { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: '(Attempted − Invalid) / Attempted', icon: Smartphone },
+              { label: 'Hygiene (%)', value: totals.hygienePct, formula: '(Connected − Identity Wrong − Not Farmer) / Connected', icon: UserCheck },
+              { label: 'Meeting Validity (%)', value: totals.meetingValidityPct, formula: 'Yes Attended / Connected', icon: Users },
+              { label: 'Meeting Conversion (%)', value: totals.meetingConversionPct, formula: 'Purchased / Connected', icon: ShoppingCart },
+              { label: 'Purchase Intention (%)', value: totals.purchaseIntentionPct, formula: '(Willing Yes + Purchased) / Connected', icon: Target },
+              { label: 'EMS Score (Totals)', value: totals.emsScore, formula: 'Average of Mobile Validity %, Meeting Validity %, Meeting Conversion %, Purchase Intention %', icon: FileBarChart },
+            ].map(({ label, value, formula, icon: Icon }) => {
+              const colorClass = value >= 70 ? 'text-lime-600 border-lime-500' : value >= 50 ? 'text-amber-600 border-amber-500' : 'text-red-600 border-red-400';
+              const bgClass = value >= 70 ? 'bg-lime-50' : value >= 50 ? 'bg-amber-50' : 'bg-red-50';
+              return (
+                <div
+                  key={label}
+                  className={`bg-white rounded-xl border border-slate-200 border-l-4 p-4 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow cursor-pointer ${colorClass}`}
+                  title={formula}
+                >
+                  <div className={`w-10 h-10 rounded-lg ${bgClass} flex items-center justify-center shrink-0`}>
+                    <Icon className={value >= 70 ? 'text-lime-600' : value >= 50 ? 'text-amber-600' : 'text-red-600'} size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</p>
+                    <p className={`text-2xl font-bold mt-0.5 ${colorClass.split(' ')[0]}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 truncate" title={formula}>{formula}</p>
+                  </div>
+                </div>
+              );
+            })}
           </>
         ) : (
-          <div className="col-span-full text-center py-8 text-slate-500">No data. Adjust filters or refresh.</div>
+          <div className="col-span-full text-center py-8 text-slate-500">No EMS data. Adjust filters or refresh.</div>
         )}
       </div>
 
-      {/* Trend: shift in the needle */}
+      {/* Call Outcome Funnel (Totals) */}
+      {totals && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <h3 className="font-semibold text-slate-800">Call Outcome Funnel (Totals)</h3>
+          </div>
+          <div className="p-4 flex flex-wrap gap-6">
+            <div className="flex-1 min-w-[200px]">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Funnel</p>
+              <div className="space-y-2">
+                {[
+                  { label: 'Total Calls Attempted', value: totals.totalAttempted, color: 'bg-slate-500' },
+                  { label: 'Connected', value: totals.totalConnected, color: 'bg-blue-500' },
+                  { label: 'Valid Identity', value: totals.validIdentity, color: 'bg-cyan-500' },
+                  { label: 'Attended Meeting', value: totals.yesAttendedCount, color: 'bg-teal-500' },
+                  { label: 'Purchased', value: totals.purchasedCount, color: 'bg-lime-500' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className={`w-24 h-8 rounded ${color} flex items-center justify-center text-white text-sm font-bold`}>{value}</div>
+                    <span className="text-sm text-slate-700">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Other outcomes</p>
+              <ul className="text-sm text-slate-700 space-y-1">
+                <li>Disconnected: <strong>{totals.disconnectedCount}</strong></li>
+                <li>Incoming Not Allowed: <strong>{totals.incomingNACount}</strong></li>
+                <li>No Answer: <strong>{totals.noAnswerCount}</strong></li>
+                <li>Invalid: <strong>{totals.invalidCount}</strong></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Meeting Attendance Quality (100% stacked bar by group) */}
+      {emsDetailRows.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <h3 className="font-semibold text-slate-800">Meeting Attendance Quality</h3>
+            <p className="text-xs text-slate-500 mt-0.5">100% stacked by group; label = Meeting Validity %</p>
+          </div>
+          <div className="p-4">
+            <ResponsiveContainer width="100%" height={Math.max(280, emsDetailRows.length * 36)}>
+              <BarChart data={emsDetailRows.map((r) => {
+                const total = (r.yesAttendedCount ?? 0) + (r.noMissedCount ?? 0) + (r.dontRecallCount ?? 0) + (r.identityWrongCount ?? 0) + (r.notAFarmerCount ?? 0) || 1;
+                return {
+                  name: r.groupLabel || r.groupKey,
+                  yes: Math.round(((r.yesAttendedCount ?? 0) / total) * 100),
+                  no: Math.round(((r.noMissedCount ?? 0) / total) * 100),
+                  maybe: Math.round(((r.dontRecallCount ?? 0) / total) * 100),
+                  identityWrong: Math.round(((r.identityWrongCount ?? 0) / total) * 100),
+                  notFarmer: Math.round(((r.notAFarmerCount ?? 0) / total) * 100),
+                  meetingValidityPct: r.meetingValidityPct,
+                };
+              })} layout="vertical" margin={{ top: 8, right: 24, left: 100, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => [`${v}%`, '']} />
+                <Legend />
+                <Bar dataKey="yes" stackId="a" name="Yes attended" fill="#22c55e" />
+                <Bar dataKey="no" stackId="a" name="No (missed)" fill="#ef4444" />
+                <Bar dataKey="maybe" stackId="a" name="Maybe" fill="#f59e0b" />
+                <Bar dataKey="identityWrong" stackId="a" name="Identity Wrong" fill="#8b5cf6" />
+                <Bar dataKey="notFarmer" stackId="a" name="Not a Farmer" fill="#64748b" />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-4 mt-2">
+              {emsDetailRows.slice(0, 12).map((r) => (
+                <span key={r.groupKey} className="text-xs text-slate-600">
+                  <strong>{r.groupLabel || r.groupKey}</strong>: {r.meetingValidityPct}%
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conversion & Intent: bar chart + scatter */}
+      {emsDetailRows.length > 0 && totals && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <h3 className="font-semibold text-slate-800">Conversion & Intent</h3>
+          </div>
+          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Per group: Purchased, Willing Yes, Yes+Purchased, Purchase Intention %</p>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={emsDetailRows.map((r) => ({
+                  name: (r.groupLabel || r.groupKey).slice(0, 14),
+                  purchased: r.purchasedCount,
+                  willingYes: r.willingYesCount,
+                  yesPlusPurchased: (r as EmsReportSummaryRow).yesPlusPurchasedCount ?? r.willingYesCount + r.purchasedCount,
+                  purchaseIntentionPct: r.purchaseIntentionPct,
+                }))} margin={{ top: 8, right: 24, left: 8, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="purchased" name="Purchased" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="willingYes" name="Willing Yes" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="yesPlusPurchased" name="Yes+Purchased" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="purchaseIntentionPct" name="Purchase Intention %" stroke="#eab308" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Meeting Validity % vs Meeting Conversion % (bubble = Connected); ref = Totals</p>
+              <ResponsiveContainer width="100%" height={320}>
+                <ScatterChart margin={{ top: 8, right: 24, left: 8, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" dataKey="meetingValidityPct" name="Meeting Validity %" domain={[0, 100]} />
+                  <YAxis type="number" dataKey="meetingConversionPct" name="Meeting Conversion %" domain={[0, 100]} />
+                  <ZAxis type="number" dataKey="totalConnected" range={[80, 400]} name="Connected" />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <ReferenceLine x={totals.meetingValidityPct} stroke="#64748b" strokeDasharray="4 4" label="Totals MV" />
+                  <ReferenceLine y={totals.meetingConversionPct} stroke="#64748b" strokeDasharray="4 4" label="Totals MC" />
+                  <Scatter name="Groups" data={emsDetailRows.map((r) => ({
+                    meetingValidityPct: r.meetingValidityPct,
+                    meetingConversionPct: r.meetingConversionPct,
+                    totalConnected: r.totalConnected,
+                    name: r.groupLabel || r.groupKey,
+                    emsScore: r.emsScore,
+                  }))} fill="#22c55e">
+                    {emsDetailRows.map((r, i) => (
+                      <Cell key={i} fill={r.emsScore >= 70 ? '#22c55e' : r.emsScore >= 50 ? '#f59e0b' : '#ef4444'} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trends View (Totals): Daily / Weekly / Monthly – EMS Score, Meeting Validity %, Meeting Conversion %, Purchase Intention % */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
             <TrendingUp className="text-lime-600" size={20} />
-            <h3 className="font-semibold text-slate-800">Trend over time</h3>
+            <h3 className="font-semibold text-slate-800">Trends (Totals)</h3>
           </div>
           <div className="flex items-center gap-2">
             {TREND_BUCKET_OPTIONS.map((opt) => (
@@ -614,67 +859,38 @@ const ActivityEmsProgressView: React.FC = () => {
           ) : emsTrends.length === 0 ? (
             <p className="text-center py-8 text-slate-500 text-sm">No trend data for current filters. Complete some calls in the date range.</p>
           ) : (
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <FileBarChart size={14} /> EMS Score
-                </p>
-                <div className="flex items-end gap-1 h-24">
-                  {emsTrends.map((r) => {
-                    const max = Math.max(...emsTrends.map((x) => x.emsScore), 1);
-                    const h = max > 0 ? (r.emsScore / max) * 80 : 0;
-                    return (
-                      <div key={r.period} className="flex-1 min-w-0 flex flex-col items-center gap-1" title={`${r.period}: ${r.emsScore}`}>
-                        <div className="w-full bg-lime-100 rounded-t flex-1 min-h-[4px] flex flex-col justify-end">
-                          <div className="bg-lime-500 rounded-t transition-all" style={{ height: `${h}px` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-500 truncate w-full text-center">{r.period}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Phone size={14} /> Connected calls
-                </p>
-                <div className="flex items-end gap-1 h-20">
-                  {emsTrends.map((r) => {
-                    const max = Math.max(...emsTrends.map((x) => x.totalConnected), 1);
-                    const h = max > 0 ? (r.totalConnected / max) * 64 : 0;
-                    return (
-                      <div key={r.period} className="flex-1 min-w-0 flex flex-col items-center gap-1" title={`${r.period}: ${r.totalConnected}`}>
-                        <div className="w-full bg-blue-100 rounded-t flex-1 min-h-[4px] flex flex-col justify-end">
-                          <div className="bg-blue-500 rounded-t transition-all" style={{ height: `${h}px` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-500 truncate w-full text-center">{r.period}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={emsTrends} margin={{ top: 8, right: 24, left: 8, bottom: 24 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(value: number) => (value != null ? `${value}%` : '')} />
+                <Legend />
+                <Line type="monotone" dataKey="emsScore" name="EMS Score" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="meetingValidityPct" name="Meeting Validity %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="meetingConversionPct" name="Meeting Conversion %" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="purchaseIntentionPct" name="Purchase Intention %" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* EMS metrics detail – drill by FDA / TM */}
+      {/* Performance Table (Group vs Totals) – sortable, filterable, row click = drill down */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
             <MessageCircle className="text-slate-600" size={20} />
-            <h3 className="font-semibold text-slate-800">EMS metrics detail</h3>
+            <h3 className="font-semibold text-slate-800">Performance Table (Group vs Totals)</h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500">Drill by</span>
-            <div className="min-w-[160px]">
-              <StyledSelect
-                value={detailGroupBy}
-                onChange={(v) => setDetailGroupBy(v as EmsReportGroupBy)}
-                options={DETAIL_GROUP_BY_OPTIONS}
-                placeholder="Drill by"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Filter by group name..."
+              value={tableFilterText}
+              onChange={(e) => setTableFilterText(e.target.value)}
+              className="min-w-[180px] px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+            />
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -682,30 +898,32 @@ const ActivityEmsProgressView: React.FC = () => {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-lime-600" size={28} />
             </div>
-          ) : emsDetailRows.length === 0 ? (
+          ) : tableRows.length === 0 ? (
             <p className="text-center py-12 text-slate-500 text-sm">No EMS detail for current filters. Apply filters and ensure completed calls exist.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-100 text-left text-slate-600 font-medium">
-                  <th className="px-4 py-3">Group</th>
-                  <th className="px-4 py-3 text-right">Attempted</th>
-                  <th className="px-4 py-3 text-right">Connected</th>
-                  <th className="px-4 py-3 text-right">Mobile validity %</th>
-                  <th className="px-4 py-3 text-right">Meeting validity %</th>
-                  <th className="px-4 py-3 text-right">Meeting conversion %</th>
-                  <th className="px-4 py-3 text-right">Purchase intention %</th>
-                  <th className="px-4 py-3 text-right">EMS Score</th>
+                  <th className="px-4 py-3 cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('groupLabel')}>Group Name {tableSortKey === 'groupLabel' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('totalAttempted')}>Total Calls {tableSortKey === 'totalAttempted' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('totalConnected')}>Connected {tableSortKey === 'totalConnected' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('meetingValidityPct')}>Meeting Validity % {tableSortKey === 'meetingValidityPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('meetingConversionPct')}>Meeting Conversion % {tableSortKey === 'meetingConversionPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('purchaseIntentionPct')}>Purchase Intention % {tableSortKey === 'purchaseIntentionPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('emsScore')}>EMS Score {tableSortKey === 'emsScore' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
                   <th className="px-4 py-3 max-w-[200px]">Relative remarks</th>
                 </tr>
               </thead>
               <tbody>
-                {emsDetailRows.map((row) => (
-                  <tr key={row.groupKey} className="border-b border-slate-100 hover:bg-slate-50">
+                {tableRows.map((row) => (
+                  <tr
+                    key={row.groupKey}
+                    className="border-b border-slate-100 hover:bg-lime-50 cursor-pointer"
+                    onClick={() => { setDrillDownGroupKey(row.groupKey); setDrillDownLabel(row.groupLabel || row.groupKey); }}
+                  >
                     <td className="px-4 py-3 font-medium text-slate-800">{row.groupLabel || '—'}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.totalAttempted}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.totalConnected}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{row.mobileValidityPct}%</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.meetingValidityPct}%</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.meetingConversionPct}%</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.purchaseIntentionPct}%</td>
@@ -724,8 +942,72 @@ const ActivityEmsProgressView: React.FC = () => {
       </div>
 
       <p className="text-xs text-slate-500">
-        For a detailed activity list with the same filters, use the <strong>Activity Monitoring</strong> tab. Use <strong>EMS report</strong> to export by FDA, Territory, Region, Zone, BU, or TM.
+        For a detailed activity list with the same filters, use the <strong>Activity Monitoring</strong> tab. Use <strong>EMS report</strong> to export by FDA, Territory, Region, Zone, BU, or TM. Click a row in the Performance Table to drill down to call-level details.
       </p>
+
+      {/* Drill-down: Call-Level View modal */}
+      {drillDownGroupKey != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDrillDownGroupKey(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-[95vw] w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
+              <h3 className="font-semibold text-slate-800">Call-level view: {drillDownLabel}</h3>
+              <button type="button" onClick={() => setDrillDownGroupKey(null)} className="p-2 rounded-lg hover:bg-slate-200 text-slate-600" aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              {isLoadingLine ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-lime-600" size={28} />
+                </div>
+              ) : lineRows.length === 0 ? (
+                <p className="text-center py-8 text-slate-500 text-sm">No call-level data for this group.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-100 text-left text-slate-600 font-medium">
+                      <th className="px-3 py-2">Farmer Name</th>
+                      <th className="px-3 py-2">Farmer Mobile</th>
+                      <th className="px-3 py-2">Officer (FDA)</th>
+                      <th className="px-3 py-2">TM</th>
+                      <th className="px-3 py-2">Territory</th>
+                      <th className="px-3 py-2 text-center">Connected</th>
+                      <th className="px-3 py-2 text-right">Mobile Validity %</th>
+                      <th className="px-3 py-2 text-right">Hygiene %</th>
+                      <th className="px-3 py-2 text-right">Meeting Validity %</th>
+                      <th className="px-3 py-2 text-right">Meeting Conversion %</th>
+                      <th className="px-3 py-2 text-right">Purchase Intention %</th>
+                      <th className="px-3 py-2 text-right">EMS Score</th>
+                      <th className="px-3 py-2 max-w-[180px]">Relative Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineRows.map((r) => (
+                      <tr key={r.taskId} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-3 py-2 font-medium text-slate-800">{r.farmerName || '—'}</td>
+                        <td className="px-3 py-2 text-slate-700">{r.farmerMobile || '—'}</td>
+                        <td className="px-3 py-2 text-slate-700">{r.officerName || '—'}</td>
+                        <td className="px-3 py-2 text-slate-700">{r.tmName || '—'}</td>
+                        <td className="px-3 py-2 text-slate-700">{r.territoryName || '—'}</td>
+                        <td className="px-3 py-2 text-center">{r.connected}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{r.mobileValidityPct}%</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{r.hygienePct}%</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.meetingValidityPct)}%</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.meetingConversionPct)}%</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.purchaseIntentionPct)}%</td>
+                        <td className="px-3 py-2 text-right">
+                          <span className={r.emsScore >= 70 ? 'text-lime-600 font-semibold' : r.emsScore >= 50 ? 'text-amber-600' : 'text-slate-700'}>{r.emsScore}</span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 text-xs max-w-[180px] truncate" title={r.relativeRemarks}>{r.relativeRemarks || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EMS Report download modal */}
       {showEmsReportModal && (
