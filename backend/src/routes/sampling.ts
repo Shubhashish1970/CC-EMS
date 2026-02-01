@@ -171,8 +171,14 @@ router.get(
         {
           $addFields: {
             farmersTotal: { $size: { $ifNull: ['$farmerIds', []] } },
+            // Farmers sampled = distinct farmers with at least one CallTask (first-time + ad-hoc), not just latest audit
             sampledFarmers: {
-              $ifNull: [{ $arrayElemAt: ['$audit.sampledCount', 0] }, 0],
+              $size: {
+                $ifNull: [
+                  { $setUnion: { $map: { input: { $ifNull: ['$tasks', []] }, as: 't', in: '$$t.farmerId' } } },
+                  [],
+                ],
+              },
             },
             tasksCreated: { $size: { $ifNull: ['$tasks', []] } },
             unassignedTasks: {

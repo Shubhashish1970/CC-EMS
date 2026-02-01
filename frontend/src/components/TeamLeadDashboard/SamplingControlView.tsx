@@ -1007,7 +1007,7 @@ const SamplingControlView: React.FC = () => {
           <div className="bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-black text-slate-700">By Activity Type</div>
             <div className="text-xs text-slate-500 min-w-0">
-              Farmers sampled = sampling audit total; Tasks created = call tasks count
+              Farmers sampled = distinct farmers with call tasks (first-time + ad-hoc); Tasks created = call tasks count
             </div>
           </div>
           <div className="overflow-x-auto min-w-0 -mx-px">
