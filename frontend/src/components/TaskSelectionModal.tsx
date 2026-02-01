@@ -46,18 +46,16 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'in_progress' | 'sampled_in_queue' | 'completed'>('in_progress');
-  const [territoryFilter, setTerritoryFilter] = useState('');
-  const [tmFilter, setTmFilter] = useState('');
-  const [fdaFilter, setFdaFilter] = useState('');
+  const [filterBy, setFilterBy] = useState<'' | 'territory' | 'tm' | 'fda'>('');
+  const [filterValue, setFilterValue] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       fetchAvailableTasks();
       setSearchQuery('');
       setFilter('in_progress');
-      setTerritoryFilter('');
-      setTmFilter('');
-      setFdaFilter('');
+      setFilterBy('');
+      setFilterValue('');
     }
   }, [isOpen]);
 
@@ -98,6 +96,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   };
 
   const norm = (s: string | undefined) => (s ?? '').trim();
+
   const territoryOptions = useMemo(() => {
     const set = new Set<string>();
     tasks.forEach(t => {
@@ -108,57 +107,56 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   }, [tasks]);
 
   const tmOptions = useMemo(() => {
-    if (!territoryFilter) return [];
     const set = new Set<string>();
     tasks.forEach(t => {
-      if (norm(t.activity?.territory) !== territoryFilter) return;
       const v = norm(t.activity?.tmName);
       if (v) set.add(v);
     });
     return Array.from(set).sort();
-  }, [tasks, territoryFilter]);
+  }, [tasks]);
 
   const fdaOptions = useMemo(() => {
-    if (!territoryFilter || !tmFilter) return [];
     const set = new Set<string>();
     tasks.forEach(t => {
-      if (norm(t.activity?.territory) !== territoryFilter || norm(t.activity?.tmName) !== tmFilter) return;
       const v = norm(t.activity?.officerName);
       if (v) set.add(v);
     });
     return Array.from(set).sort();
-  }, [tasks, territoryFilter, tmFilter]);
+  }, [tasks]);
 
-  const tasksByTerritoryTmFda = useMemo(() => {
+  const nameOptions = useMemo(() => {
+    if (filterBy === 'territory') return territoryOptions;
+    if (filterBy === 'tm') return tmOptions;
+    if (filterBy === 'fda') return fdaOptions;
+    return [];
+  }, [filterBy, territoryOptions, tmOptions, fdaOptions]);
+
+  const tasksByFilter = useMemo(() => {
+    if (!filterBy || !filterValue) return tasks;
     return tasks.filter(t => {
-      if (territoryFilter && norm(t.activity?.territory) !== territoryFilter) return false;
-      if (tmFilter && norm(t.activity?.tmName) !== tmFilter) return false;
-      if (fdaFilter && norm(t.activity?.officerName) !== fdaFilter) return false;
+      if (filterBy === 'territory') return norm(t.activity?.territory) === filterValue;
+      if (filterBy === 'tm') return norm(t.activity?.tmName) === filterValue;
+      if (filterBy === 'fda') return norm(t.activity?.officerName) === filterValue;
       return true;
     });
-  }, [tasks, territoryFilter, tmFilter, fdaFilter]);
+  }, [tasks, filterBy, filterValue]);
 
   const { inProgressCount, queueCount, completedCount } = useMemo(() => {
     let inProgress = 0, queue = 0, completed = 0;
-    tasksByTerritoryTmFda.forEach(t => {
+    tasksByFilter.forEach(t => {
       if (t.status === 'in_progress') inProgress++;
       else if (t.status === 'sampled_in_queue') queue++;
       else if (t.status === 'completed' || t.status === 'not_reachable' || t.status === 'invalid_number') completed++;
     });
     return { inProgressCount: inProgress, queueCount: queue, completedCount: completed };
-  }, [tasksByTerritoryTmFda]);
+  }, [tasksByFilter]);
 
-  const handleTerritoryChange = (value: string) => {
-    setTerritoryFilter(value);
-    setTmFilter('');
-    setFdaFilter('');
-  };
-  const handleTmChange = (value: string) => {
-    setTmFilter(value);
-    setFdaFilter('');
+  const handleFilterByChange = (value: '' | 'territory' | 'tm' | 'fda') => {
+    setFilterBy(value);
+    setFilterValue('');
   };
 
-  const filteredTasks = tasksByTerritoryTmFda.filter(task => {
+  const filteredTasks = tasksByFilter.filter(task => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -251,55 +249,45 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             />
           </div>
 
-          {/* Cascaded filters: Territory → TM → FDA */}
+          {/* Filter By: first select dimension (Territory / TM / FDA), then select name */}
           <div className="space-y-2 mb-3">
             <div className="flex items-center gap-2">
-              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">Territory</label>
+              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-16">Filter By</label>
               <select
-                value={territoryFilter}
-                onChange={(e) => handleTerritoryChange(e.target.value)}
+                value={filterBy}
+                onChange={(e) => handleFilterByChange((e.target.value || '') as '' | 'territory' | 'tm' | 'fda')}
                 className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 appearance-none bg-no-repeat bg-right"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
               >
-                <option value="">All Territories</option>
-                {territoryOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap" title="In progress / Queue / Completed">
-                ({inProgressCount} / {queueCount} / {completedCount})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">TM</label>
-              <select
-                value={tmFilter}
-                onChange={(e) => handleTmChange(e.target.value)}
-                disabled={!territoryFilter}
-                className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-60 disabled:bg-slate-50 appearance-none bg-no-repeat bg-right"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
-              >
-                <option value="">All TMs</option>
-                {tmOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
+                <option value="">—</option>
+                <option value="territory">Territory</option>
+                <option value="tm">TM</option>
+                <option value="fda">FDA</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">FDA</label>
-              <select
-                value={fdaFilter}
-                onChange={(e) => setFdaFilter(e.target.value)}
-                disabled={!territoryFilter || !tmFilter}
-                className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-60 disabled:bg-slate-50 appearance-none bg-no-repeat bg-right"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
-              >
-                <option value="">All FDAs</option>
-                {fdaOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
+            {filterBy && (
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-16">
+                  {filterBy === 'territory' ? 'Territory' : filterBy === 'tm' ? 'TM Name' : 'FDA Name'}
+                </label>
+                <select
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 appearance-none bg-no-repeat bg-right"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
+                >
+                  <option value="">
+                    {filterBy === 'territory' ? 'All Territories' : filterBy === 'tm' ? 'All TMs' : 'All FDAs'}
+                  </option>
+                  {nameOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap" title="In progress / Queue / Completed">
+                  ({inProgressCount} / {queueCount} / {completedCount})
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Filter Tabs with task counts (In Progress / Queue / Completed) */}
@@ -359,10 +347,10 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             <div className="text-center py-20 px-6">
               <Phone size={48} className="mx-auto text-slate-300 mb-4" />
               <p className="text-slate-600 font-medium text-lg mb-2">
-                {searchQuery || territoryFilter || tmFilter || fdaFilter ? 'No matches found' : 'No tasks available'}
+                {searchQuery || filterValue ? 'No matches found' : 'No tasks available'}
               </p>
               <p className="text-sm text-slate-500">
-                {searchQuery || territoryFilter || tmFilter || fdaFilter
+                {searchQuery || filterValue
                   ? 'Try adjusting your search or filters'
                   : 'All tasks have been completed or are not yet due'}
               </p>
@@ -554,7 +542,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                 <>
                   <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
                   {sortedTasks.length !== 1 ? 's' : ''} available
-                  {(searchQuery || territoryFilter || tmFilter || fdaFilter) && tasks.length > sortedTasks.length && (
+                  {(searchQuery || filterValue) && tasks.length > sortedTasks.length && (
                     <span> (filtered from {tasks.length})</span>
                   )}
                 </>
