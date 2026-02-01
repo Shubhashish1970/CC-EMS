@@ -1220,42 +1220,42 @@ const ActivitySamplingView: React.FC = () => {
           {/* Compact Statistics Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             {/* Activities */}
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Activities</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalActivities}</p>
             </div>
-            <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+            <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">With Sampling</p>
               <p className="text-xl font-black text-green-800">{statistics.activitiesWithSampling}</p>
-              <p className="text-[10px] text-green-600 mt-0.5">
+              <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
                 ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
               </p>
             </div>
             
             {/* Farmers */}
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">Total Farmers</p>
               <p className="text-xl font-black text-blue-800">{statistics.totalFarmers}</p>
             </div>
-            <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+            <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Farmers Sampled</p>
               <p className="text-xl font-black text-green-800">{statistics.farmersSampled}</p>
               {statistics.totalFarmers > 0 && (
-                <p className="text-[10px] text-green-600 mt-0.5">
+                <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
                   ({Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)
                 </p>
               )}
             </div>
             
             {/* Tasks */}
-            <div className={`rounded-xl p-3 border ${
+            <div className={`rounded-xl p-3 border min-w-0 overflow-visible ${
               statistics.totalTasks !== statistics.farmersSampled 
                 ? 'bg-orange-50 border-orange-200' 
                 : 'bg-slate-50 border-slate-200'
             }`}>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Tasks</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalTasks}</p>
-              <p className={`text-[10px] mt-0.5 ${
+              <p className={`text-xs mt-1 text-left break-words leading-tight ${
                 statistics.totalTasks !== statistics.farmersSampled 
                   ? 'text-orange-600 font-bold' 
                   : 'text-slate-500'
@@ -1267,20 +1267,20 @@ const ActivitySamplingView: React.FC = () => {
                   : `${statistics.farmersSampled} sampled = ${statistics.totalTasks} tasks ✓`}
               </p>
               {(statistics.callbackTasks || 0) > 0 && (
-                <p className="text-[10px] text-purple-600 font-bold mt-0.5">
+                <p className="text-xs text-purple-600 font-bold mt-0.5 text-left break-words leading-tight">
                   incl. {statistics.callbackTasks} callback{statistics.callbackTasks !== 1 ? 's' : ''}
                 </p>
               )}
             </div>
-            <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
+            <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Queue</p>
               <p className="text-xl font-black text-yellow-800">{statistics.tasksSampledInQueue}</p>
             </div>
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">In Progress</p>
               <p className="text-xl font-black text-blue-800">{statistics.tasksInProgress}</p>
             </div>
-            <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+            <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
               <p className="text-xl font-black text-green-800">{statistics.tasksCompleted}</p>
             </div>

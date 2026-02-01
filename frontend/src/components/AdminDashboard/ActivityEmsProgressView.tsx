@@ -264,6 +264,8 @@ const ActivityEmsProgressView: React.FC = () => {
   const [tableSortKey, setTableSortKey] = useState<string>('');
   const [tableSortDir, setTableSortDir] = useState<'asc' | 'desc'>('asc');
   const [tableFilterText, setTableFilterText] = useState<string>('');
+  type FilterDimensionKey = keyof Pick<EmsProgressFilters, 'state' | 'territory' | 'zone' | 'bu' | 'activityType'>;
+  const [filterDimension, setFilterDimension] = useState<FilterDimensionKey | 'region'>('state');
 
   const totals = useMemo(() => computeEmsTotals(emsDetailRows), [emsDetailRows]);
 
@@ -425,11 +427,38 @@ const ActivityEmsProgressView: React.FC = () => {
     setFilters((prev) => ({ ...prev, [key]: value || '' }));
   };
 
+  const DIMENSION_OPTIONS: { value: FilterDimensionKey | 'region'; label: string }[] = [
+    { value: 'state', label: 'State' },
+    { value: 'bu', label: 'BU' },
+    { value: 'region', label: 'Region' },
+    { value: 'zone', label: 'Zone' },
+    { value: 'territory', label: 'Territory' },
+    { value: 'activityType', label: 'Activity Type' },
+  ];
+
   const stateOptions = [{ value: '', label: 'All States' }, ...filterOptions.stateOptions.map((s) => ({ value: s, label: s }))];
   const territoryOptions = [{ value: '', label: 'All Territories' }, ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t }))];
   const zoneOptions = [{ value: '', label: 'All Zones' }, ...filterOptions.zoneOptions.map((z) => ({ value: z, label: z }))];
   const buOptions = [{ value: '', label: 'All BUs' }, ...filterOptions.buOptions.map((b) => ({ value: b, label: b }))];
   const activityTypeOptions = [{ value: '', label: 'All Types' }, ...filterOptions.activityTypeOptions.map((t) => ({ value: t, label: t }))];
+
+  const valueOptionsForDimension =
+    filterDimension === 'state' || filterDimension === 'region' ? stateOptions
+    : filterDimension === 'territory' ? territoryOptions
+    : filterDimension === 'zone' ? zoneOptions
+    : filterDimension === 'bu' ? buOptions
+    : activityTypeOptions;
+  const filterValue = filterDimension === 'region' ? (filters.state || '') : (filters[filterDimension] || '');
+
+  const handleFilterDimensionChange = (dim: string) => {
+    setFilterDimension(dim as FilterDimensionKey | 'region');
+    setFilters((prev) => ({ ...prev, state: '', territory: '', zone: '', bu: '', activityType: '' }));
+  };
+
+  const handleFilterValueChange = (value: string) => {
+    const key: FilterDimensionKey = filterDimension === 'region' ? 'state' : filterDimension;
+    applyFilter(key, value);
+  };
 
   return (
     <div className="space-y-6">
@@ -445,7 +474,17 @@ const ActivityEmsProgressView: React.FC = () => {
               <p className="text-sm text-slate-600">Visual EMS metrics, drill-down by group, and trends (Totals)</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Group By</label>
+              <StyledSelect
+                value={groupBy}
+                onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
+                options={GROUP_BY_OPTIONS}
+                placeholder="Group by"
+                className="min-w-[140px]"
+              />
+            </div>
             <Button
               variant="secondary"
               size="sm"
@@ -492,16 +531,7 @@ const ActivityEmsProgressView: React.FC = () => {
       {/* Filters */}
       {showFilters && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Group By</label>
-              <StyledSelect
-                value={groupBy}
-                onChange={(v) => setGroupBy(v as EmsReportGroupBy)}
-                options={GROUP_BY_OPTIONS}
-                placeholder="Group by"
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</label>
               <div className="relative" ref={datePickerRef}>
@@ -602,63 +632,41 @@ const ActivityEmsProgressView: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">State</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Filter by</label>
               <StyledSelect
-                value={filters.state || ''}
-                onChange={(v) => applyFilter('state', v)}
-                options={stateOptions}
-                placeholder="All States"
+                value={filterDimension}
+                onChange={handleFilterDimensionChange}
+                options={DIMENSION_OPTIONS}
+                placeholder="Filter by"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Territory</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Value</label>
               <StyledSelect
-                value={filters.territory || ''}
-                onChange={(v) => applyFilter('territory', v)}
-                options={territoryOptions}
-                placeholder="All Territories"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Zone</label>
-              <StyledSelect
-                value={filters.zone || ''}
-                onChange={(v) => applyFilter('zone', v)}
-                options={zoneOptions}
-                placeholder="All Zones"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">BU</label>
-              <StyledSelect
-                value={filters.bu || ''}
-                onChange={(v) => applyFilter('bu', v)}
-                options={buOptions}
-                placeholder="All BUs"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Activity Type</label>
-              <StyledSelect
-                value={filters.activityType || ''}
-                onChange={(v) => applyFilter('activityType', v)}
-                options={activityTypeOptions}
-                placeholder="All Types"
+                value={filterValue}
+                onChange={handleFilterValueChange}
+                options={valueOptionsForDimension}
+                placeholder={filterDimension === 'state' || filterDimension === 'region' ? 'All States' : filterDimension === 'territory' ? 'All Territories' : filterDimension === 'zone' ? 'All Zones' : filterDimension === 'bu' ? 'All BUs' : 'All Types'}
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* Executive KPI Scorecards (Totals) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {isLoadingEmsDetail ? (
-          <div className="col-span-full flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-slate-500" size={32} />
-          </div>
-        ) : totals ? (
-          <>
-            {[
+      {/* Executive KPI Scorecards (Totals) - aligned with Activity Monitoring Statistics */}
+      <div className="bg-white rounded-3xl p-4 mb-0 border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart3 className="text-slate-600" size={18} />
+          <h3 className="text-base font-black text-slate-900">EMS Totals</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {isLoadingEmsDetail ? (
+            <div className="col-span-full flex items-center justify-center py-12">
+              <Loader2 className="animate-spin text-slate-500" size={32} />
+            </div>
+          ) : totals ? (
+            <>
+              {[
               { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: '(Attempted − Invalid) / Attempted', icon: Smartphone },
               { label: 'Hygiene (%)', value: totals.hygienePct, formula: '(Connected − Identity Wrong − Not Farmer) / Connected', icon: UserCheck },
               { label: 'Meeting Validity (%)', value: totals.meetingValidityPct, formula: 'Yes Attended / Connected', icon: Users },
@@ -666,31 +674,36 @@ const ActivityEmsProgressView: React.FC = () => {
               { label: 'Purchase Intention (%)', value: totals.purchaseIntentionPct, formula: '(Willing Yes + Purchased) / Connected', icon: Target },
               { label: 'EMS Score (Totals)', value: totals.emsScore, formula: 'Average of Mobile Validity %, Meeting Validity %, Meeting Conversion %, Purchase Intention %', icon: FileBarChart },
             ].map(({ label, value, formula, icon: Icon }) => {
-              const valueColor = value >= 70 ? 'text-slate-900' : value >= 50 ? 'text-amber-800' : 'text-red-800';
-              const cardBg = value >= 70 ? 'bg-slate-50' : value >= 50 ? 'bg-amber-50/50' : 'bg-red-50/50';
-              const iconBg = value >= 70 ? 'bg-slate-100' : value >= 50 ? 'bg-amber-100' : 'bg-red-100';
-              const iconColor = value >= 70 ? 'text-slate-600' : value >= 50 ? 'text-amber-700' : 'text-red-700';
+              const isGood = value >= 70;
+              const isModerate = value >= 50 && value < 70;
+              const cardBg = isGood ? 'bg-green-50 border-green-200' : isModerate ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+              const labelColor = isGood ? 'text-green-600' : isModerate ? 'text-yellow-600' : 'text-red-600';
+              const valueColor = isGood ? 'text-green-800' : isModerate ? 'text-yellow-800' : 'text-red-800';
+              const detailColor = isGood ? 'text-green-600' : isModerate ? 'text-yellow-600' : 'text-red-600';
+              const iconBg = isGood ? 'bg-green-100 border-green-200' : isModerate ? 'bg-yellow-100 border-yellow-200' : 'bg-red-100 border-red-200';
+              const iconColor = isGood ? 'text-green-700' : isModerate ? 'text-yellow-700' : 'text-red-700';
               return (
                 <div
                   key={label}
-                  className={`rounded-2xl border border-slate-200 p-4 flex items-start gap-3 hover:shadow-md transition-shadow cursor-pointer ${cardBg}`}
+                  className={`rounded-xl border p-3 flex items-start gap-3 hover:shadow-md transition-shadow cursor-pointer text-left ${cardBg}`}
                   title={formula}
                 >
-                  <div className={`w-10 h-10 rounded-xl border border-slate-200 ${iconBg} flex items-center justify-center shrink-0`}>
-                    <Icon className={iconColor} size={20} />
+                  <div className={`w-9 h-9 rounded-xl border shrink-0 flex items-center justify-center ${iconBg}`}>
+                    <Icon className={iconColor} size={18} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-                    <p className={`text-2xl font-black ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
-                    <p className="text-[10px] text-slate-500 mt-1 truncate" title={formula}>{formula}</p>
+                  <div className="min-w-0 flex-1 overflow-visible">
+                    <p className={`text-xs font-black uppercase tracking-widest mb-0.5 ${labelColor}`}>{label}</p>
+                    <p className={`text-xl font-black ${valueColor}`}>{label.includes('EMS Score') ? value : `${value}%`}</p>
+                    <p className={`text-xs mt-1 text-left break-words leading-tight ${detailColor}`} title={formula}>{formula}</p>
                   </div>
                 </div>
               );
             })}
           </>
-        ) : (
-          <div className="col-span-full text-center py-8 text-slate-500">No EMS data. Adjust filters or refresh.</div>
-        )}
+          ) : (
+            <div className="col-span-full text-center py-8 text-slate-500">No EMS data. Adjust filters or refresh.</div>
+          )}
+        </div>
       </div>
 
       {/* Call Outcome Funnel (Totals) */}
