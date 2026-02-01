@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Phone, MapPin, Loader2, Search, Info, Clock, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Phone, MapPin, Loader2, Search, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { tasksAPI } from '../services/api';
 
 interface Task {
@@ -46,12 +46,18 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'in_progress' | 'sampled_in_queue' | 'completed'>('in_progress');
+  const [territoryFilter, setTerritoryFilter] = useState('');
+  const [tmFilter, setTmFilter] = useState('');
+  const [fdaFilter, setFdaFilter] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       fetchAvailableTasks();
       setSearchQuery('');
       setFilter('in_progress');
+      setTerritoryFilter('');
+      setTmFilter('');
+      setFdaFilter('');
     }
   }, [isOpen]);
 
@@ -91,20 +97,78 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     }
   };
 
-  // Filter tasks based on search query and filter
-  const filteredTasks = tasks.filter(task => {
+  const norm = (s: string | undefined) => (s ?? '').trim();
+  const territoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => {
+      const v = norm(t.activity?.territory);
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const tmOptions = useMemo(() => {
+    if (!territoryFilter) return [];
+    const set = new Set<string>();
+    tasks.forEach(t => {
+      if (norm(t.activity?.territory) !== territoryFilter) return;
+      const v = norm(t.activity?.tmName);
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort();
+  }, [tasks, territoryFilter]);
+
+  const fdaOptions = useMemo(() => {
+    if (!territoryFilter || !tmFilter) return [];
+    const set = new Set<string>();
+    tasks.forEach(t => {
+      if (norm(t.activity?.territory) !== territoryFilter || norm(t.activity?.tmName) !== tmFilter) return;
+      const v = norm(t.activity?.officerName);
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort();
+  }, [tasks, territoryFilter, tmFilter]);
+
+  const tasksByTerritoryTmFda = useMemo(() => {
+    return tasks.filter(t => {
+      if (territoryFilter && norm(t.activity?.territory) !== territoryFilter) return false;
+      if (tmFilter && norm(t.activity?.tmName) !== tmFilter) return false;
+      if (fdaFilter && norm(t.activity?.officerName) !== fdaFilter) return false;
+      return true;
+    });
+  }, [tasks, territoryFilter, tmFilter, fdaFilter]);
+
+  const { inProgressCount, queueCount, completedCount } = useMemo(() => {
+    let inProgress = 0, queue = 0, completed = 0;
+    tasksByTerritoryTmFda.forEach(t => {
+      if (t.status === 'in_progress') inProgress++;
+      else if (t.status === 'sampled_in_queue') queue++;
+      else if (t.status === 'completed' || t.status === 'not_reachable' || t.status === 'invalid_number') completed++;
+    });
+    return { inProgressCount: inProgress, queueCount: queue, completedCount: completed };
+  }, [tasksByTerritoryTmFda]);
+
+  const handleTerritoryChange = (value: string) => {
+    setTerritoryFilter(value);
+    setTmFilter('');
+    setFdaFilter('');
+  };
+  const handleTmChange = (value: string) => {
+    setTmFilter(value);
+    setFdaFilter('');
+  };
+
+  const filteredTasks = tasksByTerritoryTmFda.filter(task => {
     const query = searchQuery.toLowerCase();
-    const matchesSearch = 
-      !searchQuery || // If no search query, show all
+    const matchesSearch =
+      !searchQuery ||
       task.farmer.name.toLowerCase().includes(query) ||
       task.farmer.mobileNumber.includes(query) ||
       task.farmer.location.toLowerCase().includes(query);
-    
-    const matchesFilter = 
+    const matchesFilter =
       (filter === 'in_progress' && task.status === 'in_progress') ||
-      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue') || // Queue shows only sampled_in_queue
+      (filter === 'sampled_in_queue' && task.status === 'sampled_in_queue') ||
       (filter === 'completed' && (task.status === 'completed' || task.status === 'not_reachable' || task.status === 'invalid_number'));
-    
     return matchesSearch && matchesFilter;
   });
 
@@ -176,7 +240,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
           </div>
 
           {/* Search Bar - Light theme */}
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -187,7 +251,58 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             />
           </div>
 
-          {/* Filter Tabs - Light theme - Compact */}
+          {/* Cascaded filters: Territory → TM → FDA */}
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">Territory</label>
+              <select
+                value={territoryFilter}
+                onChange={(e) => handleTerritoryChange(e.target.value)}
+                className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 appearance-none bg-no-repeat bg-right"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
+              >
+                <option value="">All Territories</option>
+                {territoryOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap" title="In progress / Queue / Completed">
+                ({inProgressCount} / {queueCount} / {completedCount})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">TM</label>
+              <select
+                value={tmFilter}
+                onChange={(e) => handleTmChange(e.target.value)}
+                disabled={!territoryFilter}
+                className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-60 disabled:bg-slate-50 appearance-none bg-no-repeat bg-right"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
+              >
+                <option value="">All TMs</option>
+                {tmOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap w-14">FDA</label>
+              <select
+                value={fdaFilter}
+                onChange={(e) => setFdaFilter(e.target.value)}
+                disabled={!territoryFilter || !tmFilter}
+                className="flex-1 min-w-0 h-9 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 disabled:opacity-60 disabled:bg-slate-50 appearance-none bg-no-repeat bg-right"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundPosition: 'right 8px center' }}
+              >
+                <option value="">All FDAs</option>
+                {fdaOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Filter Tabs with task counts (In Progress / Queue / Completed) */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setFilter('in_progress')}
@@ -197,7 +312,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              In Progress
+              In Progress ({inProgressCount})
             </button>
             <button
               onClick={() => setFilter('sampled_in_queue')}
@@ -207,7 +322,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Queue
+              Queue ({queueCount})
             </button>
             <button
               onClick={() => setFilter('completed')}
@@ -217,7 +332,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Completed
+              Completed ({completedCount})
             </button>
           </div>
         </div>
@@ -244,11 +359,11 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             <div className="text-center py-20 px-6">
               <Phone size={48} className="mx-auto text-slate-300 mb-4" />
               <p className="text-slate-600 font-medium text-lg mb-2">
-                {searchQuery || filter !== 'all' ? 'No matches found' : 'No tasks available'}
+                {searchQuery || territoryFilter || tmFilter || fdaFilter ? 'No matches found' : 'No tasks available'}
               </p>
               <p className="text-sm text-slate-500">
-                {searchQuery || filter !== 'all' 
-                  ? 'Try adjusting your search or filter' 
+                {searchQuery || territoryFilter || tmFilter || fdaFilter
+                  ? 'Try adjusting your search or filters'
                   : 'All tasks have been completed or are not yet due'}
               </p>
             </div>
@@ -437,9 +552,9 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
             <p className="text-xs text-slate-500">
               {tasks.length > 0 ? (
                 <>
-              <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
-              {sortedTasks.length !== 1 ? 's' : ''} available
-                  {(searchQuery || filter !== 'all') && tasks.length > sortedTasks.length && (
+                  <span className="font-bold text-slate-700">{sortedTasks.length}</span> contact
+                  {sortedTasks.length !== 1 ? 's' : ''} available
+                  {(searchQuery || territoryFilter || tmFilter || fdaFilter) && tasks.length > sortedTasks.length && (
                     <span> (filtered from {tasks.length})</span>
                   )}
                 </>
