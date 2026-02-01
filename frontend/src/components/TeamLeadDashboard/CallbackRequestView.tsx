@@ -302,7 +302,7 @@ const CallbackRequestView: React.FC = () => {
                 <div className="absolute z-50 mt-2 w-[500px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                   <div className="flex">
                     <div className="w-44 border-r border-slate-200 bg-slate-50 p-2">
-                      {(['Custom', 'Today', 'Yesterday', 'Last 7 days', 'Last 14 days', 'Last 30 days', 'YTD (1 Apr LY - Today)'] as DateRangePreset[]).map((p) => (
+                      {(['Custom', 'Today', 'Yesterday', 'Last 7 days', 'Last 14 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => (
                         <button
                           key={p}
                           type="button"

@@ -454,7 +454,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                               'Last week (Sun - Sat)',
                               'Last 28 days',
                               'Last 30 days',
-                              'YTD (1 Apr LY - Today)',
+                              'YTD',
                             ] as DateRangePreset[]).map((p) => {
                               const isActive = selectedPreset === p;
                               return (

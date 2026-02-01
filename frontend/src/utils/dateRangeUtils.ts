@@ -18,7 +18,7 @@ export type DateRangePreset =
   | 'Last 28 days'
   | 'Last 30 days'
   | 'Last 90 days'
-  | 'YTD (1 Apr LY - Today)';
+  | 'YTD';
 
 /** Format a Date as YYYY-MM-DD in local timezone (avoids UTC shift e.g. for YTD April 1). */
 export function toISODateLocal(d: Date): string {
@@ -103,7 +103,7 @@ export function getPresetRange(
       s.setDate(s.getDate() - 89);
       return { start: toISODateLocal(s), end: toISODateLocal(today) };
     }
-    case 'YTD (1 Apr LY - Today)': {
+    case 'YTD': {
       const apr1LY = new Date(today.getFullYear() - 1, 3, 1); // April 1, last year (month 3 = April)
       return { start: toISODateLocal(apr1LY), end: toISODateLocal(today) };
     }
