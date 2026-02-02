@@ -82,7 +82,8 @@ const isActivityTypeEligible = (activityType: string, eligibleTypes: string[]): 
 const createUnassignedTasksForFarmers = async (
   sampledFarmerIds: mongoose.Types.ObjectId[],
   activityId: mongoose.Types.ObjectId,
-  scheduledDate: Date
+  scheduledDate: Date,
+  opts?: { samplingRunId?: mongoose.Types.ObjectId | null; samplingRunType?: 'first_sample' | 'adhoc' | null }
 ): Promise<number> => {
   let created = 0;
 
@@ -100,6 +101,8 @@ const createUnassignedTasksForFarmers = async (
       assignedAgentId: null,
       scheduledDate,
       interactionHistory: [],
+      ...(opts?.samplingRunId && { samplingRunId: opts.samplingRunId }),
+      ...(opts?.samplingRunType && { samplingRunType: opts.samplingRunType }),
     });
     created++;
   }
@@ -123,6 +126,9 @@ export const sampleAndCreateTasks = async (
     minFarmersToSample?: number;
     /** Cap on farmers to sample for this activity (e.g. for FDA proportional quota). */
     maxFarmersToSample?: number;
+    /** Set on created tasks for stats (adhoc vs first_sample). */
+    samplingRunId?: mongoose.Types.ObjectId | null;
+    samplingRunType?: 'first_sample' | 'adhoc' | null;
   }
 ): Promise<{
   skipped?: boolean;
@@ -236,11 +242,14 @@ export const sampleAndCreateTasks = async (
     // Scheduled date is the Team Lead run date (now) unless provided
     const scheduledDate = options?.scheduledDate ? new Date(options.scheduledDate) : new Date();
 
-    // Create call tasks for sampled farmers
+    // Create call tasks for sampled farmers (store run for adhoc/first_sample stats)
     const tasksCreated = await createUnassignedTasksForFarmers(
       sampledFarmerIds,
       activity._id,
-      scheduledDate
+      scheduledDate,
+      options?.samplingRunId || options?.samplingRunType
+        ? { samplingRunId: options.samplingRunId ?? undefined, samplingRunType: options.samplingRunType ?? undefined }
+        : undefined
     );
 
     // Update cooling periods for sampled farmers

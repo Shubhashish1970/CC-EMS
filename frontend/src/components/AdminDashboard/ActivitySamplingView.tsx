@@ -605,6 +605,7 @@ const ActivitySamplingView: React.FC = () => {
       tasksUnassigned: 0,
       activitiesWithSamplingAdhoc: 0,
       farmersSampledAdhoc: 0,
+      tasksAdhoc: 0,
       tasksWithMismatch: 0,
     };
 
@@ -1154,14 +1155,14 @@ const ActivitySamplingView: React.FC = () => {
           </div>
           
           {/* Compact Statistics Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
             {/* Activities */}
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Activities</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Activities</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalActivities}</p>
             </div>
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">With Sampling</p>
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">With Sampling</p>
               <p className="text-xl font-black text-green-800">{statistics.activitiesWithSampling}</p>
               <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
                 ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
@@ -1175,11 +1176,11 @@ const ActivitySamplingView: React.FC = () => {
             
             {/* Farmers */}
             <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">Total Farmers</p>
+              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Total Farmers</p>
               <p className="text-xl font-black text-blue-800">{statistics.totalFarmers}</p>
             </div>
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Farmers Sampled</p>
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Farmers Sampled</p>
               <p className="text-xl font-black text-green-800">{statistics.farmersSampled}</p>
               {statistics.totalFarmers > 0 && (
                 <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
@@ -1199,7 +1200,7 @@ const ActivitySamplingView: React.FC = () => {
                 ? 'bg-orange-50 border-orange-200' 
                 : 'bg-slate-50 border-slate-200'
             }`}>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Tasks</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Total Tasks</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalTasks}</p>
               <p className={`text-xs mt-1 text-left break-words leading-tight ${
                 statistics.totalTasks !== statistics.farmersSampled 
@@ -1216,37 +1217,47 @@ const ActivitySamplingView: React.FC = () => {
                 const queue = statistics.tasksSampledInQueue ?? 0;
                 const inProgress = statistics.tasksInProgress ?? 0;
                 const completed = statistics.tasksCompleted ?? 0;
-                const unassigned = statistics.tasksUnassigned ?? 0;
-                const notReachable = statistics.tasksNotReachable ?? 0;
-                const invalid = statistics.tasksInvalidNumber ?? 0;
-                const other = unassigned + notReachable + invalid;
+                const other = (statistics.tasksUnassigned ?? 0) + (statistics.tasksNotReachable ?? 0) + (statistics.tasksInvalidNumber ?? 0);
                 const sum = queue + inProgress + completed + other;
                 if (sum > 0 && sum === statistics.totalTasks) {
                   return (
                     <p className="text-xs text-slate-500 mt-0.5 text-left break-words leading-tight">
-                      {queue} queue + {inProgress} in progress + {completed} completed
-                      {other > 0 ? ` + ${other} other (unassigned/not reachable/invalid)` : ''} = {statistics.totalTasks}
+                      Queue + In progress + Completed + Other = {statistics.totalTasks}
                     </p>
                   );
                 }
                 return null;
               })()}
+              {(statistics.tasksAdhoc ?? 0) > 0 && (
+                <p className="text-xs text-slate-500/90 mt-0.5 text-left break-words leading-tight">
+                  ({statistics.tasksAdhoc} adhoc)
+                </p>
+              )}
               {(statistics.callbackTasks || 0) > 0 && (
                 <p className="text-xs text-purple-600 font-bold mt-0.5 text-left break-words leading-tight">
                   incl. {statistics.callbackTasks} callback{statistics.callbackTasks !== 1 ? 's' : ''}
                 </p>
               )}
             </div>
+            <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 min-w-0 overflow-visible text-left">
+              <p className="text-xs font-black text-amber-700 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Other</p>
+              <p className="text-xl font-black text-amber-800">
+                {(statistics.tasksUnassigned ?? 0) + (statistics.tasksNotReachable ?? 0) + (statistics.tasksInvalidNumber ?? 0)}
+              </p>
+              <p className="text-xs text-amber-600 mt-1 text-left break-words leading-tight">
+                (unassigned / not reachable / invalid)
+              </p>
+            </div>
             <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5">In Queue</p>
+              <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">In Queue</p>
               <p className="text-xl font-black text-yellow-800">{statistics.tasksSampledInQueue}</p>
             </div>
             <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5">In Progress</p>
+              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">In Progress</p>
               <p className="text-xl font-black text-blue-800">{statistics.tasksInProgress}</p>
             </div>
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Completed</p>
               <p className="text-xl font-black text-green-800">{statistics.tasksCompleted}</p>
             </div>
           </div>

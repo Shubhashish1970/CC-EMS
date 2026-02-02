@@ -768,6 +768,7 @@ export const getActivitiesSamplingStats = async (filters?: {
   callbackTasks: number;
   activitiesWithSamplingAdhoc: number;
   farmersSampledAdhoc: number;
+  tasksAdhoc: number;
 }> => {
   const {
     activityType,
@@ -888,6 +889,14 @@ export const getActivitiesSamplingStats = async (filters?: {
 
   const totalTasks = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
 
+  const tasksAdhoc =
+    matchingActivityIds.length > 0
+      ? await CallTask.countDocuments({
+          activityId: { $in: matchingActivityIds },
+          samplingRunType: 'adhoc',
+        })
+      : 0;
+
   return {
     totalActivities: Number(a0.totalActivities || 0),
     activitiesWithSampling: Number(a0.activitiesWithSampling || 0),
@@ -906,6 +915,7 @@ export const getActivitiesSamplingStats = async (filters?: {
     callbackTasks: totalCallbacks,
     activitiesWithSamplingAdhoc: Number((a0 as any).activitiesWithSamplingAdhoc || 0),
     farmersSampledAdhoc: Number((a0 as any).farmersSampledAdhoc || 0),
+    tasksAdhoc,
   };
 };
 

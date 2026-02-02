@@ -863,6 +863,8 @@ async function runSamplingHandler(req: Request, res: Response, next: NextFunctio
           forceRun: !!forceRun,
           scheduledDate: new Date(),
           setFirstSampleRun,
+          samplingRunId: runDoc._id,
+          samplingRunType: effectiveRunType,
           ...opts,
         });
       };

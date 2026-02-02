@@ -60,6 +60,9 @@ export interface ICallTask extends Document {
   parentTaskId?: mongoose.Types.ObjectId | null; // Link to original task for callbacks
   isCallback: boolean; // true for callback tasks
   callbackNumber: number; // 0 for original, 1 for 1st callback, 2 for 2nd callback
+  /** Set when task is created by sampling run; used for adhoc vs first_sample stats */
+  samplingRunId?: mongoose.Types.ObjectId | null;
+  samplingRunType?: 'first_sample' | 'adhoc' | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -206,6 +209,16 @@ const CallTaskSchema = new Schema<ICallTask>(
     parentTaskId: {
       type: Schema.Types.ObjectId,
       ref: 'CallTask',
+      default: null,
+    },
+    samplingRunId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SamplingRun',
+      default: null,
+    },
+    samplingRunType: {
+      type: String,
+      enum: ['first_sample', 'adhoc'],
       default: null,
     },
     isCallback: {
