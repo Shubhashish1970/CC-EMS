@@ -480,9 +480,9 @@ const ActivitySamplingView: React.FC = () => {
 
   const getSamplingStatusBadge = (status: 'sampled' | 'not_sampled' | 'partial') => {
     const config = {
-      sampled: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Sampled' },
+      sampled: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200', label: 'Full' },
       not_sampled: { icon: XCircle, color: 'bg-slate-100 text-slate-800 border-slate-200', label: 'Not Sampled' },
-      partial: { icon: AlertCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Partial' },
+      partial: { icon: AlertCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Partial (no farmers selected)' },
     };
     const { icon: Icon, color, label } = config[status];
     return (
@@ -992,9 +992,9 @@ const ActivitySamplingView: React.FC = () => {
                   onChange={(v) => setFilters({ ...filters, samplingStatus: v as any })}
                   options={[
                     { value: '', label: 'All Statuses' },
-                    { value: 'sampled', label: 'Sampled' },
+                    { value: 'sampled', label: 'Full (farmers selected)' },
                     { value: 'not_sampled', label: 'Not Sampled' },
-                    { value: 'partial', label: 'Partial' },
+                    { value: 'partial', label: 'Partial (no farmers selected)' },
                   ]}
                 />
               </div>
@@ -1164,7 +1164,7 @@ const ActivitySamplingView: React.FC = () => {
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">With Sampling</p>
               <p className="text-xl font-black text-green-800">{statistics.activitiesWithSampling}</p>
-              <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
+              <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight" title="Full = farmers selected as per norms; Partial = no farmers selected">
                 ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
               </p>
               {(statistics.activitiesWithSamplingAdhoc ?? 0) > 0 && (

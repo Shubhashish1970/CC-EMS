@@ -376,9 +376,9 @@ router.get('/export', filterValidators, async (req: Request, res: Response, next
     const summaryRows = [
       ['Metric', 'Value'],
       ['Activities Total', summary.activities.total],
-      ['Activities Sampled', summary.activities.sampledCount],
+      ['Activities Full (farmers selected)', summary.activities.sampledCount],
       ['Activities Not Sampled', summary.activities.notSampledCount],
-      ['Activities Partial', summary.activities.partialCount],
+      ['Activities Partial (no farmers selected)', summary.activities.partialCount],
       ['Tasks Total', summary.tasks.total],
       ['Tasks Completed', summary.tasks.completed],
       ['Tasks In Queue', summary.tasks.sampled_in_queue + summary.tasks.unassigned],
@@ -393,7 +393,7 @@ router.get('/export', filterValidators, async (req: Request, res: Response, next
       [
         'State',
         'Activities Total',
-        'Activities Sampled',
+        'Activities Full (farmers selected)',
         'Tasks Total',
         'Tasks Completed',
         'Completion %',

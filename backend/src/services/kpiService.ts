@@ -83,6 +83,7 @@ export async function getEmsProgress(filters?: EmsProgressFilters): Promise<EmsP
       $addFields: {
         farmerCount: { $size: { $ifNull: ['$farmerIds', []] } },
         sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+        hasAudit: { $gt: [{ $size: { $ifNull: ['$audits', []] } }, 0] },
         lifecycleStatus: { $ifNull: ['$lifecycleStatus', 'active'] },
       },
     },
@@ -91,16 +92,8 @@ export async function getEmsProgress(filters?: EmsProgressFilters): Promise<EmsP
         samplingStatus: {
           $switch: {
             branches: [
-              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
-              {
-                case: {
-                  $and: [
-                    { $gt: ['$farmerCount', 0] },
-                    { $gte: ['$sampledCount', '$farmerCount'] },
-                  ],
-                },
-                then: 'sampled',
-              },
+              { case: { $eq: ['$hasAudit', false] }, then: 'not_sampled' },
+              { case: { $gt: ['$sampledCount', 0] }, then: 'sampled' },
             ],
             default: 'partial',
           },
@@ -331,6 +324,7 @@ export async function getEmsDrilldown(
       $addFields: {
         farmerCount: { $size: { $ifNull: ['$farmerIds', []] } },
         sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+        hasAudit: { $gt: [{ $size: { $ifNull: ['$audits', []] } }, 0] },
         __group:
           groupBy === 'territory'
             ? { $ifNull: ['$territoryName', '$territory'] }
@@ -346,11 +340,8 @@ export async function getEmsDrilldown(
         samplingStatus: {
           $switch: {
             branches: [
-              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
-              {
-                case: { $and: [{ $gt: ['$farmerCount', 0] }, { $gte: ['$sampledCount', '$farmerCount'] }] },
-                then: 'sampled',
-              },
+              { case: { $eq: ['$hasAudit', false] }, then: 'not_sampled' },
+              { case: { $gt: ['$sampledCount', 0] }, then: 'sampled' },
             ],
             default: 'partial',
           },

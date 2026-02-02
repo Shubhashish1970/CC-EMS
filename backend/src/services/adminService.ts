@@ -176,22 +176,19 @@ export const getActivitiesWithSampling = async (filters?: {
           as: 'audits',
         },
       },
-      { $addFields: { sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] } } },
+      {
+        $addFields: {
+          sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+          hasAudit: { $gt: [{ $size: { $ifNull: ['$audits', []] } }, 0] },
+        },
+      },
       {
         $addFields: {
           samplingStatus: {
             $switch: {
               branches: [
-                { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
-                {
-                  case: {
-                    $and: [
-                      { $gt: ['$farmerCount', 0] },
-                      { $gte: ['$sampledCount', '$farmerCount'] },
-                    ],
-                  },
-                  then: 'sampled',
-                },
+                { case: { $eq: ['$hasAudit', false] }, then: 'not_sampled' },
+                { case: { $gt: ['$sampledCount', 0] }, then: 'sampled' },
               ],
               default: 'partial',
             },
@@ -349,16 +346,10 @@ export const getActivitiesWithSampling = async (filters?: {
       const audit = auditMap.get(activityId);
       const activityTasks = tasksByActivity.get(activityId) || [];
 
-      // Determine sampling status (same logic as aggregation)
+      // Determine sampling status: full = at least one farmer selected; partial = no farmers selected (but had sampling run)
       let status: 'sampled' | 'not_sampled' | 'partial' = 'not_sampled';
       if (audit) {
-        if (activityTasks.length >= audit.sampledCount) {
-          status = 'sampled';
-        } else if (activityTasks.length > 0) {
-          status = 'partial';
-        } else {
-          status = 'partial';
-        }
+        status = (audit.sampledCount ?? 0) > 0 ? 'sampled' : 'partial';
       }
 
       // Calculate status breakdown
@@ -627,22 +618,19 @@ export const getActivitiesSamplingExportRows = async (filters?: {
         as: 'audits',
       },
     },
-    { $addFields: { sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] } } },
+    {
+      $addFields: {
+        sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+        hasAudit: { $gt: [{ $size: { $ifNull: ['$audits', []] } }, 0] },
+      },
+    },
     {
       $addFields: {
         samplingStatus: {
           $switch: {
             branches: [
-              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
-              {
-                case: {
-                  $and: [
-                    { $gt: ['$farmerCount', 0] },
-                    { $gte: ['$sampledCount', '$farmerCount'] },
-                  ],
-                },
-                then: 'sampled',
-              },
+              { case: { $eq: ['$hasAudit', false] }, then: 'not_sampled' },
+              { case: { $gt: ['$sampledCount', 0] }, then: 'sampled' },
             ],
             default: 'partial',
           },
@@ -708,8 +696,8 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     const samplingPercentage = audit?.samplingPercentage ? Number(audit.samplingPercentage) : 0;
 
     let computedSamplingStatus: 'sampled' | 'not_sampled' | 'partial' = 'not_sampled';
-    if (audit && farmersSampled > 0) {
-      computedSamplingStatus = farmersSampled >= totalFarmers && totalFarmers > 0 ? 'sampled' : 'partial';
+    if (audit) {
+      computedSamplingStatus = farmersSampled > 0 ? 'sampled' : 'partial';
     }
 
     const t = taskMap.get(String(a._id));
@@ -814,6 +802,7 @@ export const getActivitiesSamplingStats = async (filters?: {
     {
       $addFields: {
         sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] },
+        hasAudit: { $gt: [{ $size: { $ifNull: ['$audits', []] } }, 0] },
       },
     },
     {
@@ -821,16 +810,8 @@ export const getActivitiesSamplingStats = async (filters?: {
         samplingStatus: {
           $switch: {
             branches: [
-              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
-              {
-                case: {
-                  $and: [
-                    { $gt: ['$farmerCount', 0] },
-                    { $gte: ['$sampledCount', '$farmerCount'] },
-                  ],
-                },
-                then: 'sampled',
-              },
+              { case: { $eq: ['$hasAudit', false] }, then: 'not_sampled' },
+              { case: { $gt: ['$sampledCount', 0] }, then: 'sampled' },
             ],
             default: 'partial',
           },
@@ -847,12 +828,12 @@ export const getActivitiesSamplingStats = async (filters?: {
               totalActivities: { $sum: 1 },
               totalFarmers: { $sum: '$farmerCount' },
               farmersSampled: { $sum: '$sampledCount' },
-              activitiesWithSampling: { $sum: { $cond: [{ $gt: ['$sampledCount', 0] }, 1, 0] } },
+              activitiesWithSampling: { $sum: { $cond: [{ $in: ['$samplingStatus', ['sampled', 'partial']] }, 1, 0] } },
               activitiesFullySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'sampled'] }, 1, 0] } },
               activitiesPartiallySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'partial'] }, 1, 0] } },
               activitiesNotSampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'not_sampled'] }, 1, 0] } },
-              activitiesWithSamplingAdhoc: { $sum: { $cond: [{ $and: [{ $gt: ['$sampledCount', 0] }, { $ne: ['$firstSampleRun', true] }] }, 1, 0] } },
-              farmersSampledAdhoc: { $sum: { $cond: [{ $and: [{ $gt: ['$sampledCount', 0] }, { $ne: ['$firstSampleRun', true] }] }, '$sampledCount', 0] } },
+              activitiesWithSamplingAdhoc: { $sum: { $cond: [{ $and: [{ $eq: ['$samplingStatus', 'sampled'] }, { $ne: ['$firstSampleRun', true] }] }, 1, 0] } },
+              farmersSampledAdhoc: { $sum: { $cond: [{ $and: [{ $eq: ['$samplingStatus', 'sampled'] }, { $ne: ['$firstSampleRun', true] }] }, '$sampledCount', 0] } },
             },
           },
         ],
@@ -1012,9 +993,7 @@ export const getActivitiesSamplingFilterOptions = async (filters?: {
             $cond: [
               { $eq: ['__$hasAudit', false] },
               'not_sampled',
-              {
-                $cond: [{ $gte: ['__$taskCount', '$__sampledCount'] }, 'sampled', 'partial'],
-              },
+              { $cond: [{ $gt: ['$__sampledCount', 0] }, 'sampled', 'partial'] },
             ],
           },
         },

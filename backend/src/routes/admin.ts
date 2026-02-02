@@ -257,6 +257,8 @@ router.get(
       const fmtDate = (d: Date) =>
         d && !Number.isNaN(d.getTime()) ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}` : '';
 
+      const samplingStatusLabel = (s: 'sampled' | 'not_sampled' | 'partial') =>
+        s === 'sampled' ? 'Full' : s === 'partial' ? 'Partial (no farmers selected)' : 'Not Sampled';
       const sheetRows = rows.map((r) => ({
         'Activity ID': r.activityId,
         Type: r.type,
@@ -269,7 +271,7 @@ router.get(
         'Total Farmers': r.totalFarmers,
         'Farmers Sampled': r.farmersSampled,
         'Sampling %': r.samplingPercentage,
-        'Sampling Status': r.samplingStatus,
+        'Sampling Status': samplingStatusLabel(r.samplingStatus),
         'Tasks Total': r.tasksTotal,
         'Unassigned': r.unassigned,
         'In Queue': r.sampledInQueue,
