@@ -1167,11 +1167,16 @@ const ActivitySamplingView: React.FC = () => {
             {/* With Sampling + Farmers Sampled */}
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Sampled</p>
-              <p className="text-sm font-bold text-green-800 text-left" title="Full = farmers selected as per norms; Partial = no farmers selected">
-                {statistics.activitiesWithSampling} activity ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
+              <p className="text-xs text-green-600 text-left mt-0.5 break-words leading-tight">
+                {statistics.activitiesWithSampling}
               </p>
-              <p className="text-xl font-black text-green-800 mt-1">{statistics.farmersSampled}</p>
-              <p className="text-xs text-green-600 mt-0.5 text-left break-words leading-tight">
+              <p className="text-xs text-green-600 text-left break-words leading-tight" title="Full = farmers selected as per norms; Partial = no farmers selected">
+                activity sampled ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
+              </p>
+              <p className="text-xs text-green-600 text-left mt-1 break-words leading-tight">
+                {statistics.farmersSampled}
+              </p>
+              <p className="text-xs text-green-600 text-left break-words leading-tight">
                 farmers sampled{statistics.totalFarmers > 0 ? ` (${Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)` : ''}
               </p>
               {((statistics.activitiesWithSamplingAdhoc ?? 0) > 0 || (statistics.farmersSampledAdhoc ?? 0) > 0) && (

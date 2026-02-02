@@ -475,6 +475,7 @@ const TaskList: React.FC = () => {
   const calculateStatistics = () => {
     const stats = {
       total: filteredTasks.length,
+      unassigned: 0,
       sampled_in_queue: 0,
       in_progress: 0,
       completed: 0,
@@ -885,29 +886,38 @@ const TaskList: React.FC = () => {
                 <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
               </button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Tasks</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Total Tasks</p>
                 <p className="text-2xl font-black text-slate-900">{statistics.total}</p>
               </div>
+              <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+                <p className="text-xs font-black text-amber-700 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Other</p>
+                <p className="text-2xl font-black text-amber-800">
+                  {(statistics.unassigned ?? 0) + (statistics.not_reachable ?? 0) + (statistics.invalid_number ?? 0)}
+                </p>
+                <p className="text-xs text-amber-600 mt-1 text-left break-words leading-tight">
+                  (unassigned / not reachable / invalid)
+                </p>
+              </div>
               <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Sampled In Queue</p>
                 <p className="text-2xl font-black text-yellow-800">{statistics.sampled_in_queue}</p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
-                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">In Progress</p>
                 <p className="text-2xl font-black text-blue-800">{statistics.in_progress}</p>
               </div>
               <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
-                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Completed</p>
                 <p className="text-2xl font-black text-green-800">{statistics.completed}</p>
               </div>
               <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
-                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Overdue</p>
+                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Overdue</p>
                 <p className="text-2xl font-black text-red-800">{statistics.overdue}</p>
               </div>
               <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
-                <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Due Today</p>
+                <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Due Today</p>
                 <p className="text-2xl font-black text-orange-800">{statistics.dueToday}</p>
               </div>
             </div>
