@@ -593,14 +593,12 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     samplingStatus,
     dateFrom,
     dateTo,
-    page = 1,
     limit = 5000,
   } = filters || {};
 
   const safeLimit = Math.min(Math.max(1, limit), 5000);
-  const safePage = Math.max(1, page);
-  const skip = (safePage - 1) * safeLimit;
 
+  // Same filter logic as list and stats: aggregation with samplingStatus applied in DB
   const activityQuery: any = {};
   if (activityType) activityQuery.type = activityType;
   if (territory) {
@@ -614,13 +612,64 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     if (dateTo) activityQuery.date.$lte = dateTo;
   }
 
-  const activities = await Activity.find(activityQuery).sort({ date: -1 }).skip(skip).limit(safeLimit).lean();
-  const activityIds = activities.map((a) => a._id);
+  const samplingAuditColl = SamplingAudit.collection.name;
+  const exportPipeline: any[] = [
+    { $match: activityQuery },
+    { $addFields: { farmerCount: { $size: { $ifNull: ['$farmerIds', []] } } } },
+    {
+      $lookup: {
+        from: samplingAuditColl,
+        localField: '_id',
+        foreignField: 'activityId',
+        as: 'audits',
+      },
+    },
+    { $addFields: { sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] } } },
+    {
+      $addFields: {
+        samplingStatus: {
+          $switch: {
+            branches: [
+              { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
+              {
+                case: {
+                  $and: [
+                    { $gt: ['$farmerCount', 0] },
+                    { $gte: ['$sampledCount', '$farmerCount'] },
+                  ],
+                },
+                then: 'sampled',
+              },
+            ],
+            default: 'partial',
+          },
+        },
+      },
+    },
+  ];
+  if (samplingStatus) {
+    exportPipeline.push({ $match: { samplingStatus } });
+  }
+  exportPipeline.push({ $sort: { date: -1 } }, { $limit: safeLimit }, { $project: { _id: 1 } });
+
+  const exportIds = await Activity.aggregate(exportPipeline);
+  const activityIds = exportIds.map((d: { _id: mongoose.Types.ObjectId }) => d._id);
+
+  if (activityIds.length === 0) {
+    return [];
+  }
+
+  const activities = await Activity.find({ _id: { $in: activityIds } })
+    .sort({ date: -1 })
+    .lean();
+  const activitiesOrdered = activityIds
+    .map((id) => activities.find((a) => (a._id as mongoose.Types.ObjectId).equals(id)))
+    .filter((a): a is NonNullable<typeof a> => a != null);
 
   const samplingAudits = await SamplingAudit.find({ activityId: { $in: activityIds } }).lean();
   const auditMap = new Map<string, any>(samplingAudits.map((a: any) => [String(a.activityId), a]));
 
-  // Tasks breakdown by status per activity (lightweight)
+  // Tasks breakdown by status per activity (same activity set as list/stats)
   const taskAgg = await CallTask.aggregate([
     { $match: { activityId: { $in: activityIds } } },
     {
@@ -649,7 +698,7 @@ export const getActivitiesSamplingExportRows = async (filters?: {
 
   const out: ActivitySamplingExportRow[] = [];
 
-  for (const a of activities as any[]) {
+  for (const a of activitiesOrdered as any[]) {
     const totalFarmers = Array.isArray(a.farmerIds) ? a.farmerIds.length : 0;
     const audit = auditMap.get(String(a._id));
     const farmersSampled = audit?.sampledCount ? Number(audit.sampledCount) : 0;
@@ -685,11 +734,6 @@ export const getActivitiesSamplingExportRows = async (filters?: {
     };
 
     out.push(row);
-  }
-
-  // Apply samplingStatus filter post-compute (since export derives it)
-  if (samplingStatus) {
-    return out.filter((r) => r.samplingStatus === samplingStatus);
   }
 
   return out;
