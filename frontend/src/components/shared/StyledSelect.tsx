@@ -42,13 +42,20 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
 
   const selectedOption = options.find(opt => opt.value === value);
 
-  // Position dropdown when open (for portal – avoids parent overflow clipping)
+  // Position dropdown when open (for portal – avoids parent overflow clipping).
+  // Flip above the trigger when not enough space below (e.g. ROWS selector in pagination at bottom of page).
+  const DROPDOWN_MAX_HEIGHT = 280;
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - rect.bottom - 8 : DROPDOWN_MAX_HEIGHT;
+    const openAbove = spaceBelow < Math.min(DROPDOWN_MAX_HEIGHT, 200);
     setDropdownStyle({
       position: 'fixed',
-      top: rect.bottom + 4,
+      ...(openAbove
+        ? { bottom: typeof window !== 'undefined' ? window.innerHeight - rect.top + 4 : undefined, top: undefined }
+        : { top: rect.bottom + 4 }
+      ),
       left: rect.left,
       width: rect.width,
       zIndex: 9999,
