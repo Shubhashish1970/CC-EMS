@@ -153,14 +153,17 @@ const ActivitySamplingView: React.FC = () => {
     return { ...DEFAULT_ACTIVITY_TABLE_WIDTHS };
   });
   const resizingRef = useRef<{ key: ActivityTableColumnKey; startX: number; startWidth: number } | null>(null);
-  const [filters, setFilters] = useState({
-    activityType: '',
-    territory: '',
-    zone: '',
-    bu: '',
-    samplingStatus: '' as 'sampled' | 'not_sampled' | 'partial' | '',
-    dateFrom: '',
-    dateTo: '',
+  const [filters, setFilters] = useState(() => {
+    const r = getPresetRange('Last 7 days');
+    return {
+      activityType: '',
+      territory: '',
+      zone: '',
+      bu: '',
+      samplingStatus: '' as 'sampled' | 'not_sampled' | 'partial' | '',
+      dateFrom: r.start,
+      dateTo: r.end,
+    };
   });
 
   const getRange = (preset: DateRangePreset) =>
@@ -168,8 +171,8 @@ const ActivitySamplingView: React.FC = () => {
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset>('Last 7 days');
-  const [draftStart, setDraftStart] = useState(''); // YYYY-MM-DD
-  const [draftEnd, setDraftEnd] = useState(''); // YYYY-MM-DD
+  const [draftStart, setDraftStart] = useState(() => getPresetRange('Last 7 days').start);
+  const [draftEnd, setDraftEnd] = useState(() => getPresetRange('Last 7 days').end);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
 
   const syncDraftFromFilters = () => {
@@ -178,16 +181,6 @@ const ActivitySamplingView: React.FC = () => {
     setDraftStart(start);
     setDraftEnd(end);
   };
-
-  // Apply default date range on first load (Last 7 days) if user hasn't set any dates yet
-  useEffect(() => {
-    if (filters.dateFrom || filters.dateTo) return;
-    const range = getRange('Last 7 days');
-    setFilters((prev) => ({ ...prev, dateFrom: range.start, dateTo: range.end }));
-    setDraftStart(range.start);
-    setDraftEnd(range.end);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [filterOptions, setFilterOptions] = useState<{ territoryOptions: string[]; zoneOptions: string[]; buOptions: string[] }>({
     territoryOptions: [],
@@ -244,7 +237,13 @@ const ActivitySamplingView: React.FC = () => {
     filters.dateTo,
   ]);
 
+  const fetchFilterFingerprint = () =>
+    `${filters.activityType}|${filters.territory}|${filters.zone}|${filters.bu}|${filters.samplingStatus}|${filters.dateFrom}|${filters.dateTo}`;
+  const fetchFilterFingerprintRef = useRef<string>('');
+
   const fetchActivities = async (page: number = 1, forceRefresh = false) => {
+    const fingerprint = fetchFilterFingerprint();
+    fetchFilterFingerprintRef.current = fingerprint;
     setIsLoading(true);
     setError(null);
     try {
@@ -258,21 +257,18 @@ const ActivitySamplingView: React.FC = () => {
         ...(forceRefresh && { _refresh: Date.now() }),
       }) as any;
 
+      if (fetchFilterFingerprintRef.current !== fingerprint) return;
+
       if (response.success && response.data) {
         const activitiesData = response.data.activities || [];
-        console.log('Activities received:', activitiesData.length);
         if (activitiesData.length > 0) {
-          console.log('Sample activity:', {
-            id: activitiesData[0].activity?._id,
-            farmersArray: activitiesData[0].farmers,
-            farmersCount: activitiesData[0].farmers?.length || 0,
-            totalFarmers: activitiesData[0].activity?.farmerIds?.length || 0,
-          });
+          console.log('Activities received:', activitiesData.length);
         }
         setActivities(activitiesData);
         setPagination(response.data.pagination || { page: 1, limit: pageSize, total: 0, pages: 1 });
       }
     } catch (err: any) {
+      if (fetchFilterFingerprintRef.current !== fingerprint) return;
       const errorMsg = err.message || 'Failed to load activities';
       setError(errorMsg);
       showError(errorMsg);
@@ -282,6 +278,8 @@ const ActivitySamplingView: React.FC = () => {
   };
 
   const fetchStats = async () => {
+    const fingerprint = fetchFilterFingerprint();
+    fetchFilterFingerprintRef.current = fingerprint;
     setIsStatsLoading(true);
     try {
       const res: any = await adminAPI.getActivitiesSamplingStats({
@@ -290,11 +288,12 @@ const ActivitySamplingView: React.FC = () => {
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
       });
+      if (fetchFilterFingerprintRef.current !== fingerprint) return;
       if (res?.success && res?.data) {
         setStatsData(res.data);
       }
     } catch (err) {
-      // Non-blocking: keep UI usable even if stats fail
+      if (fetchFilterFingerprintRef.current !== fingerprint) return;
       console.error('Failed to fetch activity sampling stats:', err);
     } finally {
       setIsStatsLoading(false);
