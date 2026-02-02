@@ -2058,9 +2058,192 @@ router.get(
   }
 );
 
+// @route   GET /api/tasks/dashboard/by-language
+// @desc    Team Lead: queue statistics and task list for a single language (Tasks by Language drill-down)
+// @query   language (required), dateFrom, dateTo, bu, state, page, limit (lazy load; default limit 30, max 100)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/dashboard/by-language',
+  requirePermission('tasks.view.team'),
+  [
+    query('language').notEmpty().isString().trim(),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('bu').optional().isString(),
+    query('state').optional().isString(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const language = (req.query.language as string).trim();
+      const { dateFrom, dateTo, bu, state } = req.query as any;
+      const page = req.query.page != null ? Number(req.query.page) : 1;
+      const limit = req.query.limit != null ? Math.min(Number(req.query.limit), 100) : 30;
+      const skip = (page - 1) * limit;
+
+      const dateMatch: any = {};
+      if (dateFrom || dateTo) {
+        dateMatch.scheduledDate = {};
+        if (dateFrom) {
+          const d = new Date(dateFrom);
+          d.setHours(0, 0, 0, 0);
+          dateMatch.scheduledDate.$gte = d;
+        }
+        if (dateTo) {
+          const d = new Date(dateTo);
+          d.setHours(23, 59, 59, 999);
+          dateMatch.scheduledDate.$lte = d;
+        }
+      }
+
+      const agents = await User.find({
+        teamLeadId: new mongoose.Types.ObjectId(teamLeadId),
+        role: 'cc_agent',
+        isActive: true,
+      })
+        .select('_id')
+        .lean();
+      const agentIds = agents.map((a) => a._id);
+
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const activityFilter: any = {};
+      if (bu) activityFilter['activity.buName'] = String(bu);
+      if (state) activityFilter['activity.state'] = String(state);
+
+      // All tasks: unassigned OR assigned to team (any status), then filter by language
+      const baseMatch: any = {
+        ...dateMatch,
+        $or: [{ status: 'unassigned' }, { assignedAgentId: { $in: agentIds } }],
+      };
+
+      const result = await CallTask.aggregate([
+        { $match: baseMatch },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+        { $match: { 'farmer.preferredLanguage': language } },
+        {
+          $lookup: {
+            from: activityCollection,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        ...(bu || state ? [{ $match: activityFilter }] : []),
+        {
+          $facet: {
+            statusBreakdown: [
+              {
+                $group: {
+                  _id: null,
+                  sampled_in_queue: { $sum: { $cond: [{ $eq: ['$status', 'sampled_in_queue'] }, 1, 0] } },
+                  in_progress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+                  completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+                  not_reachable: { $sum: { $cond: [{ $eq: ['$status', 'not_reachable'] }, 1, 0] } },
+                  invalid_number: { $sum: { $cond: [{ $eq: ['$status', 'invalid_number'] }, 1, 0] } },
+                  total: { $sum: 1 },
+                },
+              },
+              { $project: { _id: 0 } },
+            ],
+            tasks: [
+              { $sort: { scheduledDate: 1 } },
+              { $skip: skip },
+              { $limit: limit },
+              {
+                $lookup: {
+                  from: User.collection.name,
+                  localField: 'assignedAgentId',
+                  foreignField: '_id',
+                  as: 'agent',
+                },
+              },
+              { $unwind: { path: '$agent', preserveNullAndEmptyArrays: true } },
+              {
+                $project: {
+                  taskId: { $toString: '$_id' },
+                  farmer: {
+                    name: { $ifNull: ['$farmer.name', 'Unknown'] },
+                    mobileNumber: { $ifNull: ['$farmer.mobileNumber', 'Unknown'] },
+                    preferredLanguage: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
+                    location: { $ifNull: ['$farmer.location', 'Unknown'] },
+                  },
+                  activity: {
+                    type: { $ifNull: ['$activity.type', 'Unknown'] },
+                    date: '$activity.date',
+                    officerName: { $ifNull: ['$activity.officerName', 'Unknown'] },
+                    territory: { $ifNull: ['$activity.territoryName', '$activity.territory'] },
+                  },
+                  status: 1,
+                  scheduledDate: 1,
+                  createdAt: 1,
+                  assignedAgentName: { $ifNull: ['$agent.name', null] },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      const facet = result?.[0];
+      const statusBreakdown = facet?.statusBreakdown?.[0] || {
+        sampled_in_queue: 0,
+        in_progress: 0,
+        completed: 0,
+        not_reachable: 0,
+        invalid_number: 0,
+        total: 0,
+      };
+      const tasksTotal = statusBreakdown.total;
+      const tasks = (facet?.tasks || []).map((t: any) => ({
+        ...t,
+        activity: {
+          ...t.activity,
+          territory: t.activity?.territory ?? 'Unknown',
+          date: t.activity?.date ?? t.createdAt,
+        },
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          language,
+          statusBreakdown,
+          tasks,
+          tasksTotal,
+          page,
+          limit,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/tasks/dashboard/agent/:agentId
 // @desc    Team Lead: get agent queue detail for an agent in their team (opens Agent Queue detail view)
 // @query   language - optional: filter tasks by farmer preferredLanguage
+// @query   page, limit - optional: lazy load tasks (default limit 30, max 100)
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/dashboard/agent/:agentId',
@@ -2068,6 +2251,8 @@ router.get(
   [
     param('agentId').isMongoId().withMessage('Invalid agent ID'),
     query('language').optional().isString().trim(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -2083,6 +2268,8 @@ router.get(
       const teamLeadId = authReq.user._id.toString();
       const agentId = req.params.agentId;
       const language = (req.query.language as string)?.trim() || undefined;
+      const page = req.query.page != null ? Number(req.query.page) : undefined;
+      const limit = req.query.limit != null ? Number(req.query.limit) : undefined;
 
       const agent = await User.findById(agentId).select('_id role teamLeadId').lean();
       if (!agent) {
@@ -2108,7 +2295,7 @@ router.get(
         });
       }
 
-      const result = await getAgentQueue(agentId, { language });
+      const result = await getAgentQueue(agentId, { language, page, limit });
       res.json({
         success: true,
         data: result,

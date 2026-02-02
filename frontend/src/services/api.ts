@@ -407,11 +407,36 @@ export const tasksAPI = {
     return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
   },
 
-  getDashboardAgent: async (agentId: string, language?: string) => {
+  getDashboardAgent: async (
+    agentId: string,
+    language?: string,
+    page?: number,
+    limit?: number
+  ) => {
     const params = new URLSearchParams();
     if (language) params.set('language', language);
+    if (page != null && page >= 1) params.set('page', String(page));
+    if (limit != null && limit >= 1) params.set('limit', String(limit));
     const query = params.toString();
     return apiRequest(`/tasks/dashboard/agent/${encodeURIComponent(agentId)}${query ? `?${query}` : ''}`);
+  },
+
+  getDashboardByLanguage: async (
+    language: string,
+    filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string },
+    page?: number,
+    limit?: number
+  ) => {
+    const params = new URLSearchParams();
+    params.set('language', language);
+    if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+    if (filters?.bu) params.set('bu', filters.bu);
+    if (filters?.state) params.set('state', filters.state);
+    if (page != null && page >= 1) params.set('page', String(page));
+    if (limit != null && limit >= 1) params.set('limit', String(limit));
+    const query = params.toString();
+    return apiRequest(`/tasks/dashboard/by-language?${query}`);
   },
   allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     // Allocation can update many tasks; allow longer timeout

@@ -22,6 +22,8 @@ const LANGUAGE_ORDER = [
   'Unknown',
 ] as const;
 
+const TASKS_PAGE_SIZE = 30;
+
 interface AgentQueueDetailForTL {
   agent: {
     agentId: string;
@@ -46,6 +48,33 @@ interface AgentQueueDetailForTL {
     scheduledDate: string;
     createdAt: string;
   }>;
+  tasksTotal?: number;
+  page?: number;
+  limit?: number;
+}
+
+interface LanguageQueueDetailForTL {
+  language: string;
+  statusBreakdown: {
+    sampled_in_queue: number;
+    in_progress: number;
+    completed: number;
+    not_reachable: number;
+    invalid_number: number;
+    total: number;
+  };
+  tasks: Array<{
+    taskId: string;
+    farmer: { name: string; mobileNumber: string; preferredLanguage: string; location: string };
+    activity: { type: string; date: string; officerName: string; territory: string };
+    status: string;
+    scheduledDate: string;
+    createdAt: string;
+    assignedAgentName?: string | null;
+  }>;
+  tasksTotal?: number;
+  page?: number;
+  limit?: number;
 }
 
 const TaskDashboardView: React.FC = () => {
@@ -65,6 +94,12 @@ const TaskDashboardView: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [agentDetail, setAgentDetail] = useState<AgentQueueDetailForTL | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  const [selectedLanguageQueue, setSelectedLanguageQueue] = useState<string | null>(null);
+  const [languageQueueDetail, setLanguageQueueDetail] = useState<LanguageQueueDetailForTL | null>(null);
+  const [isLoadingLanguageQueue, setIsLoadingLanguageQueue] = useState(false);
+  const [isLoadingMoreAgent, setIsLoadingMoreAgent] = useState(false);
+  const [isLoadingMoreLanguage, setIsLoadingMoreLanguage] = useState(false);
 
   // Date range dropdown (same UX as Sampling Dashboard)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -208,7 +243,12 @@ const TaskDashboardView: React.FC = () => {
     const load = async () => {
       setIsLoadingDetail(true);
       try {
-        const res: any = await tasksAPI.getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined);
+        const res: any = await tasksAPI.getDashboardAgent(
+          selectedAgentId,
+          selectedLanguage ?? undefined,
+          1,
+          TASKS_PAGE_SIZE
+        );
         if (!cancelled && res?.data) setAgentDetail(res.data);
       } catch (e: any) {
         if (!cancelled) {
@@ -226,6 +266,44 @@ const TaskDashboardView: React.FC = () => {
       cancelled = true;
     };
   }, [selectedAgentId, selectedLanguage, toast]);
+
+  // Fetch language queue when Team Lead clicks a language in "Tasks by Language (Open)"
+  useEffect(() => {
+    if (!selectedLanguageQueue) {
+      setLanguageQueueDetail(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setIsLoadingLanguageQueue(true);
+      try {
+        const res: any = await tasksAPI.getDashboardByLanguage(
+          selectedLanguageQueue,
+          {
+            dateFrom: filters.dateFrom || undefined,
+            dateTo: filters.dateTo || undefined,
+            bu: filters.bu || undefined,
+            state: filters.state || undefined,
+          },
+          1,
+          TASKS_PAGE_SIZE
+        );
+        if (!cancelled && res?.data) setLanguageQueueDetail(res.data);
+      } catch (e: any) {
+        if (!cancelled) {
+          toast.showError(e?.message || 'Failed to load language queue');
+          setSelectedLanguageQueue(null);
+          setLanguageQueueDetail(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoadingLanguageQueue(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLanguageQueue, filters.dateFrom, filters.dateTo, filters.bu, filters.state, toast]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { icon: typeof Clock; color: string }> = {
@@ -369,6 +447,220 @@ const TaskDashboardView: React.FC = () => {
     }
   };
 
+  // Language Queue detail view (when Team Lead clicks a language in "Tasks by Language (Open)")
+  if (selectedLanguageQueue) {
+    if (!languageQueueDetail && isLoadingLanguageQueue) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLanguageQueue(null);
+                  setLanguageQueueDetail(null);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                ← Back to Tasks by Language
+              </button>
+            </div>
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="animate-spin text-slate-400" size={40} />
+              <span className="ml-3 text-sm font-bold text-slate-600">Loading queue for {selectedLanguageQueue}…</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (languageQueueDetail) {
+      const d = languageQueueDetail;
+      return (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLanguageQueue(null);
+                  setLanguageQueueDetail(null);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                ← Back to Tasks by Language
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  tasksAPI
+                    .getDashboardByLanguage(
+                      d.language,
+                      {
+                        dateFrom: filters.dateFrom || undefined,
+                        dateTo: filters.dateTo || undefined,
+                        bu: filters.bu || undefined,
+                        state: filters.state || undefined,
+                      },
+                      1,
+                      TASKS_PAGE_SIZE
+                    )
+                    .then((res: any) => res?.data && setLanguageQueueDetail(res.data))
+                    .catch(() => toast.showError('Failed to refresh'))
+                }
+                disabled={isLoadingLanguageQueue}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={isLoadingLanguageQueue ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Queue for language: {d.language}</h2>
+            <p className="text-sm text-slate-600 mt-1">Statistics and task list for this language only (same date/BU/State filters as dashboard).</p>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-4">Queue Statistics ({d.language})</h3>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                <p className="text-2xl font-black text-slate-900">{d.statusBreakdown.total}</p>
+              </div>
+              <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
+                <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+                <p className="text-2xl font-black text-yellow-800">{d.statusBreakdown.sampled_in_queue}</p>
+              </div>
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-2xl font-black text-blue-800">{d.statusBreakdown.in_progress}</p>
+              </div>
+              <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+                <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-2xl font-black text-green-800">{d.statusBreakdown.completed}</p>
+              </div>
+              <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
+                <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Not Reachable</p>
+                <p className="text-2xl font-black text-orange-800">{d.statusBreakdown.not_reachable}</p>
+              </div>
+              <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
+                <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Invalid</p>
+                <p className="text-2xl font-black text-red-800">{d.statusBreakdown.invalid_number}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-4">
+              Tasks ({d.tasksTotal != null ? `${d.tasks.length} of ${d.tasksTotal}` : d.tasks?.length ?? 0})
+            </h3>
+            {!d.tasks?.length ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-slate-600 font-medium">No tasks for this language.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {(d.tasks || []).map((task: any) => (
+                    <div
+                      key={task.taskId}
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="text-base font-black text-slate-900">{task.farmer?.name ?? '—'}</h4>
+                            {getStatusBadge(task.status)}
+                            {task.assignedAgentName && (
+                              <span className="text-xs font-bold text-slate-500">Assigned to: {task.assignedAgentName}</span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <Phone size={14} />
+                              <span>{task.farmer?.mobileNumber ?? '—'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <MapPin size={14} />
+                              <span>{task.farmer?.location ?? '—'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar size={14} />
+                              <span>Scheduled: {formatDate(task.scheduledDate)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span>Language: {task.farmer?.preferredLanguage ?? '—'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                          <span>Activity: {task.activity?.type ?? '—'}</span>
+                          <span>•</span>
+                          <span>Officer: {task.activity?.officerName ?? '—'}</span>
+                          <span>•</span>
+                          <span>Territory: {task.activity?.territory ?? '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {d.tasksTotal != null && d.tasks.length < d.tasksTotal && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!languageQueueDetail) return;
+                        setIsLoadingMoreLanguage(true);
+                        try {
+                          const res: any = await tasksAPI.getDashboardByLanguage(
+                            languageQueueDetail.language,
+                            {
+                              dateFrom: filters.dateFrom || undefined,
+                              dateTo: filters.dateTo || undefined,
+                              bu: filters.bu || undefined,
+                              state: filters.state || undefined,
+                            },
+                            (languageQueueDetail.page ?? 1) + 1,
+                            TASKS_PAGE_SIZE
+                          );
+                          if (res?.data?.tasks?.length)
+                            setLanguageQueueDetail((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    tasks: [...(prev.tasks || []), ...res.data.tasks],
+                                    page: res.data.page ?? (prev.page ?? 1) + 1,
+                                  }
+                                : null
+                            );
+                        } catch (e: any) {
+                          toast.showError(e?.message || 'Failed to load more tasks');
+                        } finally {
+                          setIsLoadingMoreLanguage(false);
+                        }
+                      }}
+                      disabled={isLoadingMoreLanguage}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+                    >
+                      {isLoadingMoreLanguage ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin inline mr-2" />
+                          Loading…
+                        </>
+                      ) : (
+                        `Load more (${d.tasks.length} of ${d.tasksTotal} shown)`
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+  }
+
   // Agent Queue detail view (when Team Lead clicks an agent)
   if (selectedAgentId) {
     if (!agentDetail && isLoadingDetail) {
@@ -414,7 +706,13 @@ const TaskDashboardView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => selectedAgentId && tasksAPI.getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined).then((res: any) => res?.data && setAgentDetail(res.data)).catch(() => toast.showError('Failed to refresh'))}
+              onClick={() =>
+                selectedAgentId &&
+                tasksAPI
+                  .getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined, 1, TASKS_PAGE_SIZE)
+                  .then((res: any) => res?.data && setAgentDetail(res.data))
+                  .catch(() => toast.showError('Failed to refresh'))
+              }
               disabled={isLoadingDetail}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
             >
@@ -480,55 +778,103 @@ const TaskDashboardView: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-black text-slate-900 mb-4">Tasks ({agentDetail.tasks?.length ?? 0})</h3>
+          <h3 className="text-lg font-black text-slate-900 mb-4">
+            Tasks ({agentDetail.tasksTotal != null ? `${agentDetail.tasks.length} of ${agentDetail.tasksTotal}` : agentDetail.tasks?.length ?? 0})
+          </h3>
           {!agentDetail.tasks?.length ? (
             <div className="text-center py-12">
               <p className="text-sm text-slate-600 font-medium">No tasks in queue</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {(agentDetail.tasks || []).map((task: any) => (
-                <div
-                  key={task.taskId}
-                  className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-base font-black text-slate-900">{task.farmer?.name ?? '—'}</h4>
-                        {getStatusBadge(task.status)}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
-                        <div className="flex items-center gap-2">
-                          <Phone size={14} />
-                          <span>{task.farmer?.mobileNumber ?? '—'}</span>
+            <>
+              <div className="space-y-3">
+                {(agentDetail.tasks || []).map((task: any) => (
+                  <div
+                    key={task.taskId}
+                    className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h4 className="text-base font-black text-slate-900">{task.farmer?.name ?? '—'}</h4>
+                          {getStatusBadge(task.status)}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin size={14} />
-                          <span>{task.farmer?.location ?? '—'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar size={14} />
-                          <span>Scheduled: {formatDate(task.scheduledDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>Language: {task.farmer?.preferredLanguage ?? '—'}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                          <div className="flex items-center gap-2">
+                            <Phone size={14} />
+                            <span>{task.farmer?.mobileNumber ?? '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={14} />
+                            <span>{task.farmer?.location ?? '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar size={14} />
+                            <span>Scheduled: {formatDate(task.scheduledDate)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>Language: {task.farmer?.preferredLanguage ?? '—'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-slate-200">
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <span>Activity: {task.activity?.type ?? '—'}</span>
-                      <span>•</span>
-                      <span>Officer: {task.activity?.officerName ?? '—'}</span>
-                      <span>•</span>
-                      <span>Territory: {task.activity?.territory ?? '—'}</span>
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <span>Activity: {task.activity?.type ?? '—'}</span>
+                        <span>•</span>
+                        <span>Officer: {task.activity?.officerName ?? '—'}</span>
+                        <span>•</span>
+                        <span>Territory: {task.activity?.territory ?? '—'}</span>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+              {agentDetail.tasksTotal != null && agentDetail.tasks.length < agentDetail.tasksTotal && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedAgentId || !agentDetail) return;
+                      setIsLoadingMoreAgent(true);
+                      try {
+                        const res: any = await tasksAPI.getDashboardAgent(
+                          selectedAgentId,
+                          selectedLanguage ?? undefined,
+                          (agentDetail.page ?? 1) + 1,
+                          TASKS_PAGE_SIZE
+                        );
+                        if (res?.data?.tasks?.length)
+                          setAgentDetail((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  tasks: [...(prev.tasks || []), ...res.data.tasks],
+                                  page: res.data.page ?? (prev.page ?? 1) + 1,
+                                }
+                              : null
+                          );
+                      } catch (e: any) {
+                        toast.showError(e?.message || 'Failed to load more tasks');
+                      } finally {
+                        setIsLoadingMoreAgent(false);
+                      }
+                    }}
+                    disabled={isLoadingMoreAgent}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+                  >
+                    {isLoadingMoreAgent ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin inline mr-2" />
+                        Loading…
+                      </>
+                    ) : (
+                      `Load more (${agentDetail.tasks.length} of ${agentDetail.tasksTotal} shown)`
+                    )}
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -799,6 +1145,7 @@ const TaskDashboardView: React.FC = () => {
             Total Unassigned: <span className="font-black text-slate-900">{data?.totals?.totalUnassigned ?? 0}</span>
           </div>
         </div>
+        <p className="text-sm text-slate-600 mt-1">Click a language to view Queue Statistics and task list for that language only.</p>
 
         {/* Allocation controls */}
         <div className="mt-4 flex flex-col md:flex-row md:items-end gap-3 md:justify-between">
@@ -917,7 +1264,15 @@ const TaskDashboardView: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {(data?.openByLanguage || []).map((r: any) => (
                 <tr key={r.language}>
-                  <td className="px-4 py-3 font-black text-slate-900">{r.language}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLanguageQueue(r.language)}
+                      className="font-black text-blue-600 hover:text-blue-800 hover:underline text-left"
+                    >
+                      {r.language}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.totalOpen}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{r.sampledInQueue}</td>

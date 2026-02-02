@@ -1137,15 +1137,20 @@ export const getAgentQueues = async (filters?: {
   }
 };
 
+const TASK_PAGE_SIZE_DEFAULT = 30;
+const TASK_PAGE_SIZE_MAX = 100;
+
 /**
  * Get detailed queue for a specific agent
- * Returns agent info, status breakdown, and chronologically ordered task list
+ * Returns agent info, status breakdown, and task list (all or paginated)
  * @param options.language - optional: filter tasks by farmer preferredLanguage
+ * @param options.page - optional: 1-based page for lazy load (requires limit)
+ * @param options.limit - optional: page size (default 30, max 100)
  */
 export const getAgentQueue = async (
   agentId: string,
-  options?: { language?: string }
-): Promise<AgentQueueDetail> => {
+  options?: { language?: string; page?: number; limit?: number }
+): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number }> => {
   try {
     // Validate agentId
     if (!mongoose.Types.ObjectId.isValid(agentId)) {
@@ -1165,16 +1170,138 @@ export const getAgentQueue = async (
       throw new Error('User is not a CC agent');
     }
 
-    // Get all tasks for this agent, ordered by scheduledDate
+    const language = options?.language?.trim();
+    const page = options?.page != null && options.page >= 1 ? options.page : undefined;
+    const limit =
+      options?.limit != null && options.limit >= 1
+        ? Math.min(options.limit, TASK_PAGE_SIZE_MAX)
+        : undefined;
+    const usePagination = page != null && limit != null;
+
+    if (usePagination) {
+      // Paginated path: aggregation for breakdown + total and one page of tasks (no full load)
+      const skip = (page - 1) * limit;
+      const basePipeline: mongoose.PipelineStage[] = [
+        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId) } },
+        {
+          $lookup: {
+            from: Farmer.collection.name,
+            localField: 'farmerId',
+            foreignField: '_id',
+            as: 'farmer',
+          },
+        },
+        { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: true } },
+      ];
+      if (language) {
+        basePipeline.push({ $match: { 'farmer.preferredLanguage': language } });
+      }
+      const facetPipeline: mongoose.PipelineStage[] = [
+        ...basePipeline,
+        {
+          $facet: {
+            statusBreakdown: [
+              {
+                $group: {
+                  _id: null,
+                  sampled_in_queue: { $sum: { $cond: [{ $eq: ['$status', 'sampled_in_queue'] }, 1, 0] } },
+                  in_progress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+                  completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+                  not_reachable: { $sum: { $cond: [{ $eq: ['$status', 'not_reachable'] }, 1, 0] } },
+                  invalid_number: { $sum: { $cond: [{ $eq: ['$status', 'invalid_number'] }, 1, 0] } },
+                  total: { $sum: 1 },
+                },
+              },
+              { $project: { _id: 0 } },
+            ],
+            tasks: [
+              { $sort: { scheduledDate: 1 } },
+              { $skip: skip },
+              { $limit: limit },
+              {
+                $lookup: {
+                  from: (await import('../models/Activity.js')).Activity.collection.name,
+                  localField: 'activityId',
+                  foreignField: '_id',
+                  as: 'activity',
+                },
+              },
+              { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+              {
+                $project: {
+                  taskId: { $toString: '$_id' },
+                  farmer: {
+                    name: { $ifNull: ['$farmer.name', 'Unknown'] },
+                    mobileNumber: { $ifNull: ['$farmer.mobileNumber', 'Unknown'] },
+                    preferredLanguage: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
+                    location: { $ifNull: ['$farmer.location', 'Unknown'] },
+                  },
+                  activity: {
+                    type: { $ifNull: ['$activity.type', 'Unknown'] },
+                    date: '$activity.date',
+                    officerName: { $ifNull: ['$activity.officerName', 'Unknown'] },
+                    territory: { $ifNull: ['$activity.territoryName', '$activity.territory'] },
+                    zone: { $ifNull: ['$activity.zoneName', ''] },
+                    bu: { $ifNull: ['$activity.buName', ''] },
+                  },
+                  status: 1,
+                  scheduledDate: 1,
+                  createdAt: 1,
+                },
+              },
+            ],
+          },
+        },
+      ];
+      const aggResult = await CallTask.aggregate(facetPipeline);
+      const facet = aggResult?.[0];
+      const statusBreakdown = facet?.statusBreakdown?.[0] || {
+        sampled_in_queue: 0,
+        in_progress: 0,
+        completed: 0,
+        not_reachable: 0,
+        invalid_number: 0,
+        total: 0,
+      };
+      const tasksTotal = statusBreakdown.total;
+      const rawTasks = facet?.tasks || [];
+      const taskDetails = rawTasks.map((t: any) => ({
+        taskId: t.taskId,
+        farmer: t.farmer || {},
+        activity: {
+          ...t.activity,
+          territory: t.activity?.territory ?? 'Unknown',
+          date: t.activity?.date ?? t.createdAt,
+        },
+        status: t.status,
+        scheduledDate: t.scheduledDate,
+        createdAt: t.createdAt,
+      }));
+
+      return {
+        agent: {
+          agentId: agent._id.toString(),
+          agentName: agent.name,
+          agentEmail: agent.email,
+          employeeId: agent.employeeId,
+          languageCapabilities: agent.languageCapabilities || [],
+        },
+        statusBreakdown,
+        tasks: taskDetails,
+        tasksTotal,
+        page,
+        limit,
+      };
+    }
+
+    // Non-paginated path: load all tasks (backward compatible)
     let tasks = await CallTask.find({
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
     })
       .populate('farmerId', 'name mobileNumber preferredLanguage location')
       .populate('activityId', 'type date officerName territory territoryName zoneName buName')
-      .sort({ scheduledDate: 1 }); // Chronologically ordered
+      .sort({ scheduledDate: 1 });
 
-    // Optional filter by farmer preferred language
-    const language = options?.language?.trim();
     if (language) {
       tasks = tasks.filter((task) => {
         const farmer = task.farmerId as any;
@@ -1182,7 +1309,6 @@ export const getAgentQueue = async (
       });
     }
 
-    // Calculate status breakdown from (possibly filtered) tasks
     const statusBreakdown = {
       sampled_in_queue: 0,
       in_progress: 0,
@@ -1199,7 +1325,6 @@ export const getAgentQueue = async (
       }
     }
 
-    // Build task details array
     const taskDetails = tasks.map((task) => {
       const farmer = task.farmerId as any;
       const activity = task.activityId as any;
