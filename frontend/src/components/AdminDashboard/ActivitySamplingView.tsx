@@ -1137,7 +1137,7 @@ const ActivitySamplingView: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="text-green-700" size={18} />
-              <h2 className="text-base font-black text-slate-900">Statistics</h2>
+              <h2 className="text-base font-black text-slate-900">Activity Statistics</h2>
             </div>
             <button
               type="button"
@@ -1167,15 +1167,11 @@ const ActivitySamplingView: React.FC = () => {
             {/* With Sampling + Farmers Sampled */}
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
               <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Sampled</p>
-              <p className="text-xs text-green-600 text-left mt-0.5 break-words leading-tight">
-                {statistics.activitiesWithSampling}
-              </p>
+              <p className="text-xl font-black text-green-800 text-left mt-0.5">{statistics.activitiesWithSampling}</p>
               <p className="text-xs text-green-600 text-left break-words leading-tight" title="Full = farmers selected as per norms; Partial = no farmers selected">
                 activity sampled ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
               </p>
-              <p className="text-xs text-green-600 text-left mt-1 break-words leading-tight">
-                {statistics.farmersSampled}
-              </p>
+              <p className="text-xl font-black text-green-800 text-left mt-1">{statistics.farmersSampled}</p>
               <p className="text-xs text-green-600 text-left break-words leading-tight">
                 farmers sampled{statistics.totalFarmers > 0 ? ` (${Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)` : ''}
               </p>
