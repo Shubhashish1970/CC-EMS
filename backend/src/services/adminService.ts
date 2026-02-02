@@ -499,9 +499,12 @@ export const getActivitiesWithSampling = async (filters?: {
       
       logger.info(`Activity ${activityId}: ${farmersList.length} farmers processed (activity has ${activity.farmerIds?.length || 0} farmer IDs)`);
       
-      // Convert activity to object and ensure farmerIds are preserved
-      const activityObj = activity.toObject();
-      
+      // Activity may be a Mongoose document (.toObject()) or a lean plain object (no toObject)
+      const activityObj =
+        typeof (activity as any).toObject === 'function'
+          ? (activity as any).toObject()
+          : { ...activity };
+
       // Ensure farmerIds is always an array in the response (even if empty)
       if (!activityObj.farmerIds || !Array.isArray(activityObj.farmerIds)) {
         activityObj.farmerIds = [];
