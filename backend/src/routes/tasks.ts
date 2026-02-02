@@ -2244,6 +2244,7 @@ router.get(
 // @desc    Team Lead: get agent queue detail for an agent in their team (opens Agent Queue detail view)
 // @query   language - optional: filter tasks by farmer preferredLanguage
 // @query   page, limit - optional: lazy load tasks (default limit 30, max 100)
+// @query   dateFrom, dateTo, bu, state - optional: filter by scheduled date and activity
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/dashboard/agent/:agentId',
@@ -2253,6 +2254,10 @@ router.get(
     query('language').optional().isString().trim(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('dateFrom').optional().isISO8601().toDate(),
+    query('dateTo').optional().isISO8601().toDate(),
+    query('bu').optional().isString(),
+    query('state').optional().isString(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -2270,6 +2275,10 @@ router.get(
       const language = (req.query.language as string)?.trim() || undefined;
       const page = req.query.page != null ? Number(req.query.page) : undefined;
       const limit = req.query.limit != null ? Number(req.query.limit) : undefined;
+      const dateFrom = req.query.dateFrom != null ? String(req.query.dateFrom).trim() : undefined;
+      const dateTo = req.query.dateTo != null ? String(req.query.dateTo).trim() : undefined;
+      const bu = (req.query.bu as string)?.trim() || undefined;
+      const state = (req.query.state as string)?.trim() || undefined;
 
       const agent = await User.findById(agentId).select('_id role teamLeadId').lean();
       if (!agent) {
@@ -2295,7 +2304,15 @@ router.get(
         });
       }
 
-      const result = await getAgentQueue(agentId, { language, page, limit });
+      const result = await getAgentQueue(agentId, {
+        language,
+        page,
+        limit,
+        dateFrom,
+        dateTo,
+        bu,
+        state,
+      });
       res.json({
         success: true,
         data: result,

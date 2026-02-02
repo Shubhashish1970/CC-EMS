@@ -22,7 +22,8 @@ const LANGUAGE_ORDER = [
   'Unknown',
 ] as const;
 
-const TASKS_PAGE_SIZE = 30;
+const TASK_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const TASK_PAGE_SIZE_DEFAULT = 20;
 
 interface AgentQueueDetailForTL {
   agent: {
@@ -100,6 +101,13 @@ const TaskDashboardView: React.FC = () => {
   const [isLoadingLanguageQueue, setIsLoadingLanguageQueue] = useState(false);
   const [isLoadingMoreAgent, setIsLoadingMoreAgent] = useState(false);
   const [isLoadingMoreLanguage, setIsLoadingMoreLanguage] = useState(false);
+  const [taskPageSize, setTaskPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('teamLead.queueTasks.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && TASK_PAGE_SIZE_OPTIONS.includes(n as any) ? n : TASK_PAGE_SIZE_DEFAULT;
+  });
+  const loadMoreAgentRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreLanguageRef = useRef<HTMLDivElement | null>(null);
 
   // Date range dropdown (same UX as Sampling Dashboard)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -247,7 +255,13 @@ const TaskDashboardView: React.FC = () => {
           selectedAgentId,
           selectedLanguage ?? undefined,
           1,
-          TASKS_PAGE_SIZE
+          taskPageSize,
+          {
+            dateFrom: filters.dateFrom || undefined,
+            dateTo: filters.dateTo || undefined,
+            bu: filters.bu || undefined,
+            state: filters.state || undefined,
+          }
         );
         if (!cancelled && res?.data) setAgentDetail(res.data);
       } catch (e: any) {
@@ -265,7 +279,7 @@ const TaskDashboardView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedAgentId, selectedLanguage, toast]);
+  }, [selectedAgentId, selectedLanguage, filters.dateFrom, filters.dateTo, filters.bu, filters.state, taskPageSize, toast]);
 
   // Fetch language queue when Team Lead clicks a language in "Tasks by Language (Open)"
   useEffect(() => {
@@ -286,7 +300,7 @@ const TaskDashboardView: React.FC = () => {
             state: filters.state || undefined,
           },
           1,
-          TASKS_PAGE_SIZE
+          taskPageSize
         );
         if (!cancelled && res?.data) setLanguageQueueDetail(res.data);
       } catch (e: any) {
@@ -303,7 +317,112 @@ const TaskDashboardView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedLanguageQueue, filters.dateFrom, filters.dateTo, filters.bu, filters.state, toast]);
+  }, [selectedLanguageQueue, filters.dateFrom, filters.dateTo, filters.bu, filters.state, taskPageSize, toast]);
+
+  useEffect(() => {
+    localStorage.setItem('teamLead.queueTasks.pageSize', String(taskPageSize));
+  }, [taskPageSize]);
+
+  const loadMoreAgentTasks = React.useCallback(async () => {
+    if (!selectedAgentId || !agentDetail || isLoadingMoreAgent) return;
+    const total = agentDetail.tasksTotal ?? 0;
+    if (agentDetail.tasks.length >= total) return;
+    setIsLoadingMoreAgent(true);
+    try {
+      const res: any = await tasksAPI.getDashboardAgent(
+        selectedAgentId,
+        selectedLanguage ?? undefined,
+        (agentDetail.page ?? 1) + 1,
+        taskPageSize,
+        {
+          dateFrom: filters.dateFrom || undefined,
+          dateTo: filters.dateTo || undefined,
+          bu: filters.bu || undefined,
+          state: filters.state || undefined,
+        }
+      );
+      if (res?.data?.tasks?.length)
+        setAgentDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                tasks: [...(prev.tasks || []), ...res.data.tasks],
+                page: res.data.page ?? (prev.page ?? 1) + 1,
+              }
+            : null
+        );
+    } catch (e: any) {
+      toast.showError(e?.message || 'Failed to load more tasks');
+    } finally {
+      setIsLoadingMoreAgent(false);
+    }
+  }, [selectedAgentId, agentDetail, selectedLanguage, taskPageSize, filters, isLoadingMoreAgent, toast]);
+
+  const loadMoreLanguageTasks = React.useCallback(async () => {
+    if (!languageQueueDetail || isLoadingMoreLanguage) return;
+    const total = languageQueueDetail.tasksTotal ?? 0;
+    if (languageQueueDetail.tasks.length >= total) return;
+    setIsLoadingMoreLanguage(true);
+    try {
+      const res: any = await tasksAPI.getDashboardByLanguage(
+        languageQueueDetail.language,
+        {
+          dateFrom: filters.dateFrom || undefined,
+          dateTo: filters.dateTo || undefined,
+          bu: filters.bu || undefined,
+          state: filters.state || undefined,
+        },
+        (languageQueueDetail.page ?? 1) + 1,
+        taskPageSize
+      );
+      if (res?.data?.tasks?.length)
+        setLanguageQueueDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                tasks: [...(prev.tasks || []), ...res.data.tasks],
+                page: res.data.page ?? (prev.page ?? 1) + 1,
+              }
+            : null
+        );
+    } catch (e: any) {
+      toast.showError(e?.message || 'Failed to load more tasks');
+    } finally {
+      setIsLoadingMoreLanguage(false);
+    }
+  }, [languageQueueDetail, taskPageSize, filters, isLoadingMoreLanguage, toast]);
+
+  // Auto load more when scroll to bottom (Agent Queue)
+  useEffect(() => {
+    const ref = loadMoreAgentRef.current;
+    if (!ref || !agentDetail?.tasksTotal || (agentDetail.tasks?.length ?? 0) >= agentDetail.tasksTotal || isLoadingMoreAgent) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && agentDetail?.tasksTotal != null && (agentDetail.tasks?.length ?? 0) < agentDetail.tasksTotal && !isLoadingMoreAgent) {
+          loadMoreAgentTasks();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    observer.observe(ref);
+    return () => observer.disconnect();
+  }, [agentDetail?.tasks?.length, agentDetail?.tasksTotal, isLoadingMoreAgent, loadMoreAgentTasks]);
+
+  // Auto load more when scroll to bottom (Language Queue)
+  useEffect(() => {
+    const ref = loadMoreLanguageRef.current;
+    if (!ref || !languageQueueDetail?.tasksTotal || (languageQueueDetail.tasks?.length ?? 0) >= languageQueueDetail.tasksTotal || isLoadingMoreLanguage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && languageQueueDetail?.tasksTotal != null && (languageQueueDetail.tasks?.length ?? 0) < languageQueueDetail.tasksTotal && !isLoadingMoreLanguage) {
+          loadMoreLanguageTasks();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    observer.observe(ref);
+    return () => observer.disconnect();
+  }, [languageQueueDetail?.tasks?.length, languageQueueDetail?.tasksTotal, isLoadingMoreLanguage, loadMoreLanguageTasks]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { icon: typeof Clock; color: string }> = {
@@ -502,7 +621,7 @@ const TaskDashboardView: React.FC = () => {
                         state: filters.state || undefined,
                       },
                       1,
-                      TASKS_PAGE_SIZE
+                      taskPageSize
                     )
                     .then((res: any) => res?.data && setLanguageQueueDetail(res.data))
                     .catch(() => toast.showError('Failed to refresh'))
@@ -515,7 +634,100 @@ const TaskDashboardView: React.FC = () => {
               </button>
             </div>
             <h2 className="text-xl font-black text-slate-900">Queue for language: {d.language}</h2>
-            <p className="text-sm text-slate-600 mt-1">Statistics and task list for this language only (same date/BU/State filters as dashboard).</p>
+            <p className="text-sm text-slate-600 mt-1">Statistics and task list for this language only. Use filters below to narrow by date, BU, or State.</p>
+
+            {/* Filters - same UI as main Task Dashboard */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDatePickerOpen((prev) => {
+                        const next = !prev;
+                        if (!prev && next) syncDraftFromFilters();
+                        return next;
+                      });
+                    }}
+                    className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
+                  >
+                    <span className="truncate">
+                      {selectedPreset}
+                      {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
+                    </span>
+                    <Calendar size={16} className="text-slate-400" />
+                  </button>
+                  {isDatePickerOpen && (
+                    <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                      <div className="flex">
+                        <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                          {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreset(p);
+                                const { start, end } = getRange(p);
+                                setDraftStart(start);
+                                setDraftEnd(end);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${selectedPreset === p ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex-1 p-4">
+                          <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="flex-1">
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                              <input
+                                type="date"
+                                value={draftStart}
+                                onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }}
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                              <input
+                                type="date"
+                                value={draftEnd}
+                                onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }}
+                                className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button type="button" onClick={() => { setIsDatePickerOpen(false); syncDraftFromFilters(); }} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+                            <button type="button" onClick={() => { setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' })); setIsDatePickerOpen(false); }} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800">Apply</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">BU</label>
+                <StyledSelect
+                  value={filters.bu}
+                  onChange={(value) => setFilters((p) => ({ ...p, bu: value }))}
+                  options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.buOptions || []).map((b: string) => ({ value: b, label: b }))]}
+                  placeholder="All"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
+                <StyledSelect
+                  value={filters.state}
+                  onChange={(value) => setFilters((p) => ({ ...p, state: value }))}
+                  options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.stateOptions || []).map((s: string) => ({ value: s, label: s }))]}
+                  placeholder="All"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
@@ -604,54 +816,50 @@ const TaskDashboardView: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {d.tasksTotal != null && d.tasks.length < d.tasksTotal && (
-                  <div className="mt-4 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!languageQueueDetail) return;
-                        setIsLoadingMoreLanguage(true);
-                        try {
-                          const res: any = await tasksAPI.getDashboardByLanguage(
-                            languageQueueDetail.language,
-                            {
-                              dateFrom: filters.dateFrom || undefined,
-                              dateTo: filters.dateTo || undefined,
-                              bu: filters.bu || undefined,
-                              state: filters.state || undefined,
-                            },
-                            (languageQueueDetail.page ?? 1) + 1,
-                            TASKS_PAGE_SIZE
-                          );
-                          if (res?.data?.tasks?.length)
-                            setLanguageQueueDetail((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    tasks: [...(prev.tasks || []), ...res.data.tasks],
-                                    page: res.data.page ?? (prev.page ?? 1) + 1,
-                                  }
-                                : null
-                            );
-                        } catch (e: any) {
-                          toast.showError(e?.message || 'Failed to load more tasks');
-                        } finally {
-                          setIsLoadingMoreLanguage(false);
-                        }
-                      }}
-                      disabled={isLoadingMoreLanguage}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
-                    >
-                      {isLoadingMoreLanguage ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin inline mr-2" />
-                          Loading…
-                        </>
-                      ) : (
-                        `Load more (${d.tasks.length} of ${d.tasksTotal} shown)`
-                      )}
-                    </button>
+                {/* Pagination bar - same UI as TaskList */}
+                {d.tasksTotal != null && d.tasksTotal > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <p className="text-sm text-slate-600">
+                        Showing {d.tasks.length} of {d.tasksTotal} tasks
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                          <StyledSelect
+                            value={String(taskPageSize)}
+                            onChange={(value) => setTaskPageSize(Number(value))}
+                            options={TASK_PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+                            className="w-20"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                )}
+                {/* Load more trigger - auto load when scrolled into view */}
+                {d.tasksTotal != null && d.tasks.length < d.tasksTotal && (
+                  <div ref={loadMoreLanguageRef} className="py-4 text-center">
+                    {isLoadingMoreLanguage ? (
+                      <div className="flex items-center justify-center gap-2 text-slate-500">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span className="text-sm">Loading more…</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={loadMoreLanguageTasks}
+                        className="text-sm text-green-700 hover:text-green-800 font-medium"
+                      >
+                        Load more ({d.tasks.length} of {d.tasksTotal} shown)
+                      </button>
+                    )}
+                  </div>
+                )}
+                {d.tasksTotal != null && d.tasks.length >= d.tasksTotal && d.tasks.length > 0 && (
+                  <p className="mt-4 pt-4 border-t border-slate-100 text-center text-sm text-slate-400">
+                    All {d.tasksTotal} tasks loaded
+                  </p>
                 )}
               </>
             )}
@@ -709,7 +917,18 @@ const TaskDashboardView: React.FC = () => {
               onClick={() =>
                 selectedAgentId &&
                 tasksAPI
-                  .getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined, 1, TASKS_PAGE_SIZE)
+                  .getDashboardAgent(
+                    selectedAgentId,
+                    selectedLanguage ?? undefined,
+                    1,
+                    taskPageSize,
+                    {
+                      dateFrom: filters.dateFrom || undefined,
+                      dateTo: filters.dateTo || undefined,
+                      bu: filters.bu || undefined,
+                      state: filters.state || undefined,
+                    }
+                  )
                   .then((res: any) => res?.data && setAgentDetail(res.data))
                   .catch(() => toast.showError('Failed to refresh'))
               }
@@ -720,6 +939,106 @@ const TaskDashboardView: React.FC = () => {
               Refresh
             </button>
           </div>
+
+          {/* Filters - same UI as main Task Dashboard */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+              <div className="relative" ref={datePickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDatePickerOpen((prev) => {
+                      const next = !prev;
+                      if (!prev && next) syncDraftFromFilters();
+                      return next;
+                    });
+                  }}
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {selectedPreset}
+                    {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
+                  </span>
+                  <Calendar size={16} className="text-slate-400" />
+                </button>
+                {isDatePickerOpen && (
+                  <div className="absolute z-50 mt-2 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex">
+                      <div className="w-56 border-r border-slate-200 bg-slate-50 p-2">
+                        {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPreset(p);
+                              const { start, end } = getRange(p);
+                              setDraftStart(start);
+                              setDraftEnd(end);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${selectedPreset === p ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex-1 p-4">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                            <input
+                              type="date"
+                              value={draftStart}
+                              onChange={(e) => {
+                                setSelectedPreset('Custom');
+                                setDraftStart(e.target.value);
+                              }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                            <input
+                              type="date"
+                              value={draftEnd}
+                              onChange={(e) => {
+                                setSelectedPreset('Custom');
+                                setDraftEnd(e.target.value);
+                              }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                          <button type="button" onClick={() => { setIsDatePickerOpen(false); syncDraftFromFilters(); }} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+                          <button type="button" onClick={() => { setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' })); setIsDatePickerOpen(false); }} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800">Apply</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">BU</label>
+              <StyledSelect
+                value={filters.bu}
+                onChange={(value) => setFilters((p) => ({ ...p, bu: value }))}
+                options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.buOptions || []).map((b: string) => ({ value: b, label: b }))]}
+                placeholder="All"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
+              <StyledSelect
+                value={filters.state}
+                onChange={(value) => setFilters((p) => ({ ...p, state: value }))}
+                options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.stateOptions || []).map((s: string) => ({ value: s, label: s }))]}
+                placeholder="All"
+              />
+            </div>
+          </div>
+
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
               <UsersIcon className="text-slate-400" size={32} />
@@ -830,49 +1149,50 @@ const TaskDashboardView: React.FC = () => {
                   </div>
                 ))}
               </div>
-              {agentDetail.tasksTotal != null && agentDetail.tasks.length < agentDetail.tasksTotal && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!selectedAgentId || !agentDetail) return;
-                      setIsLoadingMoreAgent(true);
-                      try {
-                        const res: any = await tasksAPI.getDashboardAgent(
-                          selectedAgentId,
-                          selectedLanguage ?? undefined,
-                          (agentDetail.page ?? 1) + 1,
-                          TASKS_PAGE_SIZE
-                        );
-                        if (res?.data?.tasks?.length)
-                          setAgentDetail((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  tasks: [...(prev.tasks || []), ...res.data.tasks],
-                                  page: res.data.page ?? (prev.page ?? 1) + 1,
-                                }
-                              : null
-                          );
-                      } catch (e: any) {
-                        toast.showError(e?.message || 'Failed to load more tasks');
-                      } finally {
-                        setIsLoadingMoreAgent(false);
-                      }
-                    }}
-                    disabled={isLoadingMoreAgent}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
-                  >
-                    {isLoadingMoreAgent ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin inline mr-2" />
-                        Loading…
-                      </>
-                    ) : (
-                      `Load more (${agentDetail.tasks.length} of ${agentDetail.tasksTotal} shown)`
-                    )}
-                  </button>
+              {/* Pagination bar - same UI as TaskList */}
+              {agentDetail.tasksTotal != null && agentDetail.tasksTotal > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <p className="text-sm text-slate-600">
+                      Showing {agentDetail.tasks.length} of {agentDetail.tasksTotal} tasks
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                        <StyledSelect
+                          value={String(taskPageSize)}
+                          onChange={(value) => setTaskPageSize(Number(value))}
+                          options={TASK_PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+                          className="w-20"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
+              {/* Load more trigger - auto load when scrolled into view */}
+              {agentDetail.tasksTotal != null && agentDetail.tasks.length < agentDetail.tasksTotal && (
+                <div ref={loadMoreAgentRef} className="py-4 text-center">
+                  {isLoadingMoreAgent ? (
+                    <div className="flex items-center justify-center gap-2 text-slate-500">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">Loading more…</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={loadMoreAgentTasks}
+                      className="text-sm text-green-700 hover:text-green-800 font-medium"
+                    >
+                      Load more ({agentDetail.tasks.length} of {agentDetail.tasksTotal} shown)
+                    </button>
+                  )}
+                </div>
+              )}
+              {agentDetail.tasksTotal != null && agentDetail.tasks.length >= agentDetail.tasksTotal && agentDetail.tasks.length > 0 && (
+                <p className="mt-4 pt-4 border-t border-slate-100 text-center text-sm text-slate-400">
+                  All {agentDetail.tasksTotal} tasks loaded
+                </p>
               )}
             </>
           )}

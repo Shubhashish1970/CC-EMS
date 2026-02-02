@@ -1146,10 +1146,19 @@ const TASK_PAGE_SIZE_MAX = 100;
  * @param options.language - optional: filter tasks by farmer preferredLanguage
  * @param options.page - optional: 1-based page for lazy load (requires limit)
  * @param options.limit - optional: page size (default 30, max 100)
+ * @param options.dateFrom, dateTo, bu, state - optional: filter by scheduled date and activity
  */
 export const getAgentQueue = async (
   agentId: string,
-  options?: { language?: string; page?: number; limit?: number }
+  options?: {
+    language?: string;
+    page?: number;
+    limit?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    bu?: string;
+    state?: string;
+  }
 ): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number }> => {
   try {
     // Validate agentId
@@ -1178,11 +1187,40 @@ export const getAgentQueue = async (
         : undefined;
     const usePagination = page != null && limit != null;
 
+    const dateMatch: Record<string, unknown> = {};
+    if (options?.dateFrom || options?.dateTo) {
+      dateMatch.scheduledDate = {};
+      if (options.dateFrom) {
+        const d = new Date(options.dateFrom);
+        d.setHours(0, 0, 0, 0);
+        (dateMatch.scheduledDate as Record<string, Date>).$gte = d;
+      }
+      if (options.dateTo) {
+        const d = new Date(options.dateTo);
+        d.setHours(23, 59, 59, 999);
+        (dateMatch.scheduledDate as Record<string, Date>).$lte = d;
+      }
+    }
+    const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+    const activityFilter: Record<string, string> = {};
+    if (options?.bu) activityFilter['activity.buName'] = String(options.bu).trim();
+    if (options?.state) activityFilter['activity.state'] = String(options.state).trim();
+
     if (usePagination) {
       // Paginated path: aggregation for breakdown + total and one page of tasks (no full load)
       const skip = (page - 1) * limit;
       const basePipeline: mongoose.PipelineStage[] = [
-        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId) } },
+        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId), ...dateMatch } },
+        {
+          $lookup: {
+            from: activityCollection,
+            localField: 'activityId',
+            foreignField: '_id',
+            as: 'activity',
+          },
+        },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        ...(Object.keys(activityFilter).length ? [{ $match: activityFilter }] : []),
         {
           $lookup: {
             from: Farmer.collection.name,
@@ -1295,17 +1333,25 @@ export const getAgentQueue = async (
     }
 
     // Non-paginated path: load all tasks (backward compatible)
-    let tasks = await CallTask.find({
-      assignedAgentId: new mongoose.Types.ObjectId(agentId),
-    })
+    const findMatch: Record<string, unknown> = { assignedAgentId: new mongoose.Types.ObjectId(agentId) };
+    if (Object.keys(dateMatch).length) Object.assign(findMatch, dateMatch);
+    let tasks = await CallTask.find(findMatch)
       .populate('farmerId', 'name mobileNumber preferredLanguage location')
-      .populate('activityId', 'type date officerName territory territoryName zoneName buName')
+      .populate('activityId', 'type date officerName territory territoryName zoneName buName state')
       .sort({ scheduledDate: 1 });
 
     if (language) {
       tasks = tasks.filter((task) => {
         const farmer = task.farmerId as any;
         return farmer?.preferredLanguage === language;
+      });
+    }
+    if (options?.bu || options?.state) {
+      tasks = tasks.filter((task) => {
+        const activity = task.activityId as any;
+        if (options.bu && (activity?.buName ?? '') !== options.bu.trim()) return false;
+        if (options.state && (activity?.state ?? '') !== options.state.trim()) return false;
+        return true;
       });
     }
 
