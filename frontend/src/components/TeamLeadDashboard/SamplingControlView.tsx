@@ -791,7 +791,7 @@ const SamplingControlView: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Activity cooling (days)</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1 whitespace-nowrap">Activity cooling (days)</label>
                 <input
                   type="number"
                   value={activityCoolingDays}
@@ -800,7 +800,7 @@ const SamplingControlView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Farmer cooling (days)</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1 whitespace-nowrap">Farmer cooling (days)</label>
                 <input
                   type="number"
                   value={farmerCoolingDays}
@@ -809,7 +809,7 @@ const SamplingControlView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Default sampling %</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1 whitespace-nowrap">Default sampling %</label>
                 <input
                   type="number"
                   value={defaultPercentage}
@@ -818,7 +818,7 @@ const SamplingControlView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1" title="Due date for new tasks = today + this many days (0 = today). Applies to Sampling Run and Adhoc Run.">Task due in (days)</label>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1 whitespace-nowrap" title="Due date for new tasks = today + this many days (0 = today). Applies to Sampling Run and Adhoc Run.">Task due in (days)</label>
                 <input
                   type="number"
                   min={0}
@@ -907,13 +907,13 @@ const SamplingControlView: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 flex items-start">
             <button
               onClick={handleSaveConfig}
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-black"
             >
-              <Save size={18} />
+              <Save size={16} />
               Save & Apply
             </button>
           </div>

@@ -406,6 +406,10 @@ export const tasksAPI = {
     const query = params.toString();
     return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
   },
+
+  getDashboardAgent: async (agentId: string) => {
+    return apiRequest(`/tasks/dashboard/agent/${encodeURIComponent(agentId)}`);
+  },
   allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     // Allocation can update many tasks; allow longer timeout
     return apiRequest(

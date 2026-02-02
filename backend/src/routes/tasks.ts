@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { body, validationResult, query } from 'express-validator';
+import { body, validationResult, query, param } from 'express-validator';
 import { CallTask, ICallLog, TaskStatus } from '../models/CallTask.js';
 import { User } from '../models/User.js';
 import { Farmer } from '../models/Farmer.js';
@@ -18,6 +18,7 @@ import {
   updateTaskStatus,
 } from '../services/taskService.js';
 import { getOutcomeFromStatus } from '../utils/outcomeHelper.js';
+import { getAgentQueue } from '../services/adminService.js';
 import logger from '../config/logger.js';
 import mongoose from 'mongoose';
 import * as XLSX from 'xlsx';
@@ -2050,6 +2051,62 @@ router.get(
           openByLanguage,
           agentWorkload,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// @route   GET /api/tasks/dashboard/agent/:agentId
+// @desc    Team Lead: get agent queue detail for an agent in their team (opens Agent Queue detail view)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/dashboard/agent/:agentId',
+  requirePermission('tasks.view.team'),
+  [param('agentId').isMongoId().withMessage('Invalid agent ID')],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const authReq = req as AuthRequest;
+      const teamLeadId = authReq.user._id.toString();
+      const agentId = req.params.agentId;
+
+      const agent = await User.findById(agentId).select('_id role teamLeadId').lean();
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agent not found' },
+        });
+      }
+
+      const agentObj = agent as any;
+      if (agentObj.role !== 'cc_agent') {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'User is not a CC agent' },
+        });
+      }
+
+      const agentTeamLeadId = agentObj.teamLeadId?.toString?.() || null;
+      if (agentTeamLeadId !== teamLeadId) {
+        return res.status(403).json({
+          success: false,
+          error: { message: 'Agent is not in your team' },
+        });
+      }
+
+      const result = await getAgentQueue(agentId);
+      res.json({
+        success: true,
+        data: result,
       });
     } catch (error) {
       next(error);

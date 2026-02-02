@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw, Loader2 } from 'lucide-react';
+import { Calendar, RefreshCw, Loader2, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Phone, MapPin } from 'lucide-react';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
@@ -7,6 +7,7 @@ import ConfirmationModal from '../shared/ConfirmationModal';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
+import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
 const LANGUAGE_ORDER = [
   'Hindi',
@@ -21,6 +22,32 @@ const LANGUAGE_ORDER = [
   'Unknown',
 ] as const;
 
+interface AgentQueueDetailForTL {
+  agent: {
+    agentId: string;
+    agentName: string;
+    agentEmail: string;
+    employeeId: string;
+    languageCapabilities: string[];
+  };
+  statusBreakdown: {
+    sampled_in_queue: number;
+    in_progress: number;
+    completed: number;
+    not_reachable: number;
+    invalid_number: number;
+    total: number;
+  };
+  tasks: Array<{
+    taskId: string;
+    farmer: { name: string; mobileNumber: string; preferredLanguage: string; location: string };
+    activity: { type: string; date: string; officerName: string; territory: string };
+    status: string;
+    scheduledDate: string;
+    createdAt: string;
+  }>;
+}
+
 const TaskDashboardView: React.FC = () => {
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +60,10 @@ const TaskDashboardView: React.FC = () => {
   const [isAllocConfirmOpen, setIsAllocConfirmOpen] = useState(false);
   const [reallocateAgent, setReallocateAgent] = useState<{ agentId: string; name: string; sampledInQueue: number } | null>(null);
   const [isReallocating, setIsReallocating] = useState(false);
+
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentDetail, setAgentDetail] = useState<AgentQueueDetailForTL | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Date range dropdown (same UX as Sampling Dashboard)
   const datePickerRef = useRef<HTMLDivElement | null>(null);
@@ -166,6 +197,58 @@ const TaskDashboardView: React.FC = () => {
     return rows;
   }, [data]);
 
+  // Fetch agent queue detail when Team Lead clicks an agent
+  useEffect(() => {
+    if (!selectedAgentId) {
+      setAgentDetail(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setIsLoadingDetail(true);
+      try {
+        const res: any = await tasksAPI.getDashboardAgent(selectedAgentId);
+        if (!cancelled && res?.data) setAgentDetail(res.data);
+      } catch (e: any) {
+        if (!cancelled) {
+          toast.showError(e?.message || 'Failed to load agent queue');
+          setSelectedAgentId(null);
+          setAgentDetail(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoadingDetail(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAgentId, toast]);
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { icon: typeof Clock; color: string }> = {
+      sampled_in_queue: { icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+      in_progress: { icon: Loader2, color: 'bg-blue-100 text-blue-800 border-blue-200' },
+      completed: { icon: CheckCircle, color: 'bg-green-100 text-green-800 border-green-200' },
+      not_reachable: { icon: XCircle, color: 'bg-orange-100 text-orange-800 border-orange-200' },
+      invalid_number: { icon: AlertCircle, color: 'bg-red-100 text-red-800 border-red-200' },
+    };
+    const config = statusConfig[status] || statusConfig.sampled_in_queue;
+    const Icon = config.icon;
+    const label = getTaskStatusLabel(status);
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${config.color}`}>
+        <Icon size={12} className={status === 'in_progress' ? 'animate-spin' : ''} />
+        {label}
+      </span>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   // Preselect the first language with unassigned tasks once data is loaded
   useEffect(() => {
     if (allocLanguage) return;
@@ -283,6 +366,159 @@ const TaskDashboardView: React.FC = () => {
       setIsReallocating(false);
     }
   };
+
+  // Agent Queue detail view (when Team Lead clicks an agent)
+  if (selectedAgentId) {
+    if (!agentDetail && isLoadingDetail) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAgentId(null);
+                  setAgentDetail(null);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                ← Back to Workload
+              </button>
+            </div>
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="animate-spin text-slate-400" size={40} />
+              <span className="ml-3 text-sm font-bold text-slate-600">Loading agent queue…</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (agentDetail) {
+      return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAgentId(null);
+                setAgentDetail(null);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              ← Back to Workload
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedAgentId && tasksAPI.getDashboardAgent(selectedAgentId).then((res: any) => res?.data && setAgentDetail(res.data)).catch(() => toast.showError('Failed to refresh'))}
+              disabled={isLoadingDetail}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
+              <UsersIcon className="text-slate-400" size={32} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-black text-slate-900 mb-1">{agentDetail.agent.agentName}</h2>
+              <p className="text-sm text-slate-600 mb-2">{agentDetail.agent.agentEmail}</p>
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span>Employee ID: {agentDetail.agent.employeeId}</span>
+                <span>Languages: {(agentDetail.agent.languageCapabilities || []).join(', ')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-black text-slate-900 mb-4">Queue Statistics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
+              <p className="text-2xl font-black text-slate-900">{agentDetail.statusBreakdown.total}</p>
+            </div>
+            <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
+              <p className="text-xs font-black text-yellow-600 uppercase tracking-widest mb-1">Sampled - in queue</p>
+              <p className="text-2xl font-black text-yellow-800">{agentDetail.statusBreakdown.sampled_in_queue}</p>
+            </div>
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">In Progress</p>
+              <p className="text-2xl font-black text-blue-800">{agentDetail.statusBreakdown.in_progress}</p>
+            </div>
+            <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Completed</p>
+              <p className="text-2xl font-black text-green-800">{agentDetail.statusBreakdown.completed}</p>
+            </div>
+            <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
+              <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-1">Not Reachable</p>
+              <p className="text-2xl font-black text-orange-800">{agentDetail.statusBreakdown.not_reachable}</p>
+            </div>
+            <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
+              <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Invalid</p>
+              <p className="text-2xl font-black text-red-800">{agentDetail.statusBreakdown.invalid_number}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-black text-slate-900 mb-4">Tasks ({agentDetail.tasks?.length ?? 0})</h3>
+          {!agentDetail.tasks?.length ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-slate-600 font-medium">No tasks in queue</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {(agentDetail.tasks || []).map((task: any) => (
+                <div
+                  key={task.taskId}
+                  className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="text-base font-black text-slate-900">{task.farmer?.name ?? '—'}</h4>
+                        {getStatusBadge(task.status)}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <Phone size={14} />
+                          <span>{task.farmer?.mobileNumber ?? '—'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin size={14} />
+                          <span>{task.farmer?.location ?? '—'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} />
+                          <span>Scheduled: {formatDate(task.scheduledDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>Language: {task.farmer?.preferredLanguage ?? '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span>Activity: {task.activity?.type ?? '—'}</span>
+                      <span>•</span>
+                      <span>Officer: {task.activity?.officerName ?? '—'}</span>
+                      <span>•</span>
+                      <span>Territory: {task.activity?.territory ?? '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -687,7 +923,7 @@ const TaskDashboardView: React.FC = () => {
       {/* Agent workload */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-black text-slate-900">Agent Workload</h3>
-        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress</p>
+        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress. Click an agent name to view their queue details.</p>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
           <table className="min-w-[980px] w-full text-sm">
@@ -706,8 +942,14 @@ const TaskDashboardView: React.FC = () => {
               {agentRows.map((a: any) => (
                 <tr key={a.agentId}>
                   <td className="px-4 py-3">
-                    <div className="font-black text-slate-900">{a.name}</div>
-                    <div className="text-xs text-slate-500">{a.email}</div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAgentId(a.agentId)}
+                      className="text-left group block w-full"
+                    >
+                      <div className="font-black text-blue-600 group-hover:text-blue-800 group-hover:underline">{a.name}</div>
+                      <div className="text-xs text-slate-500 group-hover:text-slate-600">{a.email}</div>
+                    </button>
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.employeeId}</td>
                   <td className="px-4 py-3 text-xs font-bold text-slate-700">
