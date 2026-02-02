@@ -136,13 +136,12 @@ export const getActivitiesWithSampling = async (filters?: {
 
     const skip = (page - 1) * limit;
 
-    // Build query for activities
+    // Build query for activities (same semantics as getActivitiesSamplingStats)
     const activityQuery: any = {};
     if (activityType) {
       activityQuery.type = activityType;
     }
     if (territory) {
-      // Prefer territoryName (v2) but support legacy territory
       activityQuery.$or = [
         { territoryName: territory },
         { territory: territory },
@@ -164,16 +163,71 @@ export const getActivitiesWithSampling = async (filters?: {
       }
     }
 
-    // Get all activities matching filters
-    const activities = await Activity.find(activityQuery)
-      .sort({ date: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Use same filter logic as stats: compute samplingStatus in aggregation, then paginate
+    const samplingAuditColl = SamplingAudit.collection.name;
+    const listPipeline: any[] = [
+      { $match: activityQuery },
+      { $addFields: { farmerCount: { $size: { $ifNull: ['$farmerIds', []] } } } },
+      {
+        $lookup: {
+          from: samplingAuditColl,
+          localField: '_id',
+          foreignField: 'activityId',
+          as: 'audits',
+        },
+      },
+      { $addFields: { sampledCount: { $ifNull: [{ $arrayElemAt: ['$audits.sampledCount', 0] }, 0] } } },
+      {
+        $addFields: {
+          samplingStatus: {
+            $switch: {
+              branches: [
+                { case: { $lte: ['$sampledCount', 0] }, then: 'not_sampled' },
+                {
+                  case: {
+                    $and: [
+                      { $gt: ['$farmerCount', 0] },
+                      { $gte: ['$sampledCount', '$farmerCount'] },
+                    ],
+                  },
+                  then: 'sampled',
+                },
+              ],
+              default: 'partial',
+            },
+          },
+        },
+      },
+    ];
+    if (samplingStatus) {
+      listPipeline.push({ $match: { samplingStatus } });
+    }
+    listPipeline.push(
+      { $sort: { date: -1 } },
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          page: [{ $skip: skip }, { $limit: limit }, { $project: { _id: 1 } }],
+        },
+      }
+    );
 
-    const totalActivities = await Activity.countDocuments(activityQuery);
+    const [facetResult] = await Activity.aggregate(listPipeline);
+    const totalActivities = (facetResult?.total?.[0] as { count: number } | undefined)?.count ?? 0;
+    const pageIds: mongoose.Types.ObjectId[] = (facetResult?.page ?? []).map(
+      (d: { _id: mongoose.Types.ObjectId }) => d._id
+    );
+
+    const activities = await Activity.find({ _id: { $in: pageIds } })
+      .sort({ date: -1 })
+      .lean();
+    const activitiesOrdered = pageIds
+      .map((id) => activities.find((a) => (a._id as mongoose.Types.ObjectId).equals(id)))
+      .filter((a): a is NonNullable<typeof a> => a != null);
+
+    const activityIds = activitiesOrdered.map((a) => a._id);
 
     // Get all sampling audits for these activities
-    const activityIds = activities.map((a) => a._id);
     const samplingAudits = await SamplingAudit.find({
       activityId: { $in: activityIds },
     });
@@ -231,7 +285,7 @@ export const getActivitiesWithSampling = async (filters?: {
 
     // Collect all farmer IDs across all activities for batch fetching
     const allFarmerIds = new Set<string>();
-    for (const activity of activities) {
+    for (const activity of activitiesOrdered) {
       if (activity.farmerIds && Array.isArray(activity.farmerIds)) {
         for (const farmerId of activity.farmerIds) {
           // Handle different formats: ObjectId, populated object, or string
@@ -254,15 +308,15 @@ export const getActivitiesWithSampling = async (filters?: {
       }
     }
     
-    logger.info(`Collected ${allFarmerIds.size} unique farmer IDs from ${activities.length} activities`);
+    logger.info(`Collected ${allFarmerIds.size} unique farmer IDs from ${activitiesOrdered.length} activities`);
     
     // Log sample of farmer IDs for debugging
-    if (allFarmerIds.size === 0 && activities.length > 0) {
+    if (allFarmerIds.size === 0 && activitiesOrdered.length > 0) {
       logger.warn('No farmer IDs found in activities. Sample activity:', {
-        activityId: activities[0]._id,
-        farmerIds: activities[0].farmerIds,
-        farmerIdsType: Array.isArray(activities[0].farmerIds) ? 'array' : typeof activities[0].farmerIds,
-        farmerIdsLength: Array.isArray(activities[0].farmerIds) ? activities[0].farmerIds.length : 'N/A',
+        activityId: activitiesOrdered[0]._id,
+        farmerIds: activitiesOrdered[0].farmerIds,
+        farmerIdsType: Array.isArray(activitiesOrdered[0].farmerIds) ? 'array' : typeof activitiesOrdered[0].farmerIds,
+        farmerIdsLength: Array.isArray(activitiesOrdered[0].farmerIds) ? activitiesOrdered[0].farmerIds.length : 'N/A',
       });
     }
 
@@ -287,30 +341,24 @@ export const getActivitiesWithSampling = async (filters?: {
       }
     }
 
-    // Build result array
+    // Build result array (activitiesOrdered already filtered by samplingStatus in aggregation)
     const result: ActivitySamplingStatus[] = [];
 
-    for (const activity of activities) {
-      const activityId = activity._id.toString();
+    for (const activity of activitiesOrdered) {
+      const activityId = (activity._id as mongoose.Types.ObjectId).toString();
       const audit = auditMap.get(activityId);
       const activityTasks = tasksByActivity.get(activityId) || [];
 
-      // Determine sampling status
+      // Determine sampling status (same logic as aggregation)
       let status: 'sampled' | 'not_sampled' | 'partial' = 'not_sampled';
       if (audit) {
-        // Check if all sampled farmers have tasks
         if (activityTasks.length >= audit.sampledCount) {
           status = 'sampled';
         } else if (activityTasks.length > 0) {
           status = 'partial';
         } else {
-          status = 'partial'; // Audit exists but no tasks created
+          status = 'partial';
         }
-      }
-
-      // Apply sampling status filter if provided
-      if (samplingStatus && status !== samplingStatus) {
-        continue;
       }
 
       // Calculate status breakdown
@@ -698,10 +746,10 @@ export const getActivitiesSamplingStats = async (filters?: {
 
   const samplingAuditCollection = SamplingAudit.collection.name;
 
-  const activityAgg = await Activity.aggregate([
+  const activityAggPipeline: any[] = [
     { $match: activityQuery },
     {
-      $project: {
+      $addFields: {
         farmerCount: { $size: { $ifNull: ['$farmerIds', []] } },
       },
     },
@@ -741,49 +789,36 @@ export const getActivitiesSamplingStats = async (filters?: {
     },
     ...(samplingStatus ? [{ $match: { samplingStatus } }] : []),
     {
-      $group: {
-        _id: null,
-        totalActivities: { $sum: 1 },
-        totalFarmers: { $sum: '$farmerCount' },
-        farmersSampled: { $sum: '$sampledCount' },
-        activitiesWithSampling: { $sum: { $cond: [{ $gt: ['$sampledCount', 0] }, 1, 0] } },
-        activitiesFullySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'sampled'] }, 1, 0] } },
-        activitiesPartiallySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'partial'] }, 1, 0] } },
-        activitiesNotSampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'not_sampled'] }, 1, 0] } },
+      $facet: {
+        stats: [
+          {
+            $group: {
+              _id: null,
+              totalActivities: { $sum: 1 },
+              totalFarmers: { $sum: '$farmerCount' },
+              farmersSampled: { $sum: '$sampledCount' },
+              activitiesWithSampling: { $sum: { $cond: [{ $gt: ['$sampledCount', 0] }, 1, 0] } },
+              activitiesFullySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'sampled'] }, 1, 0] } },
+              activitiesPartiallySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'partial'] }, 1, 0] } },
+              activitiesNotSampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'not_sampled'] }, 1, 0] } },
+            },
+          },
+        ],
+        ids: [{ $project: { _id: 1 } }],
       },
     },
-  ]);
+  ];
 
-  const a0 = activityAgg?.[0] || {};
+  const activityAggResult = await Activity.aggregate(activityAggPipeline);
+  const facetRow = activityAggResult?.[0];
+  const a0 = (facetRow?.stats?.[0] as Record<string, unknown>) || {};
+  const matchingActivityIds: mongoose.Types.ObjectId[] = (facetRow?.ids ?? []).map(
+    (d: { _id: mongoose.Types.ObjectId }) => d._id
+  );
 
-  // Task aggregation: join tasks to activities and apply same activity filters
-  const taskMatch: any = {};
-  if (activityType) taskMatch['activity.type'] = activityType;
-  if (territory) {
-    taskMatch.$or = [
-      { 'activity.territoryName': territory },
-      { 'activity.territory': territory },
-    ];
-  }
-  if (zone) taskMatch['activity.zoneName'] = zone;
-  if (bu) taskMatch['activity.buName'] = bu;
-  if (dateFrom || dateTo) {
-    taskMatch['activity.date'] = {};
-    if (dateFrom) taskMatch['activity.date'].$gte = dateFrom;
-    if (dateTo) taskMatch['activity.date'].$lte = dateTo;
-  }
-
+  // Task aggregation: count tasks only for activities in the filtered set (same as list/stats filter)
   const taskAgg = await CallTask.aggregate([
-    {
-      $lookup: {
-        from: Activity.collection.name,
-        localField: 'activityId',
-        foreignField: '_id',
-        as: 'activity',
-      },
-    },
-    { $unwind: '$activity' },
-    { $match: taskMatch },
+    { $match: matchingActivityIds.length > 0 ? { activityId: { $in: matchingActivityIds } } : { _id: null } },
     {
       $group: {
         _id: '$status',
