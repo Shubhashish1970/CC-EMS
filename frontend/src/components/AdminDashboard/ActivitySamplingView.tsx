@@ -1155,82 +1155,39 @@ const ActivitySamplingView: React.FC = () => {
           </div>
           
           {/* Compact Statistics Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
-            {/* Activities */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            {/* Activities + Total Farmers */}
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Activities</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Activities & Farmers</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalActivities}</p>
+              <p className="text-xs text-slate-500 mt-0.5 text-left">activities</p>
+              <p className="text-xl font-black text-slate-900 mt-1">{statistics.totalFarmers}</p>
+              <p className="text-xs text-slate-500 mt-0.5 text-left">total farmers</p>
             </div>
+            {/* With Sampling + Farmers Sampled */}
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">With Sampling</p>
+              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">With Sampling & Farmers Sampled</p>
               <p className="text-xl font-black text-green-800">{statistics.activitiesWithSampling}</p>
-              <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight" title="Full = farmers selected as per norms; Partial = no farmers selected">
+              <p className="text-xs text-green-600 mt-0.5 text-left break-words leading-tight" title="Full = farmers selected as per norms; Partial = no farmers selected">
                 ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
               </p>
-              {(statistics.activitiesWithSamplingAdhoc ?? 0) > 0 && (
+              <p className="text-xl font-black text-green-800 mt-1">{statistics.farmersSampled}</p>
+              <p className="text-xs text-green-600 mt-0.5 text-left break-words leading-tight">
+                farmers sampled{statistics.totalFarmers > 0 ? ` (${Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)` : ''}
+              </p>
+              {((statistics.activitiesWithSamplingAdhoc ?? 0) > 0 || (statistics.farmersSampledAdhoc ?? 0) > 0) && (
                 <p className="text-xs text-green-600/80 mt-0.5 text-left break-words leading-tight">
-                  ({statistics.activitiesWithSamplingAdhoc} adhoc)
+                  ({statistics.activitiesWithSamplingAdhoc ?? 0} activities, {statistics.farmersSampledAdhoc ?? 0} farmers adhoc)
                 </p>
               )}
             </div>
-            
-            {/* Farmers */}
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 min-w-0 overflow-visible text-left">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Total Farmers</p>
-              <p className="text-xl font-black text-blue-800">{statistics.totalFarmers}</p>
-            </div>
-            <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
-              <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Farmers Sampled</p>
-              <p className="text-xl font-black text-green-800">{statistics.farmersSampled}</p>
-              {statistics.totalFarmers > 0 && (
-                <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
-                  ({Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)
-                </p>
-              )}
-              {(statistics.farmersSampledAdhoc ?? 0) > 0 && (
-                <p className="text-xs text-green-600/80 mt-0.5 text-left break-words leading-tight">
-                  ({statistics.farmersSampledAdhoc} adhoc)
-                </p>
-              )}
-            </div>
-            
-            {/* Tasks */}
-            <div className={`rounded-xl p-3 border min-w-0 overflow-visible ${
-              statistics.totalTasks !== statistics.farmersSampled 
-                ? 'bg-orange-50 border-orange-200' 
-                : 'bg-slate-50 border-slate-200'
-            }`}>
+            {/* Total Tasks: number only + Sampling Run / Adhoc breakup */}
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 min-w-0 overflow-visible text-left">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5 h-[2.5rem] flex items-end leading-tight line-clamp-2 overflow-hidden">Total Tasks</p>
               <p className="text-xl font-black text-slate-900">{statistics.totalTasks}</p>
-              <p className={`text-xs mt-1 text-left break-words leading-tight ${
-                statistics.totalTasks !== statistics.farmersSampled 
-                  ? 'text-orange-600 font-bold' 
-                  : 'text-slate-500'
-              }`}>
-                {statistics.farmersSampled > statistics.totalTasks 
-                  ? `⚠ ${statistics.farmersSampled - statistics.totalTasks} pending (${statistics.farmersSampled} sampled)`
-                  : statistics.farmersSampled < statistics.totalTasks
-                  ? `⚠ ${statistics.totalTasks - statistics.farmersSampled} extra (${statistics.farmersSampled} sampled)`
-                  : `${statistics.farmersSampled} sampled = ${statistics.totalTasks} tasks ✓`}
-              </p>
-              {(() => {
-                const queue = statistics.tasksSampledInQueue ?? 0;
-                const inProgress = statistics.tasksInProgress ?? 0;
-                const completed = statistics.tasksCompleted ?? 0;
-                const other = (statistics.tasksUnassigned ?? 0) + (statistics.tasksNotReachable ?? 0) + (statistics.tasksInvalidNumber ?? 0);
-                const sum = queue + inProgress + completed + other;
-                if (sum > 0 && sum === statistics.totalTasks) {
-                  return (
-                    <p className="text-xs text-slate-500 mt-0.5 text-left break-words leading-tight">
-                      Queue + In progress + Completed + Other = {statistics.totalTasks}
-                    </p>
-                  );
-                }
-                return null;
-              })()}
-              {(statistics.tasksAdhoc ?? 0) > 0 && (
-                <p className="text-xs text-slate-500/90 mt-0.5 text-left break-words leading-tight">
-                  ({statistics.tasksAdhoc} adhoc)
+              {(statistics.totalTasks > 0) && (
+                <p className="text-xs text-slate-500 mt-1 text-left break-words leading-tight">
+                  Sampling run: {(statistics.totalTasks ?? 0) - (statistics.tasksAdhoc ?? 0)}, Adhoc: {statistics.tasksAdhoc ?? 0}
                 </p>
               )}
               {(statistics.callbackTasks || 0) > 0 && (
