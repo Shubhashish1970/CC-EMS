@@ -766,6 +766,8 @@ export const getActivitiesSamplingStats = async (filters?: {
   tasksInvalidNumber: number;
   tasksUnassigned: number;
   callbackTasks: number;
+  activitiesWithSamplingAdhoc: number;
+  farmersSampledAdhoc: number;
 }> => {
   const {
     activityType,
@@ -848,6 +850,8 @@ export const getActivitiesSamplingStats = async (filters?: {
               activitiesFullySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'sampled'] }, 1, 0] } },
               activitiesPartiallySampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'partial'] }, 1, 0] } },
               activitiesNotSampled: { $sum: { $cond: [{ $eq: ['$samplingStatus', 'not_sampled'] }, 1, 0] } },
+              activitiesWithSamplingAdhoc: { $sum: { $cond: [{ $and: [{ $gt: ['$sampledCount', 0] }, { $ne: ['$firstSampleRun', true] }] }, 1, 0] } },
+              farmersSampledAdhoc: { $sum: { $cond: [{ $and: [{ $gt: ['$sampledCount', 0] }, { $ne: ['$firstSampleRun', true] }] }, '$sampledCount', 0] } },
             },
           },
         ],
@@ -900,6 +904,8 @@ export const getActivitiesSamplingStats = async (filters?: {
     tasksInvalidNumber: Number(byStatus.invalid_number || 0),
     tasksUnassigned: Number(byStatus.unassigned || 0),
     callbackTasks: totalCallbacks,
+    activitiesWithSamplingAdhoc: Number((a0 as any).activitiesWithSamplingAdhoc || 0),
+    farmersSampledAdhoc: Number((a0 as any).farmersSampledAdhoc || 0),
   };
 };
 

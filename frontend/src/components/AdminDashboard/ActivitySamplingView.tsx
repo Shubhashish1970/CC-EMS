@@ -590,19 +590,22 @@ const ActivitySamplingView: React.FC = () => {
   const calculateStatistics = () => {
     const stats = {
       totalActivities: activities.length,
-      activitiesWithSampling: 0, // Activities that have any sampling (sampled + partial)
-      activitiesFullySampled: 0, // Activities where all farmers were sampled
-      activitiesPartiallySampled: 0, // Activities where only some farmers were sampled
+      activitiesWithSampling: 0,
+      activitiesFullySampled: 0,
+      activitiesPartiallySampled: 0,
       activitiesNotSampled: 0,
       totalFarmers: 0,
       farmersSampled: 0,
-      totalTasks: 0, // Use statusBreakdown sum as source of truth (ensures all tasks have status)
+      totalTasks: 0,
       tasksSampledInQueue: 0,
       tasksInProgress: 0,
       tasksCompleted: 0,
       tasksNotReachable: 0,
       tasksInvalidNumber: 0,
-      tasksWithMismatch: 0, // Track activities where tasksCount != statusBreakdown sum
+      tasksUnassigned: 0,
+      activitiesWithSamplingAdhoc: 0,
+      farmersSampledAdhoc: 0,
+      tasksWithMismatch: 0,
     };
 
     activities.forEach((item) => {
@@ -641,6 +644,7 @@ const ActivitySamplingView: React.FC = () => {
         stats.tasksCompleted += item.statusBreakdown.completed || 0;
         stats.tasksNotReachable += item.statusBreakdown.not_reachable || 0;
         stats.tasksInvalidNumber += item.statusBreakdown.invalid_number || 0;
+        stats.tasksUnassigned += item.statusBreakdown.unassigned || 0;
 
         // Validate: tasksCount should equal statusBreakdown sum
         if (item.tasksCount && item.tasksCount !== statusSum) {
@@ -1162,6 +1166,11 @@ const ActivitySamplingView: React.FC = () => {
               <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
                 ({statistics.activitiesFullySampled} full, {statistics.activitiesPartiallySampled} partial)
               </p>
+              {(statistics.activitiesWithSamplingAdhoc ?? 0) > 0 && (
+                <p className="text-xs text-green-600/80 mt-0.5 text-left break-words leading-tight">
+                  ({statistics.activitiesWithSamplingAdhoc} adhoc)
+                </p>
+              )}
             </div>
             
             {/* Farmers */}
@@ -1175,6 +1184,11 @@ const ActivitySamplingView: React.FC = () => {
               {statistics.totalFarmers > 0 && (
                 <p className="text-xs text-green-600 mt-1 text-left break-words leading-tight">
                   ({Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)
+                </p>
+              )}
+              {(statistics.farmersSampledAdhoc ?? 0) > 0 && (
+                <p className="text-xs text-green-600/80 mt-0.5 text-left break-words leading-tight">
+                  ({statistics.farmersSampledAdhoc} adhoc)
                 </p>
               )}
             </div>
@@ -1198,6 +1212,25 @@ const ActivitySamplingView: React.FC = () => {
                   ? `⚠ ${statistics.totalTasks - statistics.farmersSampled} extra (${statistics.farmersSampled} sampled)`
                   : `${statistics.farmersSampled} sampled = ${statistics.totalTasks} tasks ✓`}
               </p>
+              {(() => {
+                const queue = statistics.tasksSampledInQueue ?? 0;
+                const inProgress = statistics.tasksInProgress ?? 0;
+                const completed = statistics.tasksCompleted ?? 0;
+                const unassigned = statistics.tasksUnassigned ?? 0;
+                const notReachable = statistics.tasksNotReachable ?? 0;
+                const invalid = statistics.tasksInvalidNumber ?? 0;
+                const other = unassigned + notReachable + invalid;
+                const sum = queue + inProgress + completed + other;
+                if (sum > 0 && sum === statistics.totalTasks) {
+                  return (
+                    <p className="text-xs text-slate-500 mt-0.5 text-left break-words leading-tight">
+                      {queue} queue + {inProgress} in progress + {completed} completed
+                      {other > 0 ? ` + ${other} other (unassigned/not reachable/invalid)` : ''} = {statistics.totalTasks}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
               {(statistics.callbackTasks || 0) > 0 && (
                 <p className="text-xs text-purple-600 font-bold mt-0.5 text-left break-words leading-tight">
                   incl. {statistics.callbackTasks} callback{statistics.callbackTasks !== 1 ? 's' : ''}
