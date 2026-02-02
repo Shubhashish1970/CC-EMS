@@ -2060,11 +2060,15 @@ router.get(
 
 // @route   GET /api/tasks/dashboard/agent/:agentId
 // @desc    Team Lead: get agent queue detail for an agent in their team (opens Agent Queue detail view)
+// @query   language - optional: filter tasks by farmer preferredLanguage
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/dashboard/agent/:agentId',
   requirePermission('tasks.view.team'),
-  [param('agentId').isMongoId().withMessage('Invalid agent ID')],
+  [
+    param('agentId').isMongoId().withMessage('Invalid agent ID'),
+    query('language').optional().isString().trim(),
+  ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
@@ -2078,6 +2082,7 @@ router.get(
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
       const agentId = req.params.agentId;
+      const language = (req.query.language as string)?.trim() || undefined;
 
       const agent = await User.findById(agentId).select('_id role teamLeadId').lean();
       if (!agent) {
@@ -2103,7 +2108,7 @@ router.get(
         });
       }
 
-      const result = await getAgentQueue(agentId);
+      const result = await getAgentQueue(agentId, { language });
       res.json({
         success: true,
         data: result,

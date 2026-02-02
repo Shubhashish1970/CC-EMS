@@ -1140,9 +1140,11 @@ export const getAgentQueues = async (filters?: {
 /**
  * Get detailed queue for a specific agent
  * Returns agent info, status breakdown, and chronologically ordered task list
+ * @param options.language - optional: filter tasks by farmer preferredLanguage
  */
 export const getAgentQueue = async (
-  agentId: string
+  agentId: string,
+  options?: { language?: string }
 ): Promise<AgentQueueDetail> => {
   try {
     // Validate agentId
@@ -1164,14 +1166,23 @@ export const getAgentQueue = async (
     }
 
     // Get all tasks for this agent, ordered by scheduledDate
-    const tasks = await CallTask.find({
+    let tasks = await CallTask.find({
       assignedAgentId: new mongoose.Types.ObjectId(agentId),
     })
       .populate('farmerId', 'name mobileNumber preferredLanguage location')
       .populate('activityId', 'type date officerName territory territoryName zoneName buName')
       .sort({ scheduledDate: 1 }); // Chronologically ordered
 
-    // Calculate status breakdown
+    // Optional filter by farmer preferred language
+    const language = options?.language?.trim();
+    if (language) {
+      tasks = tasks.filter((task) => {
+        const farmer = task.farmerId as any;
+        return farmer?.preferredLanguage === language;
+      });
+    }
+
+    // Calculate status breakdown from (possibly filtered) tasks
     const statusBreakdown = {
       sampled_in_queue: 0,
       in_progress: 0,

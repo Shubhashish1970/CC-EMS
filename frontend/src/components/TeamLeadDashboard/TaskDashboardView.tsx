@@ -62,6 +62,7 @@ const TaskDashboardView: React.FC = () => {
   const [isReallocating, setIsReallocating] = useState(false);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [agentDetail, setAgentDetail] = useState<AgentQueueDetailForTL | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
@@ -197,7 +198,7 @@ const TaskDashboardView: React.FC = () => {
     return rows;
   }, [data]);
 
-  // Fetch agent queue detail when Team Lead clicks an agent
+  // Fetch agent queue detail when Team Lead clicks an agent (or a language link)
   useEffect(() => {
     if (!selectedAgentId) {
       setAgentDetail(null);
@@ -207,12 +208,13 @@ const TaskDashboardView: React.FC = () => {
     const load = async () => {
       setIsLoadingDetail(true);
       try {
-        const res: any = await tasksAPI.getDashboardAgent(selectedAgentId);
+        const res: any = await tasksAPI.getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined);
         if (!cancelled && res?.data) setAgentDetail(res.data);
       } catch (e: any) {
         if (!cancelled) {
           toast.showError(e?.message || 'Failed to load agent queue');
           setSelectedAgentId(null);
+          setSelectedLanguage(null);
           setAgentDetail(null);
         }
       } finally {
@@ -223,7 +225,7 @@ const TaskDashboardView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedAgentId, toast]);
+  }, [selectedAgentId, selectedLanguage, toast]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { icon: typeof Clock; color: string }> = {
@@ -378,6 +380,7 @@ const TaskDashboardView: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setSelectedAgentId(null);
+                  setSelectedLanguage(null);
                   setAgentDetail(null);
                 }}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
@@ -402,6 +405,7 @@ const TaskDashboardView: React.FC = () => {
               type="button"
               onClick={() => {
                 setSelectedAgentId(null);
+                setSelectedLanguage(null);
                 setAgentDetail(null);
               }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
@@ -410,7 +414,7 @@ const TaskDashboardView: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => selectedAgentId && tasksAPI.getDashboardAgent(selectedAgentId).then((res: any) => res?.data && setAgentDetail(res.data)).catch(() => toast.showError('Failed to refresh'))}
+              onClick={() => selectedAgentId && tasksAPI.getDashboardAgent(selectedAgentId, selectedLanguage ?? undefined).then((res: any) => res?.data && setAgentDetail(res.data)).catch(() => toast.showError('Failed to refresh'))}
               disabled={isLoadingDetail}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
             >
@@ -425,16 +429,28 @@ const TaskDashboardView: React.FC = () => {
             <div className="flex-1">
               <h2 className="text-2xl font-black text-slate-900 mb-1">{agentDetail.agent.agentName}</h2>
               <p className="text-sm text-slate-600 mb-2">{agentDetail.agent.agentEmail}</p>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                 <span>Employee ID: {agentDetail.agent.employeeId}</span>
                 <span>Languages: {(agentDetail.agent.languageCapabilities || []).join(', ')}</span>
+                {selectedLanguage && (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-bold text-blue-700">Filtered by: {selectedLanguage}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLanguage(null)}
+                      className="text-blue-600 hover:text-blue-800 underline font-bold"
+                    >
+                      Show all
+                    </button>
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-black text-slate-900 mb-4">Queue Statistics</h3>
+          <h3 className="text-lg font-black text-slate-900 mb-4">Queue Statistics{selectedLanguage ? ` (${selectedLanguage})` : ''}</h3>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
@@ -923,7 +939,7 @@ const TaskDashboardView: React.FC = () => {
       {/* Agent workload */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-black text-slate-900">Agent Workload</h3>
-        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress. Click an agent name to view their queue details.</p>
+        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress. Click an agent name to view their queue, or click a language to open their queue filtered by that language.</p>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
           <table className="min-w-[980px] w-full text-sm">
@@ -944,7 +960,10 @@ const TaskDashboardView: React.FC = () => {
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      onClick={() => setSelectedAgentId(a.agentId)}
+                      onClick={() => {
+                        setSelectedAgentId(a.agentId);
+                        setSelectedLanguage(null);
+                      }}
                       className="text-left group block w-full"
                     >
                       <div className="font-black text-blue-600 group-hover:text-blue-800 group-hover:underline">{a.name}</div>
@@ -953,7 +972,26 @@ const TaskDashboardView: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.employeeId}</td>
                   <td className="px-4 py-3 text-xs font-bold text-slate-700">
-                    {(Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).join(', ') || '—'}
+                    {(Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).length ? (
+                      (a.languageCapabilities as string[]).map((lang: string, i: number) => (
+                        <span key={lang}>
+                          {i > 0 && ', '}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAgentId(a.agentId);
+                              setSelectedLanguage(lang);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-bold"
+                          >
+                            {lang}
+                          </button>
+                        </span>
+                      ))
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue}</td>
                   <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress}</td>

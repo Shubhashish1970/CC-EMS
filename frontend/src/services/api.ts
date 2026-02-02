@@ -407,8 +407,11 @@ export const tasksAPI = {
     return apiRequest(`/tasks/dashboard${query ? `?${query}` : ''}`);
   },
 
-  getDashboardAgent: async (agentId: string) => {
-    return apiRequest(`/tasks/dashboard/agent/${encodeURIComponent(agentId)}`);
+  getDashboardAgent: async (agentId: string, language?: string) => {
+    const params = new URLSearchParams();
+    if (language) params.set('language', language);
+    const query = params.toString();
+    return apiRequest(`/tasks/dashboard/agent/${encodeURIComponent(agentId)}${query ? `?${query}` : ''}`);
   },
   allocate: async (payload: { language: string; count?: number; dateFrom?: string; dateTo?: string; bu?: string; state?: string }) => {
     // Allocation can update many tasks; allow longer timeout
