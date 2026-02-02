@@ -126,13 +126,16 @@ const StyledSelect: React.FC<StyledSelectProps> = ({
           ref={dropdownRef}
           style={{
             ...dropdownStyle,
-            maxHeight: 'min(280px, 60vh)',
+            maxHeight: 280,
           }}
           className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden flex flex-col"
         >
           <div
             className="overflow-y-auto overscroll-contain flex-1 min-h-0"
-            style={{ WebkitOverflowScrolling: 'touch' }}
+            style={{
+              maxHeight: 260,
+              WebkitOverflowScrolling: 'touch',
+            }}
           >
             {options.map((option) => {
               const isSelected = option.value === value;
