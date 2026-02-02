@@ -376,6 +376,7 @@ router.put(
     body('autoRunEnabled').optional().isBoolean(),
     body('autoRunThreshold').optional().isInt({ min: 1, max: 100000 }),
     body('autoRunActivateFrom').optional().isISO8601(),
+    body('taskDueInDays').optional().isInt({ min: 0, max: 365 }),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -820,6 +821,13 @@ async function runSamplingHandler(req: Request, res: Response, next: NextFunctio
 
       logger.info('Sampling run requested', { runType: effectiveRunType, requestedCount: ids.length, forceRun: !!forceRun, fdaCount: fdaGroups?.length ?? 0 });
 
+      const samplingConfig = await SamplingConfig.findOne({ key: 'default' }).select('taskDueInDays').lean();
+      const taskDueInDays = Math.max(0, Math.min(365, Number((samplingConfig as any)?.taskDueInDays ?? 0)));
+      const baseDate = new Date();
+      baseDate.setHours(0, 0, 0, 0);
+      const scheduledDate = new Date(baseDate);
+      scheduledDate.setDate(baseDate.getDate() + taskDueInDays);
+
       const shouldIncludeResults = includeResults === true;
       const results: any[] = [];
       let tasksCreatedTotal = 0;
@@ -861,7 +869,7 @@ async function runSamplingHandler(req: Request, res: Response, next: NextFunctio
         return sampleAndCreateTasks(id, samplingPercentage, {
           runByUserId: authUserId,
           forceRun: !!forceRun,
-          scheduledDate: new Date(),
+          scheduledDate,
           setFirstSampleRun,
           samplingRunId: runDoc._id,
           samplingRunType: effectiveRunType,

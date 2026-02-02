@@ -22,6 +22,7 @@ const DEFAULT_CONFIG_SEED = {
     'Other': 10,
   },
   eligibleActivityTypes: [] as string[], // empty => all eligible
+  taskDueInDays: 0,
 };
 
 const getActiveSamplingConfig = async () => {

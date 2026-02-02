@@ -7,6 +7,7 @@ import Button from './shared/Button';
 import StyledSelect from './shared/StyledSelect';
 import TaskDetail from './TaskDetail';
 import ReassignModal from './ReassignModal';
+import InfoBanner from './shared/InfoBanner';
 import { getTaskStatusLabel, TaskStatus } from '../utils/taskStatusLabels';
 import { type DateRangePreset, getPresetRange, formatPretty } from '../utils/dateRangeUtils';
 
@@ -644,6 +645,10 @@ const TaskList: React.FC = () => {
               </Button>
             </div>
           </div>
+
+          <InfoBanner>
+            Statistics and export reflect current filters (status, agent, date range, search).
+          </InfoBanner>
 
           {/* Filters */}
           {showFilters && (

@@ -16,6 +16,8 @@ export interface ISamplingConfig extends Document {
   autoRunThreshold?: number;
   /** Cron will only trigger a run on or after this date (ISO date string); null = no restriction */
   autoRunActivateFrom?: Date | null;
+  /** Task due date = today + this many days (0 = today). Used for both Sampling Run and Adhoc Run. */
+  taskDueInDays?: number;
   /** Last time POST /api/sampling/auto-run actually triggered a run (set when ran: true) */
   lastAutoRunAt?: Date | null;
   lastAutoRunRunId?: string | null;
@@ -82,6 +84,12 @@ const SamplingConfigSchema = new Schema<ISamplingConfig>(
     autoRunActivateFrom: {
       type: Date,
       default: null,
+    },
+    taskDueInDays: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 365,
     },
     lastAutoRunAt: { type: Date, default: null },
     lastAutoRunRunId: { type: String, default: null },

@@ -481,6 +481,7 @@ export const samplingAPI = {
     autoRunEnabled?: boolean;
     autoRunThreshold?: number;
     autoRunActivateFrom?: string | null;
+    taskDueInDays?: number;
   }) => {
     return apiRequest('/sampling/config', {
       method: 'PUT',

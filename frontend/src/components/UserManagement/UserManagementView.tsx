@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Search, Users as UsersIcon, Info, Grid3x3 } from 'lucide-react';
+import { Plus, Filter, Search, Users as UsersIcon, Grid3x3 } from 'lucide-react';
 import { usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import UserList from './UserList';
@@ -7,6 +7,7 @@ import UserForm, { UserRole } from './UserForm';
 import AgentLanguageMatrix from './AgentLanguageMatrix';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import StyledSelect from '../shared/StyledSelect';
+import InfoBanner from '../shared/InfoBanner';
 
 interface User {
   _id: string;
@@ -190,17 +191,10 @@ const UserManagementView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
-        <Info size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-900">
-          <p className="font-bold mb-1">User Management - Call Centre Employees Only</p>
-          <p className="text-blue-700">
-            Field Sales employees (FDA, TM, RM, ZM, BU Head, RDM) and hierarchy information are
-            managed via the Activity API and used for reporting purposes.
-          </p>
-        </div>
-      </div>
+      <InfoBanner title="User Management - Call Centre Employees Only">
+        Field Sales employees (FDA, TM, RM, ZM, BU Head, RDM) and hierarchy information are
+        managed via the Activity API and used for reporting purposes.
+      </InfoBanner>
 
       {/* Header */}
       <div className="flex items-center justify-between">

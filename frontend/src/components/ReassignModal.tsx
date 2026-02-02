@@ -3,6 +3,7 @@ import { tasksAPI, usersAPI } from '../services/api';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import Button from './shared/Button';
 import Modal from './shared/Modal';
+import InfoBanner from './shared/InfoBanner';
 
 interface Task {
   _id: string;
@@ -148,14 +149,10 @@ const ReassignModal: React.FC<ReassignModalProps> = ({ isOpen, onClose, task, on
         )}
 
         {isBulkMode && (
-          <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
-            <p className="text-sm font-medium text-blue-900">
-              You are about to reassign <strong>{selectedTaskIds.length} task(s)</strong> to a new agent.
-            </p>
-            <p className="text-xs text-blue-700 mt-2">
-              Note: Language matching will be validated by the system. Tasks may be skipped if the selected agent doesn't have the required language capabilities.
-            </p>
-          </div>
+          <InfoBanner title={`Reassign ${selectedTaskIds.length} task(s)`}>
+            You are about to reassign <strong>{selectedTaskIds.length} task(s)</strong> to a new agent.
+            Language matching will be validated by the system. Tasks may be skipped if the selected agent doesn&apos;t have the required language capabilities.
+          </InfoBanner>
         )}
 
         {/* Agent Selection */}

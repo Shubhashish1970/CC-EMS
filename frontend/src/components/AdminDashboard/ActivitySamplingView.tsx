@@ -4,6 +4,7 @@ import { adminAPI, ffaAPI } from '../../services/api';
 import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, ArrowUpToLine, UserCheck, Package, BarChart } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
+import InfoBanner from '../shared/InfoBanner';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
@@ -665,6 +666,10 @@ const ActivitySamplingView: React.FC = () => {
 
   return (
     <div className="space-y-6 min-w-0">
+      <InfoBanner>
+        Activity statistics and sampling status for the selected date range and filters. Export matches current filters.
+      </InfoBanner>
+
       {/* Header with Filters */}
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm min-w-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">

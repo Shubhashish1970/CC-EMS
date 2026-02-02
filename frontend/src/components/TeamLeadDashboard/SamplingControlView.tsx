@@ -4,6 +4,7 @@ import { samplingAPI, tasksAPI, usersAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
 import StyledSelect from '../shared/StyledSelect';
+import InfoBanner from '../shared/InfoBanner';
 import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
@@ -59,6 +60,7 @@ const SamplingControlView: React.FC = () => {
   const [autoRunEnabled, setAutoRunEnabled] = useState<boolean>(false);
   const [autoRunThreshold, setAutoRunThreshold] = useState<number>(200);
   const [autoRunActivateFrom, setAutoRunActivateFrom] = useState<string>('');
+  const [taskDueInDays, setTaskDueInDays] = useState<number>(0);
 
   const [activityFilters, setActivityFilters] = useState(() => {
     const ytd = getPresetRange('YTD');
@@ -162,6 +164,7 @@ const SamplingControlView: React.FC = () => {
     setAutoRunEnabled(!!cfg?.autoRunEnabled);
     setAutoRunThreshold(Number(cfg?.autoRunThreshold ?? 200));
     setAutoRunActivateFrom(cfg?.autoRunActivateFrom ? (typeof cfg.autoRunActivateFrom === 'string' ? cfg.autoRunActivateFrom.split('T')[0] : new Date(cfg.autoRunActivateFrom).toISOString().split('T')[0]) : '');
+    setTaskDueInDays(Math.max(0, Math.min(365, Number(cfg?.taskDueInDays ?? 0))));
   };
 
   const loadStats = async () => {
@@ -346,6 +349,7 @@ const SamplingControlView: React.FC = () => {
         autoRunEnabled,
         autoRunThreshold,
         autoRunActivateFrom: autoRunActivateFrom || null,
+        taskDueInDays: Math.max(0, Math.min(365, taskDueInDays)),
       });
       // Requirement: if a type is not selected, activities of that type should move to Not Eligible.
       await samplingAPI.applyEligibility(eligibleTypes);
@@ -763,6 +767,10 @@ const SamplingControlView: React.FC = () => {
         </div>
       </Modal>
 
+      <InfoBanner title="Sampling Control">
+        Configure eligibility and cooling, then run Sampling Run or Adhoc Run to create Unassigned tasks. Task due in (days) sets the scheduled date for new tasks.
+      </InfoBanner>
+
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -781,7 +789,7 @@ const SamplingControlView: React.FC = () => {
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Activity cooling (days)</label>
                 <input
@@ -808,6 +816,18 @@ const SamplingControlView: React.FC = () => {
                   onChange={(e) => setDefaultPercentage(Number(e.target.value))}
                   className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1" title="Due date for new tasks = today + this many days (0 = today). Applies to Sampling Run and Adhoc Run.">Task due in (days)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={taskDueInDays}
+                  onChange={(e) => setTaskDueInDays(Math.max(0, Math.min(365, Number(e.target.value) || 0)))}
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5">0 = today. Used for new tasks when running sampling.</p>
               </div>
             </div>
 

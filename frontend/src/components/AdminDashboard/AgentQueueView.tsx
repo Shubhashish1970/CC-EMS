@@ -3,6 +3,7 @@ import { useToast } from '../../context/ToastContext';
 import { adminAPI } from '../../services/api';
 import { Loader2, RefreshCw, Users as UsersIcon, Calendar, Phone, MapPin, CheckCircle, Clock, XCircle, AlertCircle, Search, ChevronRight } from 'lucide-react';
 import Button from '../shared/Button';
+import InfoBanner from '../shared/InfoBanner';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 
 interface AgentQueueSummary {
@@ -274,10 +275,14 @@ const AgentQueueView: React.FC = () => {
   // Default view: List of all agent queues
   return (
     <div className="space-y-6">
+      <InfoBanner>
+        Monitor task queues and workload by agent. Click an agent to see their tasks and status breakdown.
+      </InfoBanner>
+
       {/* Header */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
             <h2 className="text-xl font-black text-slate-900 mb-1">Agent Queues</h2>
             <p className="text-sm text-slate-600">Monitor task queues for all agents</p>
           </div>
