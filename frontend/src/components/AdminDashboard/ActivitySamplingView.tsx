@@ -855,7 +855,8 @@ const ActivitySamplingView: React.FC = () => {
 
                 <p className="text-xs text-slate-500">
                   Excel must include sheet names exactly: <span className="font-bold">Activities</span> and{' '}
-                  <span className="font-bold">Farmers</span>. Date format: <span className="font-bold">DD/MM/YYYY</span>.
+                  <span className="font-bold">Farmers</span>. Use the download template for correct column headers.
+                  Date format: <span className="font-bold">DD/MM/YYYY</span> or <span className="font-bold">YYYY-MM-DD</span>.
                 </p>
               </div>
 

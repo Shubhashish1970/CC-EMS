@@ -232,6 +232,44 @@ router.get(
     try {
       const wb = XLSX.utils.book_new();
 
+      // Sheet 1: Instructions – column meanings and date format (matches import program)
+      const instructionRows = [
+        ['ACTIVITIES + FARMERS UPLOAD – INSTRUCTIONS'],
+        [''],
+        ['This workbook must have 2 data sheets named exactly: Activities, Farmers'],
+        [''],
+        ['ACTIVITIES SHEET – use these column headers (order can vary):'],
+        ['• activityId     = Unique activity ID (required)'],
+        ['• type          = Field Day | Group Meeting | Demo Visit | OFM | Other (required)'],
+        ['• date          = Activity date – use DD/MM/YYYY or YYYY-MM-DD (required)'],
+        ['• officerId     = FDA / Officer code (required)'],
+        ['• officerName   = FDA / Officer name (required)'],
+        ['• location      = Village / location name (required)'],
+        ['• territory     = Territory name (required)'],
+        ['• state         = State name – used for language (required)'],
+        ['• territoryName = Territory display name (optional; defaults to territory)'],
+        ['• zoneName      = Zone name (optional)'],
+        ['• buName        = Business unit (optional)'],
+        ['• tmEmpCode     = TM employee code (optional)'],
+        ['• tmName        = TM name (optional)'],
+        ['• crops         = Comma-separated crops e.g. Rice,Wheat (optional)'],
+        ['• products      = Comma-separated products e.g. NACL Pro,NACL Gold (optional)'],
+        [''],
+        ['FARMERS SHEET – use these column headers:'],
+        ['• activityId    = Must match an activityId from Activities sheet (required)'],
+        ['• name          = Farmer name (required)'],
+        ['• mobileNumber  = 10-digit mobile number (required, unique per farmer)'],
+        ['• location      = Village, District, State (required)'],
+        ['• photoUrl      = URL to photo (optional)'],
+        ['• farmerId      = Optional reference ID'],
+        ['• crops         = Optional; not stored on farmer record'],
+        [''],
+        ['Then upload this file in Activity Monitoring → Upload Excel.'],
+      ];
+      const wsInstructions = XLSX.utils.aoa_to_sheet(instructionRows);
+      wsInstructions['!cols'] = [{ wch: 75 }];
+      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
+
       const activitiesSample = [
         {
           activityId: 'FFA-ACT-EX-0001',
