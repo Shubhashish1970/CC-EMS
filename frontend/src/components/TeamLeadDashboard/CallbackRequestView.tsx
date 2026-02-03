@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronUp, ArrowUpDown, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowUpDown, Filter, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import { tasksAPI } from '../../services/api';
@@ -84,6 +84,7 @@ const CallbackRequestView: React.FC = () => {
     return { key: 'date', dir: 'desc' };
   });
 
+  const [showFilters, setShowFilters] = useState(false);
   // Filters
   const [filters, setFilters] = useState({
     dateFrom: '',
@@ -278,17 +279,24 @@ const CallbackRequestView: React.FC = () => {
             <h2 className="text-xl font-black text-slate-900">Request Callbacks</h2>
             <p className="text-sm text-slate-600 mt-1">Select completed/unsuccessful calls to schedule callbacks</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => fetchPage(1)} disabled={isLoading}>
-            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)}>
+              <Filter size={16} />
+              Filters
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => fetchPage(1)} disabled={isLoading}>
+              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        {/* Filters - label style consistent with Activity Monitoring */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Date Range */}
-          <div className="lg:col-span-2">
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+        {/* Filters – expand when Filter button clicked */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
             <div className="relative" ref={datePickerRef}>
               <button
                 type="button"
@@ -306,7 +314,6 @@ const CallbackRequestView: React.FC = () => {
                 </span>
                 <ChevronDown size={16} className="text-slate-400" />
               </button>
-
               {isDatePickerOpen && (
                 <div className="absolute z-50 mt-2 w-[500px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
                   <div className="flex">
@@ -369,8 +376,6 @@ const CallbackRequestView: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* Outcome Filter */}
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Outcome</label>
             <StyledSelect
@@ -384,8 +389,6 @@ const CallbackRequestView: React.FC = () => {
               placeholder="All Outcomes"
             />
           </div>
-
-          {/* Call Type Filter */}
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Type</label>
             <StyledSelect
@@ -399,8 +402,6 @@ const CallbackRequestView: React.FC = () => {
               placeholder="All Types"
             />
           </div>
-
-          {/* Agent Filter */}
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agent</label>
             <StyledSelect
@@ -412,8 +413,10 @@ const CallbackRequestView: React.FC = () => {
               ]}
               placeholder="All Agents"
             />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Tasks Table - card style match Activity Monitoring (rounded-3xl) */}

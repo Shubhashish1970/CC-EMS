@@ -98,3 +98,30 @@ Master management views (`CropsMasterView`, `ProductsMasterView`, `LanguagesMast
   - **Sortable columns** (clickable headers, ChevronUp/ChevronDown, sort state persisted to localStorage where applicable).
 - **User Management** has a Rows selector, same pagination card pattern, and sortable User/Role/Languages/Team Lead/Status columns.
 - **TaskQueueTable** (Language Queue, Agent Queue details) uses a separate pagination card and optional `tableSortStorageKey` for persisting sort like Activity Monitoring.
+
+---
+
+## 8. Filter placement (site-wide consistency)
+
+**Standard applied across the site:**
+
+- **Filter button:** Every page with filters has a **"Filters"** button (with Filter icon) in the header/toolbar. Clicking it **expands** a section to reveal the filter controls.
+- **Section heading:** Every filter block has a visible **“Filters”** heading:  
+  `<h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3">Filters</h3>`  
+  (displays as “FILTERS” via uppercase).
+- **Visibility:** Filters are **always visible** (no collapsible “Filters” toggle).
+- **Layout:** Single horizontal row on large screens:  
+  `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-N gap-3` with Date Range often `lg:col-span-2`.  
+  Field labels: `block text-xs font-black text-slate-400 uppercase tracking-widest mb-1`.
+
+**Pages updated:**
+
+| Page | Component | Change |
+|------|------------|--------|
+| **Activity Monitoring** | `ActivitySamplingView.tsx` | Removed Filters toggle; filters moved into a **separate Filters card** below the header card, always visible, single-row grid (Activity Type, Territory, Zone, BU, Sampling Status, Date Range). |
+| **Task Management** | `TaskList.tsx` | Removed Filters toggle; filters moved into a **separate Filters card** below the header card, always visible, same heading and grid (Status, Agent, Territory, Zone, BU, Date Range, Search; team_lead sees subset). |
+| **Request Callbacks** | `CallbackRequestView.tsx` | Filters moved from inside the header card into a **dedicated Filters card** with “Filters” heading (Date Range, Outcome, Call Type, Agent). |
+| **Agent Queue (Admin detail)** | `AgentQueueView.tsx` | Already used the standard (dedicated Filters card + heading); no change. |
+| **Task Dashboard (Team Lead)** | `TaskDashboardView.tsx` | Added **“Filters”** heading above each filter block: main sidebar (Date, BU, State), language queue detail (Date, Agent, Call Status, BU, State), agent detail (Date, State, BU, Status, FDA). |
+
+Result: All filters are under a **Filter** button that, when clicked, **expands** the section to reveal the filters (same pattern as Activity Monitoring).

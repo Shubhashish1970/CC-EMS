@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI } from '../../services/api';
-import { Loader2, RefreshCw, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
+import { Loader2, Filter, RefreshCw, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import InfoBanner from '../shared/InfoBanner';
@@ -75,6 +75,7 @@ const AgentQueueView: React.FC = () => {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
+  const [showDetailFilters, setShowDetailFilters] = useState(false);
 
   const [detailFilters, setDetailFilters] = useState({
     dateFrom: '',
@@ -194,15 +195,25 @@ const AgentQueueView: React.FC = () => {
                 ← Back to Queues
               </Button>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => fetchAgentDetail(selectedAgentId, true)}
-              disabled={isLoadingDetail}
-            >
-              <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowDetailFilters(!showDetailFilters)}
+              >
+                <Filter size={16} />
+                Filters
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fetchAgentDetail(selectedAgentId, true)}
+                disabled={isLoadingDetail}
+              >
+                <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-start gap-4">
@@ -251,7 +262,8 @@ const AgentQueueView: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters: Date, Agent, Status, Language, Territory */}
+        {/* Filters – expand when Filter button clicked */}
+        {showDetailFilters && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
           <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
@@ -399,6 +411,7 @@ const AgentQueueView: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Tasks List - same table UX as Team Lead Task Queue (primary columns, expandable secondary) */}
         <TaskQueueTable

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw, Loader2, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Phone, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
+import { Calendar, Filter, RefreshCw, Loader2, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Phone, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
@@ -106,6 +106,9 @@ const TaskDashboardView: React.FC = () => {
   const [isLoadingLanguageQueue, setIsLoadingLanguageQueue] = useState(false);
   const [isLoadingMoreAgent, setIsLoadingMoreAgent] = useState(false);
   const [isLoadingMoreLanguage, setIsLoadingMoreLanguage] = useState(false);
+  const [showMainFilters, setShowMainFilters] = useState(false);
+  const [showLanguageQueueFilters, setShowLanguageQueueFilters] = useState(false);
+  const [showAgentDetailFilters, setShowAgentDetailFilters] = useState(false);
   const [taskPageSize, setTaskPageSize] = useState<number>(() => {
     const raw = localStorage.getItem('teamLead.queueTasks.pageSize');
     const n = raw ? Number(raw) : NaN;
@@ -753,8 +756,16 @@ const TaskDashboardView: React.FC = () => {
             <h2 className="text-xl font-black text-slate-900">Queue for language: {d.language}</h2>
             <p className="text-sm text-slate-600 mt-1">Statistics and task list for this language only. Use filters below to narrow by date, agent, call status, BU, or State.</p>
 
-            {/* Filters: Date Range, Agent, Call Status, BU, State */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+            <button
+              type="button"
+              onClick={() => setShowLanguageQueueFilters((p) => !p)}
+              className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <Filter size={16} />
+              Filters
+            </button>
+            {showLanguageQueueFilters && (
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-5 gap-3">
               <div className="md:col-span-2">
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
                 <div className="relative" ref={datePickerRef}>
@@ -863,6 +874,7 @@ const TaskDashboardView: React.FC = () => {
                 />
               </div>
             </div>
+            )}
           </div>
 
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
@@ -988,8 +1000,16 @@ const TaskDashboardView: React.FC = () => {
             </button>
           </div>
 
-          {/* Filters: Date, State, BU, Status, FDA - single row, FDA column wider to avoid text wrap */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAgentDetailFilters((p) => !p)}
+            className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
+            <Filter size={16} />
+            Filters
+          </button>
+          {showAgentDetailFilters && (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
             <div className="md:col-span-2">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
               <div className="relative" ref={datePickerRef}>
@@ -1105,6 +1125,7 @@ const TaskDashboardView: React.FC = () => {
               />
             </div>
           </div>
+          )}
 
           <div className="flex items-start gap-4 mt-8">
             <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
@@ -1264,7 +1285,16 @@ const TaskDashboardView: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setShowMainFilters((p) => !p)}
+          className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
+        >
+          <Filter size={16} />
+          Filters
+        </button>
+        {showMainFilters && (
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2">
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
             <div className="relative" ref={datePickerRef}>
@@ -1404,6 +1434,7 @@ const TaskDashboardView: React.FC = () => {
             />
           </div>
         </div>
+        )}
 
         {/* KPI strip */}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">

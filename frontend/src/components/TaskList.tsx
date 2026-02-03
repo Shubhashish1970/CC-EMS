@@ -672,221 +672,192 @@ const TaskList: React.FC = () => {
             Statistics and export reflect current filters (status, agent, date range, search).
           </InfoBanner>
 
-          {/* Filters */}
+          {/* Filters – expand when Filter button clicked */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Status
-                  </label>
-                  <StyledSelect
-                    value={filters.status}
-                    onChange={(value) => setFilters({ ...filters, status: value })}
-                    options={[
-                      { value: '', label: 'All Statuses' },
-                      { value: 'sampled_in_queue', label: 'Sampled - in queue' },
-                      { value: 'in_progress', label: 'In Progress' },
-                      { value: 'completed', label: 'Completed' },
-                      { value: 'not_reachable', label: 'Not Reachable' },
-                      { value: 'invalid_number', label: 'Invalid Number' },
-                    ]}
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status</label>
+              <StyledSelect
+                value={filters.status}
+                onChange={(value) => setFilters({ ...filters, status: value })}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  { value: 'sampled_in_queue', label: 'Sampled - in queue' },
+                  { value: 'in_progress', label: 'In Progress' },
+                  { value: 'completed', label: 'Completed' },
+                  { value: 'not_reachable', label: 'Not Reachable' },
+                  { value: 'invalid_number', label: 'Invalid Number' },
+                ]}
                     placeholder="All Statuses"
                   />
                 </div>
-
                 {user?.role !== 'team_lead' && (
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                      Agent
-                    </label>
-                    <StyledSelect
-                      value={filters.agentId}
-                      onChange={(value) => setFilters({ ...filters, agentId: value })}
-                      options={[
-                        { value: '', label: 'All Agents' },
-                        ...agents.map((agent) => ({
-                          value: agent._id,
-                          label: `${agent.name} (${agent.email})`,
-                        })),
-                      ]}
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Agent</label>
+                <StyledSelect
+                  value={filters.agentId}
+                  onChange={(value) => setFilters({ ...filters, agentId: value })}
+                  options={[
+                    { value: '', label: 'All Agents' },
+                    ...agents.map((agent) => ({
+                      value: agent._id,
+                      label: `${agent.name} (${agent.email})`,
+                    })),
+                  ]}
                       placeholder="All Agents"
                     />
                   </div>
                 )}
-
                 {user?.role !== 'team_lead' && (
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                      Territory
-                    </label>
-                    <StyledSelect
-                      value={filters.territory}
-                      onChange={(value) => setFilters({ ...filters, territory: value })}
-                      options={[
-                        { value: '', label: 'All Territories' },
-                        ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t })),
-                      ]}
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Territory</label>
+                <StyledSelect
+                  value={filters.territory}
+                  onChange={(value) => setFilters({ ...filters, territory: value })}
+                  options={[
+                    { value: '', label: 'All Territories' },
+                    ...filterOptions.territoryOptions.map((t) => ({ value: t, label: t })),
+                  ]}
                       placeholder="All Territories"
                     />
                   </div>
                 )}
-
                 {user?.role !== 'team_lead' && (
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                      Zone
-                    </label>
-                    <StyledSelect
-                      value={filters.zone}
-                      onChange={(value) => setFilters({ ...filters, zone: value })}
-                      options={[
-                        { value: '', label: 'All Zones' },
-                        ...filterOptions.zoneOptions.map((z) => ({ value: z, label: z })),
-                      ]}
-                      placeholder="All Zones"
-                    />
-                  </div>
-                )}
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Zone</label>
+                <StyledSelect
+                  value={filters.zone}
+                  onChange={(value) => setFilters({ ...filters, zone: value })}
+                  options={[
+                    { value: '', label: 'All Zones' },
+                    ...filterOptions.zoneOptions.map((z) => ({ value: z, label: z })),
+                  ]}
+                  placeholder="All Zones"
+                />
+              </div>
+            )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {user?.role !== 'team_lead' && (
                   <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                      BU
-                    </label>
-                    <StyledSelect
-                      value={filters.bu}
-                      onChange={(value) => setFilters({ ...filters, bu: value })}
-                      options={[
-                        { value: '', label: 'All BUs' },
-                        ...filterOptions.buOptions.map((b) => ({ value: b, label: b })),
-                      ]}
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">BU</label>
+                <StyledSelect
+                  value={filters.bu}
+                  onChange={(value) => setFilters({ ...filters, bu: value })}
+                  options={[
+                    { value: '', label: 'All BUs' },
+                    ...filterOptions.buOptions.map((b) => ({ value: b, label: b })),
+                  ]}
                       placeholder="All BUs"
                     />
                   </div>
                 )}
-
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                    Date Range
-                  </label>
-                  <div className="relative" ref={datePickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDatePickerOpen((prev) => {
-                          const next = !prev;
-                          if (!prev && next) syncDraftFromFilters();
-                          return next;
-                        });
-                      }}
-                      className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
-                      title="Choose date range"
-                    >
-                      <span className="truncate">
-                        {selectedPreset}
-                        {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
-                      </span>
-                      <span className="text-slate-400 font-black">▾</span>
-                    </button>
-
-                    {isDatePickerOpen && (
-                      <div className="absolute z-50 mt-2 left-0 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
-                        <div className="flex flex-col sm:flex-row">
-                          <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
-                            {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => {
-                              const isActive = selectedPreset === p;
-                              return (
-                                <button
-                                  key={p}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPreset(p);
-                                    const { start, end } = getRange(p);
-                                    setDraftStart(start);
-                                    setDraftEnd(end);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
-                                >
-                                  {p}
-                                </button>
-                              );
-                            })}
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</label>
+              <div className="relative" ref={datePickerRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDatePickerOpen((prev) => {
+                      const next = !prev;
+                      if (!prev && next) syncDraftFromFilters();
+                      return next;
+                    });
+                  }}
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400 flex items-center justify-between"
+                  title="Choose date range"
+                >
+                  <span className="truncate">
+                    {selectedPreset}
+                    {filters.dateFrom && filters.dateTo ? ` • ${formatPretty(filters.dateFrom)} - ${formatPretty(filters.dateTo)}` : ''}
+                  </span>
+                  <span className="text-slate-400 font-black">▾</span>
+                </button>
+                {isDatePickerOpen && (
+                  <div className="absolute z-50 mt-2 left-0 w-[720px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="w-full sm:w-56 border-b sm:border-b-0 sm:border-r border-slate-200 bg-slate-50 p-2 shrink-0">
+                        {(['Custom', 'Today', 'Yesterday', 'This week (Sun - Today)', 'Last 7 days', 'Last week (Sun - Sat)', 'Last 28 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => {
+                          const isActive = selectedPreset === p;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreset(p);
+                                const { start, end } = getRange(p);
+                                setDraftStart(start);
+                                setDraftEnd(end);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${isActive ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex-1 p-4">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
+                            <input
+                              type="date"
+                              value={draftStart}
+                              onChange={(e) => { setSelectedPreset('Custom'); setDraftStart(e.target.value); }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
                           </div>
-                          <div className="flex-1 p-4">
-                            <div className="flex items-center justify-between gap-3 mb-4">
-                              <div className="flex-1">
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Start date</p>
-                                <input
-                                  type="date"
-                                  value={draftStart}
-                                  onChange={(e) => {
-                                    setSelectedPreset('Custom');
-                                    setDraftStart(e.target.value);
-                                  }}
-                                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                                />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
-                                <input
-                                  type="date"
-                                  value={draftEnd}
-                                  onChange={(e) => {
-                                    setSelectedPreset('Custom');
-                                    setDraftEnd(e.target.value);
-                                  }}
-                                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsDatePickerOpen(false);
-                                  syncDraftFromFilters();
-                                }}
-                                className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' }));
-                                  setIsDatePickerOpen(false);
-                                }}
-                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
-                              >
-                                Apply
-                              </button>
-                            </div>
+                          <div className="flex-1">
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">End date</p>
+                            <input
+                              type="date"
+                              value={draftEnd}
+                              onChange={(e) => { setSelectedPreset('Custom'); setDraftEnd(e.target.value); }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                            />
                           </div>
                         </div>
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => { setIsDatePickerOpen(false); syncDraftFromFilters(); }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilters((prev) => ({ ...prev, dateFrom: draftStart || '', dateTo: draftEnd || '' }));
+                              setIsDatePickerOpen(false);
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
+                          >
+                            Apply
+                          </button>
+                        </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
+                )}
                   </div>
                 </div>
-
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Search
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="text"
-                    value={filters.search}
-                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                    placeholder="Search by farmer name, mobile, agent, or location..."
-                    className="w-full min-h-12 pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-                  />
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      value={filters.search}
+                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                      placeholder="Search by farmer name, mobile, agent, or location..."
+                      className="w-full min-h-12 pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           )}
         </div>
