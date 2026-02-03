@@ -50,6 +50,7 @@ const UserManagementView: React.FC = () => {
     return Number.isFinite(n) && USER_PAGE_SIZE_OPTIONS.includes(n as any) ? n : USER_PAGE_SIZE_DEFAULT;
   });
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [showFilters, setShowFilters] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; user: User | null }>({
     isOpen: false,
     user: null,
@@ -209,58 +210,62 @@ const UserManagementView: React.FC = () => {
         managed via the Activity API and used for reporting purposes.
       </InfoBanner>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">Call Centre Users</h2>
-          <p className="text-sm text-slate-600 mt-1">
-            Manage Call Centre employees and their language capabilities
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 rounded-xl p-1">
-            <button
-              onClick={() => setView('users')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                view === 'users'
-                  ? 'bg-white text-green-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Users
-            </button>
-            <button
-              onClick={() => setView('matrix')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${
-                view === 'matrix'
-                  ? 'bg-white text-green-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Grid3x3 size={16} />
-              Language Matrix
-            </button>
+      {/* Header – same card style as Activity Monitoring / TaskList */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900">Call Centre Users</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Manage Call Centre employees and their language capabilities
+            </p>
           </div>
-          {view === 'users' && (
-            <button
-              onClick={handleCreateUser}
-              className="flex items-center gap-2 px-6 py-3 bg-green-700 text-white font-bold rounded-xl hover:bg-green-800 transition-colors"
-            >
-              <Plus size={20} />
-              Create User
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="flex items-center bg-slate-100 rounded-xl p-1">
+              <button
+                onClick={() => setView('users')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                  view === 'users'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Users
+              </button>
+              <button
+                onClick={() => setView('matrix')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${
+                  view === 'matrix'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Grid3x3 size={16} />
+                Language Matrix
+              </button>
+            </div>
+            {view === 'users' && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)}>
+                  <Filter size={16} />
+                  {showFilters ? 'Hide filters' : 'Filters'}
+                </Button>
+                <button
+                  onClick={handleCreateUser}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-700 text-white font-bold rounded-xl hover:bg-green-800 transition-colors"
+                >
+                  <Plus size={20} />
+                  Create User
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Content based on view */}
-      {view === 'users' ? (
-        <>
-          {/* Filters */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        {/* Filters – expand when Filter button clicked (consistent with other list pages) */}
+        {view === 'users' && showFilters && (
+          <div className="mt-4 pt-4 border-t border-slate-200">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Search */}
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
@@ -271,9 +276,8 @@ const UserManagementView: React.FC = () => {
                   className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
                 />
               </div>
-
-              {/* Role Filter */}
               <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Role</label>
                 <StyledSelect
                   value={filters.role}
                   onChange={(value) => setFilters({ ...filters, role: value as UserRole | '' })}
@@ -288,9 +292,8 @@ const UserManagementView: React.FC = () => {
                   placeholder="All Roles"
                 />
               </div>
-
-              {/* Status Filter */}
               <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
                 <StyledSelect
                   value={filters.isActive === undefined ? '' : filters.isActive ? 'true' : 'false'}
                   onChange={(value) =>
@@ -309,7 +312,12 @@ const UserManagementView: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+      </div>
 
+      {/* Content based on view */}
+      {view === 'users' ? (
+        <>
           {/* User List */}
           <UserList
             users={users}

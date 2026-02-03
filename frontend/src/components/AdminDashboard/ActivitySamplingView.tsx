@@ -714,7 +714,7 @@ const ActivitySamplingView: React.FC = () => {
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter size={16} />
-              Filters
+              {showFilters ? 'Hide filters' : 'Filters'}
             </Button>
             <Button
               variant="secondary"

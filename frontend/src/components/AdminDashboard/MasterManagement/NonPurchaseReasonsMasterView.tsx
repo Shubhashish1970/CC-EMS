@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, GripVertical, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Plus, Edit2, Loader2, Download, Upload, Search, CheckCircle, XCircle, GripVertical, Trash2, CheckSquare, Square, Filter } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import ConfirmationModal from '../../shared/ConfirmationModal';
 import * as XLSX from 'xlsx';
@@ -39,6 +39,7 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchReasons = async () => {
     setIsLoading(true);
@@ -225,13 +226,22 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">Non-Purchase Reasons</h2>
-          <p className="text-sm text-slate-600 mt-1">Reasons why farmers didn't purchase products</p>
-        </div>
+      {/* Header – same card style as other list pages */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Non-Purchase Reasons</h2>
+            <p className="text-sm text-slate-600 mt-1">Reasons why farmers didn't purchase products</p>
+          </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            <Filter size={16} />
+            {showFilters ? 'Hide filters' : 'Filters'}
+          </button>
           {selectedIds.size > 0 && (
             <button
               onClick={() => setShowBulkDeleteModal(true)}
@@ -263,33 +273,37 @@ const NonPurchaseReasonsMasterView: React.FC = () => {
             Add Reason
           </button>
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search reasons..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-          />
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-          />
-          Show inactive
-        </label>
+
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
+              <div className="relative flex-1 min-w-0">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search reasons..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full min-h-12 pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                />
+                Show inactive
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={32} className="animate-spin text-lime-600" />

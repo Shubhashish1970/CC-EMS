@@ -138,13 +138,13 @@ const AgentAnalyticsView: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto p-6 bg-slate-50">
-      <div className="max-w-6xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-black text-slate-900">Performance Dashboard</h2>
-              <p className="text-xs text-slate-500">Your call performance metrics and trends</p>
+              <p className="text-sm text-slate-600">Your call performance metrics and trends</p>
             </div>
             <div className="flex items-center gap-3">
               {/* Date Range Selector - Matching AgentHistoryView style */}

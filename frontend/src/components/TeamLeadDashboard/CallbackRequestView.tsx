@@ -282,7 +282,7 @@ const CallbackRequestView: React.FC = () => {
           <div className="flex items-center gap-3">
             <Button variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)}>
               <Filter size={16} />
-              Filters
+              {showFilters ? 'Hide filters' : 'Filters'}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => fetchPage(1)} disabled={isLoading}>
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />

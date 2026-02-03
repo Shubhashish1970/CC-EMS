@@ -341,7 +341,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
   return (
     <div className="h-full overflow-y-auto p-6 bg-slate-50">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Section - Matching Activity Sampling */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -352,7 +352,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <div className="flex items-center gap-3">
               <Button variant="secondary" size="sm" onClick={() => setShowFilters((v) => !v)}>
                 <Filter size={16} />
-                Filters
+                {showFilters ? 'Hide filters' : 'Filters'}
               </Button>
               <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={isLoading}>
                 <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />

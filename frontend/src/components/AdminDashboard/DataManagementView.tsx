@@ -52,14 +52,15 @@ const DataManagementView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-1">Data Management</h2>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header – same card style as other list pages */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <h2 className="text-xl font-black text-slate-900 mb-1">Data Management</h2>
         <p className="text-sm text-slate-600">Clear database and generate sample data via Mock FFA API (Indian names, optional Sales Hierarchy Excel).</p>
       </div>
 
       {/* Clear database */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
             <Trash2 className="text-red-600" size={20} />
@@ -106,7 +107,7 @@ const DataManagementView: React.FC = () => {
       </div>
 
       {/* Generate data via Mock FFA */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-lime-100 flex items-center justify-center">
             <Database className="text-lime-700" size={20} />

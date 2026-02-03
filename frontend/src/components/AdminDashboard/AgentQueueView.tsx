@@ -202,7 +202,7 @@ const AgentQueueView: React.FC = () => {
                 onClick={() => setShowDetailFilters(!showDetailFilters)}
               >
                 <Filter size={16} />
-                Filters
+                {showDetailFilters ? 'Hide filters' : 'Filters'}
               </Button>
               <Button
                 variant="secondary"

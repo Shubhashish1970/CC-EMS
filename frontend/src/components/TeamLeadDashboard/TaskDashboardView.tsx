@@ -762,7 +762,7 @@ const TaskDashboardView: React.FC = () => {
               className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
               <Filter size={16} />
-              Filters
+              {showLanguageQueueFilters ? 'Hide filters' : 'Filters'}
             </button>
             {showLanguageQueueFilters && (
             <div className="mt-3 grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -1006,7 +1006,7 @@ const TaskDashboardView: React.FC = () => {
             className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
             <Filter size={16} />
-            Filters
+            {showAgentDetailFilters ? 'Hide filters' : 'Filters'}
           </button>
           {showAgentDetailFilters && (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -1267,7 +1267,7 @@ const TaskDashboardView: React.FC = () => {
         isLoading={isReallocating}
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-black text-slate-900">Task Dashboard</h2>
@@ -1291,7 +1291,7 @@ const TaskDashboardView: React.FC = () => {
           className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
         >
           <Filter size={16} />
-          Filters
+          {showMainFilters ? 'Hide filters' : 'Filters'}
         </button>
         {showMainFilters && (
         <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1468,7 +1468,7 @@ const TaskDashboardView: React.FC = () => {
       </div>
 
       {/* Unassigned by language */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-black text-slate-900">Tasks by Language (Open)</h3>
           <div className="text-sm font-bold text-slate-600">
@@ -1641,7 +1641,7 @@ const TaskDashboardView: React.FC = () => {
       </div>
 
       {/* Agent workload */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-black text-slate-900">Agent Workload</h3>
         <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress. Click an agent name to view their queue, or click a language to open their queue filtered by that language.</p>
 
