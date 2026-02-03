@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Calendar, ChevronDown, ChevronUp, Loader2, MapPin, Phone, Package, MessageSquare, Users as UsersIcon } from 'lucide-react';
 import StyledSelect from '../shared/StyledSelect';
 
@@ -89,6 +89,8 @@ export interface TaskQueueTableProps {
   onLoadMore?: () => void;
   /** Optional table title override; default uses "Tasks (X of Y)" */
   title?: React.ReactNode;
+  /** If set, sort state is persisted to localStorage under this key (e.g. admin.agentQueue.tableSort) */
+  tableSortStorageKey?: string;
 }
 
 const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
@@ -103,12 +105,27 @@ const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
   isLoadingMore = false,
   onLoadMore,
   title,
+  tableSortStorageKey,
 }) => {
-  const [tableSort, setTableSort] = useState<{ key: TaskTableColumnKey; dir: 'asc' | 'desc' }>({
-    key: 'scheduledDate',
-    dir: 'asc',
+  const [tableSort, setTableSort] = useState<{ key: TaskTableColumnKey; dir: 'asc' | 'desc' }>(() => {
+    if (tableSortStorageKey) {
+      const raw = localStorage.getItem(tableSortStorageKey);
+      try {
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    return { key: 'scheduledDate', dir: 'asc' };
   });
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tableSortStorageKey) {
+      localStorage.setItem(tableSortStorageKey, JSON.stringify(tableSort));
+    }
+  }, [tableSort, tableSortStorageKey]);
 
   const sortedTasks = useMemo(() => {
     const { key, dir } = tableSort;

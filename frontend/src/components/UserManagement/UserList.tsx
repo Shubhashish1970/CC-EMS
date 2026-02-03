@@ -1,6 +1,8 @@
-import React from 'react';
-import { Edit2, Trash2, UserCheck, UserX, Mail, Hash, Users as UsersIcon } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Edit2, Trash2, UserCheck, UserX, Mail, Hash, Users as UsersIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import { UserRole } from './UserForm';
+
+type UserTableColumnKey = 'name' | 'role' | 'languages' | 'teamLead' | 'status';
 
 interface User {
   _id: string;
@@ -45,6 +47,62 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 const UserList: React.FC<UserListProps> = ({ users, isLoading, onEdit, onDelete, currentUserId }) => {
+  const [tableSort, setTableSort] = useState<{ key: UserTableColumnKey; dir: 'asc' | 'desc' }>(() => {
+    const raw = localStorage.getItem('admin.userManagement.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+    } catch {
+      // ignore
+    }
+    return { key: 'name', dir: 'asc' };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('admin.userManagement.tableSort', JSON.stringify(tableSort));
+  }, [tableSort]);
+
+  const getSortValue = (user: User, key: UserTableColumnKey): string | number => {
+    switch (key) {
+      case 'name':
+        return (user.name || '').toLowerCase();
+      case 'role': {
+        const roles = user.roles && user.roles.length > 0 ? user.roles : [user.role];
+        return (ROLE_LABELS[roles[0]] || '').toLowerCase();
+      }
+      case 'languages':
+        return (user.languageCapabilities || []).join(',').toLowerCase();
+      case 'teamLead':
+        return (user.teamLead?.name || '').toLowerCase();
+      case 'status':
+        return user.isActive ? 1 : 0;
+      default:
+        return '';
+    }
+  };
+
+  const sortedUsers = useMemo(() => {
+    const { key, dir } = tableSort;
+    const mapped = users.map((u, idx) => ({ user: u, idx }));
+    mapped.sort((a, b) => {
+      const va = getSortValue(a.user, key);
+      const vb = getSortValue(b.user, key);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      if (cmp === 0) return a.idx - b.idx;
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return mapped.map((m) => m.user);
+  }, [users, tableSort]);
+
+  const handleHeaderClick = (key: UserTableColumnKey) => {
+    setTableSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      return { key, dir: 'asc' };
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -66,34 +124,43 @@ const UserList: React.FC<UserListProps> = ({ users, isLoading, onEdit, onDelete,
     );
   }
 
+  const sortableColumns: Array<{ key: UserTableColumnKey; label: string }> = [
+    { key: 'name', label: 'User' },
+    { key: 'role', label: 'Role' },
+    { key: 'languages', label: 'Languages' },
+    { key: 'teamLead', label: 'Team Lead' },
+    { key: 'status', label: 'Status' },
+  ];
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
-                Languages
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
-                Team Lead
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-black text-slate-700 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-black text-slate-700 uppercase tracking-wider">
+              {sortableColumns.map((col) => {
+                const isSorted = tableSort.key === col.key;
+                return (
+                  <th
+                    key={col.key}
+                    className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none cursor-pointer hover:bg-slate-100"
+                    onClick={() => handleHeaderClick(col.key)}
+                    title="Click to sort"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{col.label}</span>
+                      {isSorted && (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="px-6 py-4 text-right text-xs font-black text-slate-500 uppercase tracking-widest">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {users.map((user) => {
+            {sortedUsers.map((user) => {
               const isCurrentUser = user._id === currentUserId;
               return (
                 <tr key={user._id} className="hover:bg-slate-50 transition-colors">

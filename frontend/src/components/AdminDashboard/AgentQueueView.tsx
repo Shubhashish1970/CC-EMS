@@ -210,6 +210,7 @@ const AgentQueueView: React.FC = () => {
           onPageSizeChange={() => {}}
           showAssignedColumn={false}
           getStatusBadge={getStatusBadge}
+          tableSortStorageKey="admin.agentQueue.tableSort"
         />
       </div>
     );

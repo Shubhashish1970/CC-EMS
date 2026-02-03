@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ChevronDown, ChevronUp, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import { tasksAPI } from '../../services/api';
@@ -45,6 +45,8 @@ interface Agent {
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const PAGE_SIZE_DEFAULT = 20;
 
+type CallbackTableColumnKey = 'farmer' | 'outcome' | 'outbound' | 'type' | 'agent' | 'date';
+
 const formatDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
@@ -71,6 +73,16 @@ const CallbackRequestView: React.FC = () => {
     const raw = localStorage.getItem('teamLead.callbackRequest.pageSize');
     const n = raw ? Number(raw) : NaN;
     return Number.isFinite(n) && PAGE_SIZE_OPTIONS.includes(n as any) ? n : PAGE_SIZE_DEFAULT;
+  });
+  const [tableSort, setTableSort] = useState<{ key: CallbackTableColumnKey; dir: 'asc' | 'desc' }>(() => {
+    const raw = localStorage.getItem('teamLead.callbackRequest.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+    } catch {
+      // ignore
+    }
+    return { key: 'date', dir: 'desc' };
   });
 
   // Filters
@@ -200,6 +212,51 @@ const CallbackRequestView: React.FC = () => {
     localStorage.setItem('teamLead.callbackRequest.pageSize', String(pageSize));
   }, [pageSize]);
 
+  useEffect(() => {
+    localStorage.setItem('teamLead.callbackRequest.tableSort', JSON.stringify(tableSort));
+  }, [tableSort]);
+
+  const getSortValue = (task: CallbackTask, key: CallbackTableColumnKey): string | number => {
+    switch (key) {
+      case 'farmer':
+        return (task.farmer?.name || '').toLowerCase();
+      case 'outcome':
+        return (task.outcome || '').toLowerCase();
+      case 'outbound':
+        return (task.callLog?.callStatus || '').toLowerCase();
+      case 'type':
+        return task.isCallback ? 'callback' : 'original';
+      case 'agent':
+        return (task.agent?.name || '').toLowerCase();
+      case 'date':
+        return new Date(task.updatedAt || 0).getTime();
+      default:
+        return '';
+    }
+  };
+
+  const sortedTasks = useMemo(() => {
+    const { key, dir } = tableSort;
+    const mapped = tasks.map((t, idx) => ({ task: t, idx }));
+    mapped.sort((a, b) => {
+      const va = getSortValue(a.task, key);
+      const vb = getSortValue(b.task, key);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      if (cmp === 0) return a.idx - b.idx;
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return mapped.map((m) => m.task);
+  }, [tasks, tableSort]);
+
+  const handleHeaderClick = (key: CallbackTableColumnKey) => {
+    setTableSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      return { key, dir: 'asc' };
+    });
+  };
+
   // Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -218,8 +275,8 @@ const CallbackRequestView: React.FC = () => {
     return () => observer.disconnect();
   }, [pagination.hasMore, isLoadingMore, isLoading, loadMoreTasks]);
 
-  // Filter tasks that can be selected (not at max callbacks)
-  const selectableTasks = tasks.filter(t => (t.callbackNumber || 0) < 2);
+  // Filter tasks that can be selected (not at max callbacks) — use sorted list for display order
+  const selectableTasks = sortedTasks.filter(t => (t.callbackNumber || 0) < 2);
 
   const handleSelectAll = () => {
     if (selectedTaskIds.size === selectableTasks.length && selectableTasks.length > 0) {
@@ -451,18 +508,37 @@ const CallbackRequestView: React.FC = () => {
           </button>
         </div>
 
-        {/* Table - header style match Activity Monitoring */}
+        {/* Table - header style and sortable columns match Activity Monitoring */}
         <div ref={tableContainerRef} className="overflow-x-auto max-h-[60vh] overflow-y-auto">
           <table className="w-full">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
               <tr>
                 <th className="px-3 py-3 text-left w-10 text-xs font-black text-slate-500 uppercase tracking-widest"></th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Farmer</th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Outcome</th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Outbound</th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Type</th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Agent</th>
-                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Date</th>
+                {(
+                  [
+                    { key: 'farmer' as CallbackTableColumnKey, label: 'Farmer' },
+                    { key: 'outcome' as CallbackTableColumnKey, label: 'Outcome' },
+                    { key: 'outbound' as CallbackTableColumnKey, label: 'Outbound' },
+                    { key: 'type' as CallbackTableColumnKey, label: 'Type' },
+                    { key: 'agent' as CallbackTableColumnKey, label: 'Agent' },
+                    { key: 'date' as CallbackTableColumnKey, label: 'Date' },
+                  ] as Array<{ key: CallbackTableColumnKey; label: string }>
+                ).map((col) => {
+                  const isSorted = tableSort.key === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none cursor-pointer hover:bg-slate-100"
+                      onClick={() => handleHeaderClick(col.key)}
+                      title="Click to sort"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{col.label}</span>
+                        {isSorted && (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 border-b border-slate-100">
@@ -482,7 +558,7 @@ const CallbackRequestView: React.FC = () => {
                 </tr>
               ) : (
                 <>
-                  {tasks.map((task) => {
+                  {sortedTasks.map((task) => {
                     const isMaxRetry = (task.callbackNumber || 0) >= 2;
                     const isSelected = selectedTaskIds.has(task._id);
 

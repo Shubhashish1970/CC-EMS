@@ -806,6 +806,7 @@ const TaskDashboardView: React.FC = () => {
             loadMoreRef={loadMoreLanguageRef}
             isLoadingMore={isLoadingMoreLanguage}
             onLoadMore={loadMoreLanguageTasks}
+            tableSortStorageKey="teamLead.queueTasks.tableSort"
           />
         </div>
       );
@@ -1073,6 +1074,7 @@ const TaskDashboardView: React.FC = () => {
           loadMoreRef={loadMoreAgentRef}
           isLoadingMore={isLoadingMoreAgent}
           onLoadMore={loadMoreAgentTasks}
+          tableSortStorageKey="teamLead.queueTasks.tableSort"
         />
       </div>
     );

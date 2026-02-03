@@ -129,8 +129,26 @@ const TaskList: React.FC = () => {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<
     'scheduledDate' | 'status' | 'farmerName' | 'agentName' | 'territory' | 'activityType' | 'officerName' | 'language'
-  >('scheduledDate');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  >(() => {
+    const raw = localStorage.getItem('admin.taskManagement.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.sortBy && parsed?.sortOrder) return parsed.sortBy;
+    } catch {
+      // ignore
+    }
+    return 'scheduledDate';
+  });
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+    const raw = localStorage.getItem('admin.taskManagement.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.sortOrder === 'asc' || parsed?.sortOrder === 'desc') return parsed.sortOrder;
+    } catch {
+      // ignore
+    }
+    return 'asc';
+  });
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
@@ -164,6 +182,10 @@ const TaskList: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('admin.taskManagement.pageSize', String(pageSize));
   }, [pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('admin.taskManagement.tableSort', JSON.stringify({ sortBy, sortOrder }));
+  }, [sortBy, sortOrder]);
 
   useEffect(() => {
     localStorage.setItem('admin.taskManagement.tableColumnWidths', JSON.stringify(tableColumnWidths));

@@ -59,18 +59,42 @@
 
 ---
 
-## 5. Master data views (Crops, Products, Languages, etc.)
+## 5. Sortable columns (aligned with Activity Monitoring)
+
+All detail-record tables now follow the same sortable-column pattern as **Activity Monitoring**:
+
+- **Clickable column headers** with “Click to sort” title.
+- **ChevronUp / ChevronDown** to show current sort column and direction (asc/desc).
+- **Sort state persisted** in `localStorage` where applicable (per-page key).
+- **Stable sort** (original index as tiebreaker).
+
+| Page | Component | Sortable columns | Persisted sort key |
+|------|-----------|------------------|--------------------|
+| **Activity Monitoring** | `ActivitySamplingView.tsx` | Type, Sampling, Date, Territory, BU, Officer, Total Farmers, Farmers Sampled, Tasks, In Queue, In Progress, Completed | `admin.activitySampling.tableSort` ✓ |
+| **Request Callbacks** | `CallbackRequestView.tsx` | Farmer, Outcome, Outbound, Type, Agent, Date | `teamLead.callbackRequest.tableSort` ✓ *(added)* |
+| **Task Management (Admin)** | `TaskList.tsx` | Farmer, Status, Scheduled, Agent, Territory, Activity, Officer, Language | `admin.taskManagement.tableSort` ✓ *(persist added)* |
+| **Agent History** | `AgentHistoryView.tsx` | All data columns (Type, Territory, etc.) | `agent.history.tableSort` ✓ |
+| **User Management** | `UserList.tsx` | User, Role, Languages, Team Lead, Status | `admin.userManagement.tableSort` ✓ *(added)* |
+| **Task Queue (Team Lead)** | `TaskQueueTable.tsx` | Farmer, Status, Scheduled, Activity, Territory, Officer, Language, Assigned | `teamLead.queueTasks.tableSort` ✓ *(persist added)* |
+| **Agent Queue (Admin)** | `TaskQueueTable.tsx` | Same as above | `admin.agentQueue.tableSort` ✓ *(persist added)* |
+
+**Pattern (same as Activity Monitoring):** `tableSort` state `{ key, dir }`, `getSortValue(row, key)`, `sortedRows = useMemo(...)`, `handleHeaderClick(key)` toggles direction or sets new column, header `<th>` with `onClick`, `cursor-pointer`, `hover:bg-slate-100`, and ChevronUp/ChevronDown for the active column.
+
+---
+
+## 6. Master data views (Crops, Products, Languages, etc.)
 
 Master management views (`CropsMasterView`, `ProductsMasterView`, `LanguagesMasterView`, `SentimentsMasterView`, `NonPurchaseReasonsMasterView`, `StateLanguageMappingView`) use tables for relatively small datasets. They do not currently have a Rows selector or pagination. If they grow large in the future, the same pattern (separate pagination card + Rows + page-based or load-more) can be applied.
 
 ---
 
-## 6. Summary
+## 7. Summary
 
-- **Request Callback** design now matches **Activity Monitoring** (cards, table header style, **pagination in a separate card**).
+- **Request Callback** design now matches **Activity Monitoring** (cards, table header style, **pagination in a separate card**, **sortable columns**).
 - All main **detail-record pages** have:
   - **Page Rows** (configurable rows per page with a Rows dropdown where applicable).
   - **Lazy loading** (page-based or infinite scroll with “Load more”).
   - **Pagination in a separate card** with consistent styling.
-- **User Management** now has a Rows selector and the same pagination card pattern.
-- **TaskQueueTable** (Language Queue, Agent Queue details) now uses a separate pagination card and remains consistent with the rest of the app.
+  - **Sortable columns** (clickable headers, ChevronUp/ChevronDown, sort state persisted to localStorage where applicable).
+- **User Management** has a Rows selector, same pagination card pattern, and sortable User/Role/Languages/Team Lead/Status columns.
+- **TaskQueueTable** (Language Queue, Agent Queue details) uses a separate pagination card and optional `tableSortStorageKey` for persisting sort like Activity Monitoring.
