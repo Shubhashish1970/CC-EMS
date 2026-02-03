@@ -731,7 +731,7 @@ const ActivityEmsProgressView: React.FC = () => {
                     <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="Invalid" stackId="a" name="Invalid (reduces validity)" fill="#ef4444" radius={[0, 4, 4, 0]} isAnimationActive>
-                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#fff"} />
+                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#fff" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
