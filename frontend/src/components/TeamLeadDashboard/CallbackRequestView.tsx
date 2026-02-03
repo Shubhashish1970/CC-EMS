@@ -63,7 +63,6 @@ const formatDate = (dateStr: string) => {
 const CallbackRequestView: React.FC = () => {
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [tasks, setTasks] = useState<CallbackTask[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -104,8 +103,6 @@ const CallbackRequestView: React.FC = () => {
   const getRange = (preset: DateRangePreset) =>
     getPresetRange(preset, filters.dateFrom || undefined, filters.dateTo || undefined);
 
-  // Infinite scroll refs
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize date range
@@ -127,83 +124,46 @@ const CallbackRequestView: React.FC = () => {
     return () => document.removeEventListener('mousedown', onClick);
   }, [isDatePickerOpen]);
 
-  // Load tasks (initial or refresh)
-  const loadTasks = useCallback(async (reset = true) => {
-    if (reset) {
+  // Load one page of tasks (page-based, like Activity Monitoring)
+  const fetchPage = useCallback(
+    async (page: number) => {
       setIsLoading(true);
-      setTasks([]);
-      setSelectedTaskIds(new Set());
-    }
-    
-    try {
-      const res: any = await tasksAPI.getCallbackCandidates({
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined,
-        outcome: filters.outcome !== 'all' ? filters.outcome : undefined,
-        callType: filters.callType !== 'all' ? filters.callType : undefined,
-        agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
-        page: 1,
-        limit: pageSize,
-      });
-
-      if (res.success) {
-        setTasks(res.data.tasks || []);
-        setAgents(res.data.agents || []);
-        const pag = res.data.pagination || { page: 1, total: 0, pages: 0 };
-        setPagination({
-          page: pag.page,
-          total: pag.total,
-          pages: pag.pages,
-          hasMore: pag.page < pag.pages,
+      if (page === 1) setSelectedTaskIds(new Set());
+      try {
+        const res: any = await tasksAPI.getCallbackCandidates({
+          dateFrom: filters.dateFrom || undefined,
+          dateTo: filters.dateTo || undefined,
+          outcome: filters.outcome !== 'all' ? filters.outcome : undefined,
+          callType: filters.callType !== 'all' ? filters.callType : undefined,
+          agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
+          page,
+          limit: pageSize,
         });
+
+        if (res.success) {
+          setTasks(res.data.tasks || []);
+          setAgents(res.data.agents || []);
+          const pag = res.data.pagination || { page: 1, total: 0, pages: 0 };
+          setPagination({
+            page: pag.page,
+            total: pag.total,
+            pages: pag.pages,
+            hasMore: pag.page < pag.pages,
+          });
+        }
+      } catch (e: any) {
+        toast.showError(e?.message || 'Failed to load tasks');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e: any) {
-      toast.showError(e?.message || 'Failed to load tasks');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters, pageSize, toast]);
+    },
+    [filters, pageSize, toast]
+  );
 
-  // Load more tasks (infinite scroll)
-  const loadMoreTasks = useCallback(async () => {
-    if (isLoadingMore || !pagination.hasMore) return;
-    
-    setIsLoadingMore(true);
-    const nextPage = pagination.page + 1;
-    
-    try {
-      const res: any = await tasksAPI.getCallbackCandidates({
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined,
-        outcome: filters.outcome !== 'all' ? filters.outcome : undefined,
-        callType: filters.callType !== 'all' ? filters.callType : undefined,
-        agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
-        page: nextPage,
-        limit: pageSize,
-      });
-
-      if (res.success) {
-        const newTasks = res.data.tasks || [];
-        setTasks(prev => [...prev, ...newTasks]);
-        const pag = res.data.pagination || { page: nextPage, total: 0, pages: 0 };
-        setPagination({
-          page: pag.page,
-          total: pag.total,
-          pages: pag.pages,
-          hasMore: pag.page < pag.pages,
-        });
-      }
-    } catch (e: any) {
-      toast.showError(e?.message || 'Failed to load more tasks');
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [filters, pagination, pageSize, isLoadingMore, toast]);
-
-  // Initial load when filters or pageSize change
+  // Initial load and when filters or pageSize change (go to page 1)
   useEffect(() => {
     if (filters.dateFrom && filters.dateTo) {
-      loadTasks(true);
+      fetchPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, pageSize]);
@@ -257,24 +217,6 @@ const CallbackRequestView: React.FC = () => {
     });
   };
 
-  // Intersection Observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && pagination.hasMore && !isLoadingMore && !isLoading) {
-          loadMoreTasks();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [pagination.hasMore, isLoadingMore, isLoading, loadMoreTasks]);
-
   // Filter tasks that can be selected (not at max callbacks) — use sorted list for display order
   const selectableTasks = sortedTasks.filter(t => (t.callbackNumber || 0) < 2);
 
@@ -311,7 +253,7 @@ const CallbackRequestView: React.FC = () => {
       
       if (res.success) {
         toast.showSuccess(`Created ${res.data.summary.created} callback(s)${res.data.summary.skipped > 0 ? `, ${res.data.summary.skipped} skipped` : ''}`);
-        loadTasks(true); // Reload to reflect changes
+        fetchPage(pagination.page); // Reload current page to reflect changes
       }
     } catch (e: any) {
       toast.showError(e?.message || 'Failed to create callbacks');
@@ -336,7 +278,7 @@ const CallbackRequestView: React.FC = () => {
             <h2 className="text-xl font-black text-slate-900">Request Callbacks</h2>
             <p className="text-sm text-slate-600 mt-1">Select completed/unsuccessful calls to schedule callbacks</p>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => loadTasks(true)} disabled={isLoading}>
+          <Button variant="secondary" size="sm" onClick={() => fetchPage(1)} disabled={isLoading}>
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </Button>
@@ -490,9 +432,9 @@ const CallbackRequestView: React.FC = () => {
             </button>
             <span className="text-sm text-slate-500">
               {selectedTaskIds.size} of {selectableTasks.length} selected
-              {pagination.total > 0 && (
+              {pagination.total > 0 && pagination.pages > 1 && (
                 <span className="text-slate-400 ml-1">
-                  ({tasks.length} of {pagination.total} loaded)
+                  (Page {pagination.page} of {pagination.pages})
                 </span>
               )}
             </span>
@@ -508,10 +450,10 @@ const CallbackRequestView: React.FC = () => {
           </button>
         </div>
 
-        {/* Table - header style and sortable columns match Activity Monitoring */}
-        <div ref={tableContainerRef} className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+        {/* Table - no internal scroll; entire page scrolls (match Activity Monitoring) */}
+        <div ref={tableContainerRef} className="overflow-x-auto">
           <table className="w-full">
-            <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-3 py-3 text-left w-10 text-xs font-black text-slate-500 uppercase tracking-widest"></th>
                 {(
@@ -637,49 +579,45 @@ const CallbackRequestView: React.FC = () => {
               )}
             </tbody>
           </table>
-          
-          {/* Load more trigger */}
-          {!isLoading && tasks.length > 0 && (
-            <div ref={loadMoreRef} className="py-4 text-center">
-              {isLoadingMore ? (
-                <div className="flex items-center justify-center gap-2 text-slate-500">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span className="text-sm">Loading more...</span>
-                </div>
-              ) : pagination.hasMore ? (
-                <button
-                  type="button"
-                  onClick={loadMoreTasks}
-                  className="text-sm text-green-700 hover:text-green-800 font-medium"
-                >
-                  Load more ({tasks.length} of {pagination.total} shown)
-                </button>
-              ) : pagination.total > 0 && tasks.length >= pagination.total ? (
-                <p className="text-sm text-slate-400">All {pagination.total} tasks loaded</p>
-              ) : null}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Pagination - separate card to match Activity Monitoring */}
+      {/* Pagination - separate card, page-based like Activity Monitoring (Previous/Next) */}
       {!isLoading && pagination.total > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <p className="text-sm text-slate-600">
-              Showing {tasks.length} of {pagination.total} tasks
+              Page {pagination.page} of {pagination.pages} • {pagination.total} total tasks
               {selectableTasks.length >= 0 && (
-                <span className="text-slate-500 ml-1">• {selectableTasks.length} eligible for callback</span>
+                <span className="text-slate-500 ml-1">• {selectableTasks.length} eligible for callback on this page</span>
               )}
             </p>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-              <StyledSelect
-                value={String(pageSize)}
-                onChange={(v) => setPageSize(Number(v))}
-                options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
-                className="min-w-[80px]"
-              />
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                <StyledSelect
+                  value={String(pageSize)}
+                  onChange={(v) => setPageSize(Number(v))}
+                  options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+                  className="min-w-[80px]"
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fetchPage(pagination.page - 1)}
+                disabled={pagination.page === 1 || isLoading || pagination.pages <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fetchPage(pagination.page + 1)}
+                disabled={pagination.page >= pagination.pages || isLoading || pagination.pages <= 1}
+              >
+                Next
+              </Button>
             </div>
           </div>
         </div>
