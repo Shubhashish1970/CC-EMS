@@ -411,7 +411,7 @@ const ActivityEmsProgressView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header - aligned with Activity Monitoring layout and controls */}
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm min-w-0">
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm min-w-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center shrink-0">

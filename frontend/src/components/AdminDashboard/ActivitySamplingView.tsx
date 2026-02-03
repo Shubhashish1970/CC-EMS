@@ -671,7 +671,7 @@ const ActivitySamplingView: React.FC = () => {
       </InfoBanner>
 
       {/* Header with Filters */}
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm min-w-0">
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm min-w-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div className="min-w-0">
             <h2 className="text-xl font-black text-slate-900 mb-1">Activity Monitoring</h2>

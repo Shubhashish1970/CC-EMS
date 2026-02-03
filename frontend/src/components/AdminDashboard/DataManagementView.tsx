@@ -66,7 +66,7 @@ const DataManagementView: React.FC = () => {
             <Trash2 className="text-red-600" size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-slate-900">Clear database</h3>
+            <h3 className="text-lg font-black text-slate-900">Clear database</h3>
             <p className="text-xs text-slate-600">Remove transaction and/or master data. Use with caution.</p>
           </div>
         </div>
@@ -113,7 +113,7 @@ const DataManagementView: React.FC = () => {
             <Database className="text-lime-700" size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-slate-900">Generate data via Mock FFA API</h3>
+            <h3 className="text-lg font-black text-slate-900">Generate data via Mock FFA API</h3>
             <p className="text-xs text-slate-600">Set activity and farmer counts; optionally upload Sales Hierarchy Excel (Territory Name, Region, Zone Name, BU). Generate &amp; Sync does not clear any existing data—it creates more activities and farmers in the same territories with the same TM and FDA names already in the database, so data stays close to reality. Data uses Indian names.</p>
           </div>
         </div>

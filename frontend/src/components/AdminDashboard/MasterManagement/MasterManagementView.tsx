@@ -26,7 +26,7 @@ const MasterManagementView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Sub-navigation pills */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-2">
         <div className="flex flex-wrap gap-2">
           {subTabs.map((tab) => {
             const Icon = tab.icon;

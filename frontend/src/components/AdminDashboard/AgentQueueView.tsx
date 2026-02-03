@@ -488,7 +488,7 @@ const AgentQueueView: React.FC = () => {
           {queues.map((queue) => (
             <div
               key={queue.agentId}
-              className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => fetchAgentDetail(queue.agentId)}
             >
               <div className="flex items-start justify-between mb-4">
