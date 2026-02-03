@@ -691,10 +691,23 @@ const ActivityEmsProgressView: React.FC = () => {
               Only <strong className="text-red-600">Invalid</strong> (Invalid / Invalid Number) reduces validity; Connected, Disconnected, No Answer, and Incoming N/A count as valid numbers.
             </p>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-4">
             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">By call outcome (stacked)</p>
-              <ResponsiveContainer width="100%" height={56}>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Total Attempted</p>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-slate-700 whitespace-nowrap w-28">Total Attempted</span>
+                <div className="flex-1 h-5 min-w-0 rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-md bg-slate-500 border-r border-slate-400"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <span className="text-sm font-black text-slate-800 tabular-nums">{totals.totalAttempted}</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By call outcome (stacked)</p>
+              <ResponsiveContainer width="100%" height={36}>
                 <BarChart
                   data={[
                     {
@@ -707,63 +720,74 @@ const ActivityEmsProgressView: React.FC = () => {
                     },
                   ]}
                   layout="vertical"
-                  margin={{ top: 0, right: 48, left: 120, bottom: 0 }}
-                  barSize={32}
-                  barCategoryGap={8}
+                  margin={{ top: 0, right: 32, left: 100, bottom: 0 }}
+                  barSize={20}
+                  barCategoryGap={4}
                 >
                   <XAxis type="number" domain={[0, totals.totalAttempted]} hide />
-                  <YAxis type="category" dataKey="name" width={116} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 10 }} />
                   <Tooltip
                     formatter={(value: number, name: string) => [value, name]}
                     contentStyle={{ fontSize: 12 }}
                     labelFormatter={() => 'Total Attempted'}
                   />
                   <Bar dataKey="Connected" stackId="a" name="Connected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="Disconnected" stackId="a" name="Disconnected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="NoAnswer" stackId="a" name="No Answer" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="NoAnswer" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="NoAnswer" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="IncomingNA" stackId="a" name="Incoming N/A" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="Invalid" stackId="a" name="Invalid (reduces validity)" fill="#ef4444" radius={[0, 4, 4, 0]} isAnimationActive>
-                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#fff" />
+                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[400px] text-sm border-collapse">
+              <table className="w-full min-w-[380px] text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 font-semibold text-slate-700">Call status</th>
-                    <th className="text-right py-2 px-3 font-semibold text-slate-700">Count</th>
-                    <th className="text-right py-2 px-3 font-semibold text-slate-700">% of attempted</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-700">Reduces validity?</th>
+                    <th className="text-left py-1.5 px-2 font-semibold text-slate-700">Call status</th>
+                    <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-14">Count</th>
+                    <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-20">%</th>
+                    <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[120px]">Bar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Connected', count: totals.totalConnected },
-                    { label: 'Disconnected', count: totals.disconnectedCount },
-                    { label: 'No Answer', count: totals.noAnswerCount },
-                    { label: 'Incoming N/A', count: totals.incomingNACount },
-                    { label: 'Invalid', count: totals.invalidCount, reducesValidity: true },
+                    { label: 'Connected', count: totals.totalConnected, isInvalid: false },
+                    { label: 'Disconnected', count: totals.disconnectedCount, isInvalid: false },
+                    { label: 'No Answer', count: totals.noAnswerCount, isInvalid: false },
+                    { label: 'Incoming N/A', count: totals.incomingNACount, isInvalid: false },
+                    { label: 'Invalid', count: totals.invalidCount, isInvalid: true },
                   ].map((row) => {
-                    const pct = totals.totalAttempted > 0 ? Math.round((row.count / totals.totalAttempted) * 100) : 0;
+                    const pct = totals.totalAttempted > 0 ? (row.count / totals.totalAttempted) * 100 : 0;
+                    const pctRounded = Math.round(pct);
                     return (
                       <tr
                         key={row.label}
-                        className={`border-b border-slate-100 ${(row as { reducesValidity?: boolean }).reducesValidity ? 'bg-red-50 font-medium text-red-800' : 'text-slate-700'}`}
+                        className={`border-b border-slate-100 ${row.isInvalid ? 'bg-red-50 font-medium text-red-800' : 'text-slate-700'}`}
                       >
-                        <td className="py-2 px-3">{(row as { reducesValidity?: boolean }).reducesValidity ? 'Invalid' : row.label}</td>
-                        <td className="py-2 px-3 text-right">{row.count}</td>
-                        <td className="py-2 px-3 text-right">{pct}%</td>
-                        <td className="py-2 px-3">{(row as { reducesValidity?: boolean }).reducesValidity ? 'Yes' : 'No'}</td>
+                        <td className="py-1.5 px-2">{row.label}</td>
+                        <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
+                        <td className="py-1.5 px-2 text-right tabular-nums">{pctRounded}%</td>
+                        <td className="py-1.5 px-2">
+                          <div className="h-5 min-w-[80px] max-w-[180px] rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
+                            <div
+                              className="h-full rounded-md min-w-0"
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: row.isInvalid ? '#ef4444' : '#64748b',
+                              }}
+                            />
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
