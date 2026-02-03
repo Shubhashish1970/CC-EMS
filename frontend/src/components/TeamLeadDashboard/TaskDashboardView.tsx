@@ -887,9 +887,8 @@ const TaskDashboardView: React.FC = () => {
             </button>
           </div>
 
-          {/* Filters: Date, State, BU, Status (left); FDA (RHS) */}
-          <div className="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 min-w-0">
+          {/* Filters: Date, State, BU, Status, FDA - single row, FDA column wider to avoid text wrap */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
             <div className="md:col-span-2">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
               <div className="relative" ref={datePickerRef}>
@@ -994,14 +993,14 @@ const TaskDashboardView: React.FC = () => {
                 placeholder="All"
               />
             </div>
-            </div>
-            <div className="shrink-0 md:ml-4 w-full md:w-auto md:min-w-[140px]">
+            <div className="min-w-0 md:min-w-[200px]">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">FDA</label>
               <StyledSelect
                 value={agentDetailFilters.fda}
                 onChange={(value) => setAgentDetailFilters((p) => ({ ...p, fda: value }))}
                 options={[{ value: '', label: 'All' }, ...(agentDetail?.officerOptions || []).map((name: string) => ({ value: name, label: name }))]}
                 placeholder="All"
+                className="min-w-0"
               />
             </div>
           </div>

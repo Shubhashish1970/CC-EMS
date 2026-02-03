@@ -42,7 +42,8 @@ interface Agent {
   email: string;
 }
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const PAGE_SIZE_DEFAULT = 20;
 
 const formatDate = (dateStr: string) => {
   try {
@@ -66,6 +67,11 @@ const CallbackRequestView: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0, hasMore: false });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('teamLead.callbackRequest.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && PAGE_SIZE_OPTIONS.includes(n as any) ? n : PAGE_SIZE_DEFAULT;
+  });
 
   // Filters
   const [filters, setFilters] = useState({
@@ -125,7 +131,7 @@ const CallbackRequestView: React.FC = () => {
         callType: filters.callType !== 'all' ? filters.callType : undefined,
         agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
         page: 1,
-        limit: PAGE_SIZE,
+        limit: pageSize,
       });
 
       if (res.success) {
@@ -144,7 +150,7 @@ const CallbackRequestView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filters, toast]);
+  }, [filters, pageSize, toast]);
 
   // Load more tasks (infinite scroll)
   const loadMoreTasks = useCallback(async () => {
@@ -161,7 +167,7 @@ const CallbackRequestView: React.FC = () => {
         callType: filters.callType !== 'all' ? filters.callType : undefined,
         agentId: filters.agentId !== 'all' ? filters.agentId : undefined,
         page: nextPage,
-        limit: PAGE_SIZE,
+        limit: pageSize,
       });
 
       if (res.success) {
@@ -180,15 +186,19 @@ const CallbackRequestView: React.FC = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [filters, pagination, isLoadingMore, toast]);
+  }, [filters, pagination, pageSize, isLoadingMore, toast]);
 
-  // Initial load when filters change
+  // Initial load when filters or pageSize change
   useEffect(() => {
     if (filters.dateFrom && filters.dateTo) {
       loadTasks(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('teamLead.callbackRequest.pageSize', String(pageSize));
+  }, [pageSize]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -558,19 +568,33 @@ const CallbackRequestView: React.FC = () => {
                   onClick={loadMoreTasks}
                   className="text-sm text-green-700 hover:text-green-800 font-medium"
                 >
-                  Load more tasks
+                  Load more ({tasks.length} of {pagination.total} shown)
                 </button>
-              ) : tasks.length > PAGE_SIZE ? (
+              ) : pagination.total > 0 && tasks.length >= pagination.total ? (
                 <p className="text-sm text-slate-400">All {pagination.total} tasks loaded</p>
               ) : null}
             </div>
           )}
         </div>
 
-        {/* Footer with stats */}
-        {!isLoading && tasks.length > 0 && (
-          <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-xs text-slate-500">
-            Showing {tasks.length} of {pagination.total} tasks • {selectableTasks.length} eligible for callback
+        {/* Pagination bar - consistent with Task Queue / TaskList */}
+        {!isLoading && pagination.total > 0 && (
+          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              Showing {tasks.length} of {pagination.total} tasks
+              {selectableTasks.length >= 0 && (
+                <span className="text-slate-500 ml-1">• {selectableTasks.length} eligible for callback</span>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+              <StyledSelect
+                value={String(pageSize)}
+                onChange={(v) => setPageSize(Number(v))}
+                options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+                className="w-20"
+              />
+            </div>
           </div>
         )}
       </div>
