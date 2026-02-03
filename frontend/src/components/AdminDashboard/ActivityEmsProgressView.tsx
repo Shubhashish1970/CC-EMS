@@ -676,9 +676,12 @@ const ActivityEmsProgressView: React.FC = () => {
         />
       </div>
 
-      {/* Mobile No. Validity breakdown – 1st quadrant only, half page width (respects current filters) */}
-      {totals && totals.totalAttempted > 0 && (
-        <div className="w-full max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Quadrants 1 & 2: Mobile No. Validity and Hygiene breakdowns side by side (respects current filters) */}
+      {totals && (
+        <div className="flex flex-wrap gap-4 w-full">
+        {/* Mobile No. Validity – 1st quadrant */}
+        {totals.totalAttempted > 0 && (
+        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
             <h3 className="text-lg font-black text-slate-900">Mobile No. Validity – Breakdown</h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -802,6 +805,138 @@ const ActivityEmsProgressView: React.FC = () => {
               );
             })()}
           </div>
+        </div>
+        )}
+
+        {/* Hygiene – 2nd quadrant */}
+        {totals.totalConnected > 0 && (
+        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-lg font-black text-slate-900">Hygiene – Breakdown</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Formula: Hygiene = (Connected − Identity Wrong − Not a Farmer) ÷ Connected × 100 ={' '}
+              <span className="font-semibold text-slate-700">
+                ({totals.totalConnected} − {totals.identityWrongCount} − {totals.notAFarmerCount}) ÷ {totals.totalConnected} × 100 = {totals.hygienePct}%
+              </span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Only <strong className="text-red-600">Identity Wrong</strong> and <strong className="text-red-600">Not a Farmer</strong> reduce hygiene; Yes attended, No missed, and Don&apos;t recall count as valid identity.
+            </p>
+          </div>
+          <div className="p-6">
+            {(() => {
+              const statusRows = [
+                { label: 'Yes, I attended', count: totals.yesAttendedCount, key: 'YesAttended' },
+                { label: 'No, I missed', count: totals.noMissedCount, key: 'NoMissed' },
+                { label: "Don't recall", count: totals.dontRecallCount, key: 'DontRecall' },
+                { label: 'Identity Wrong', count: totals.identityWrongCount, key: 'IdentityWrong', reducesHygiene: true },
+                { label: 'Not a Farmer', count: totals.notAFarmerCount, key: 'NotAFarmer', reducesHygiene: true },
+              ];
+              const statusColors: Record<string, string> = {
+                YesAttended: '#cbd5e1',
+                NoMissed: '#94a3b8',
+                DontRecall: '#64748b',
+                IdentityWrong: '#ef4444',
+                NotAFarmer: '#ef4444',
+              };
+              return (
+                <>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By status (did attend)</p>
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[7rem]">Status</th>
+                          <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-14">Count</th>
+                          <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-20">%</th>
+                          <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[120px]">Bar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-slate-100 align-middle">
+                          <td className="py-1.5 px-2 text-slate-700 font-medium">Total Connected</td>
+                          <td colSpan={3} className="py-1.5 px-2 align-middle">
+                            <div className="w-full" style={{ height: 36 }}>
+                              <ResponsiveContainer width="100%" height={36}>
+                                <BarChart
+                                  data={[
+                                    {
+                                      name: 'Total Connected',
+                                      YesAttended: totals.yesAttendedCount,
+                                      NoMissed: totals.noMissedCount,
+                                      DontRecall: totals.dontRecallCount,
+                                      IdentityWrong: totals.identityWrongCount,
+                                      NotAFarmer: totals.notAFarmerCount,
+                                    },
+                                  ]}
+                                  layout="vertical"
+                                  margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+                                  barSize={20}
+                                  barCategoryGap={4}
+                                >
+                                  <XAxis type="number" domain={[0, totals.totalConnected]} hide />
+                                  <YAxis type="category" dataKey="name" width={0} tick={false} />
+                                  <Tooltip
+                                    formatter={(value: number, name: string) => [value, name]}
+                                    contentStyle={{ fontSize: 12 }}
+                                    labelFormatter={() => 'Total Connected'}
+                                  />
+                                  <Bar dataKey="YesAttended" stackId="b" name="Yes, I attended" fill={statusColors.YesAttended} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="YesAttended" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
+                                  </Bar>
+                                  <Bar dataKey="NoMissed" stackId="b" name="No, I missed" fill={statusColors.NoMissed} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="NoMissed" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
+                                  </Bar>
+                                  <Bar dataKey="DontRecall" stackId="b" name="Don't recall" fill={statusColors.DontRecall} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="DontRecall" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
+                                  </Bar>
+                                  <Bar dataKey="IdentityWrong" stackId="b" name="Identity Wrong" fill={statusColors.IdentityWrong} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="IdentityWrong" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
+                                  </Bar>
+                                  <Bar dataKey="NotAFarmer" stackId="b" name="Not a Farmer" fill={statusColors.NotAFarmer} radius={[0, 4, 4, 0]} isAnimationActive>
+                                    <LabelList dataKey="NotAFarmer" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </td>
+                        </tr>
+                        {statusRows.map((row) => {
+                          const pct = totals.totalConnected > 0 ? (row.count / totals.totalConnected) * 100 : 0;
+                          const pctRounded = Math.round(pct);
+                          const barColor = statusColors[row.key];
+                          const reducesHygiene = (row as { reducesHygiene?: boolean }).reducesHygiene;
+                          return (
+                            <tr
+                              key={row.label}
+                              className={`border-b border-slate-100 ${reducesHygiene ? 'bg-red-50 font-medium text-red-800' : 'text-slate-700'}`}
+                            >
+                              <td className="py-1.5 px-2">{row.label}</td>
+                              <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
+                              <td className="py-1.5 px-2 text-right tabular-nums">{pctRounded}%</td>
+                              <td className="py-1.5 px-2">
+                                <div className="h-5 min-w-[80px] max-w-[180px] rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-md min-w-0"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: barColor,
+                                    }}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+        )}
         </div>
       )}
 
