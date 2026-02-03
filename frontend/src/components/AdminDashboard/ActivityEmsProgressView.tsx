@@ -27,8 +27,6 @@ import {
   Scatter,
   ZAxis,
   ReferenceLine,
-  FunnelChart,
-  Funnel,
   LabelList,
 } from 'recharts';
 import {
@@ -601,7 +599,7 @@ const ActivityEmsProgressView: React.FC = () => {
           ) : totals ? (
             <>
               {[
-              { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: 'Out of all calls we tried, what % were to valid mobile numbers? (Hygiene – not in EMS Score.)', icon: Smartphone },
+              { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: 'Out of all calls we tried, what % were to valid mobile numbers?', icon: Smartphone },
               { label: 'Hygiene (%)', value: totals.hygienePct, formula: '(Connected − Identity Wrong − Not Farmer) / Connected', icon: UserCheck },
               { label: 'Meeting Validity (%)', value: totals.meetingValidityPct, formula: 'Out of all farmers we successfully spoke to, how many actually attended the meeting or demo?', icon: Users },
               { label: 'Meeting Conversion (%)', value: totals.meetingConversionPct, formula: 'Out of all farmers we successfully spoke to, how many actually bought the product?', icon: ShoppingCart },
@@ -678,77 +676,103 @@ const ActivityEmsProgressView: React.FC = () => {
         />
       </div>
 
-      {/* Call Outcome Funnel (Totals) - Recharts FunnelChart + horizontal bars for other outcomes */}
-      {totals && (() => {
-        const funnelData = [
-          { name: 'Total Calls Attempted', value: totals.totalAttempted, fill: '#475569' },
-          { name: 'Connected', value: totals.totalConnected, fill: '#64748b' },
-          { name: 'Valid Identity', value: totals.validIdentity, fill: '#94a3b8' },
-          { name: 'Attended Meeting', value: totals.yesAttendedCount, fill: '#93c5fd' },
-          { name: 'Purchased', value: totals.purchasedCount, fill: '#86efac' },
-        ].filter((d) => d.value != null && d.value >= 0);
-        const hasFunnelValues = funnelData.length > 0 && funnelData.some((d) => (d.value ?? 0) > 0);
-        const otherOutcomesData = [
-          { name: 'Disconnected', value: totals.disconnectedCount, fill: '#64748b' },
-          { name: 'Incoming Not Allowed', value: totals.incomingNACount, fill: '#94a3b8' },
-          { name: 'No Answer', value: totals.noAnswerCount, fill: '#cbd5e1' },
-          { name: 'Invalid', value: totals.invalidCount, fill: '#f87171' },
-        ].filter((d) => (d.value ?? 0) > 0);
-        const maxOther = Math.max(1, ...otherOutcomesData.map((d) => d.value));
-        return (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-              <h3 className="text-lg font-black text-slate-900">Call Outcome Funnel (Totals)</h3>
-              <p className="text-xs text-slate-500 mt-1">Funnel: Recharts FunnelChart · Other outcomes: horizontal bars (BarChart)</p>
+      {/* Mobile No. Validity breakdown – drill-down after KPI cards (respects current filters) */}
+      {totals && totals.totalAttempted > 0 && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-lg font-black text-slate-900">Mobile No. Validity – Breakdown</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Formula: Mobile No. Validity = (Total Attempted − Invalid) ÷ Total Attempted × 100 ={' '}
+              <span className="font-semibold text-slate-700">
+                ({totals.totalAttempted} − {totals.invalidCount}) ÷ {totals.totalAttempted} × 100 = {totals.mobileValidityPct}%
+              </span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Only <strong className="text-red-600">Invalid</strong> (Invalid / Invalid Number) reduces validity; Connected, Disconnected, No Answer, and Incoming N/A count as valid numbers.
+            </p>
+          </div>
+          <div className="p-6 space-y-6">
+            <div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">By call outcome (stacked)</p>
+              <ResponsiveContainer width="100%" height={56}>
+                <BarChart
+                  data={[
+                    {
+                      name: 'Total Attempted',
+                      Connected: totals.totalConnected,
+                      Disconnected: totals.disconnectedCount,
+                      NoAnswer: totals.noAnswerCount,
+                      IncomingNA: totals.incomingNACount,
+                      Invalid: totals.invalidCount,
+                    },
+                  ]}
+                  layout="vertical"
+                  margin={{ top: 0, right: 48, left: 120, bottom: 0 }}
+                  barSize={32}
+                  barCategoryGap={8}
+                >
+                  <XAxis type="number" domain={[0, totals.totalAttempted]} hide />
+                  <YAxis type="category" dataKey="name" width={116} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [value, name]}
+                    contentStyle={{ fontSize: 12 }}
+                    labelFormatter={() => 'Total Attempted'}
+                  />
+                  <Bar dataKey="Connected" stackId="a" name="Connected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
+                    <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                  </Bar>
+                  <Bar dataKey="Disconnected" stackId="a" name="Disconnected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
+                    <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                  </Bar>
+                  <Bar dataKey="NoAnswer" stackId="a" name="No Answer" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
+                    <LabelList dataKey="NoAnswer" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                  </Bar>
+                  <Bar dataKey="IncomingNA" stackId="a" name="Incoming N/A" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
+                    <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                  </Bar>
+                  <Bar dataKey="Invalid" stackId="a" name="Invalid (reduces validity)" fill="#ef4444" radius={[0, 4, 4, 0]} isAnimationActive>
+                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#fff"} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <div className="p-6 flex flex-wrap gap-8">
-              <div className="flex-1 min-w-[280px] w-full" style={{ height: 320 }}>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Funnel</p>
-                {!hasFunnelValues ? (
-                  <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center" style={{ height: 280 }}>
-                    <p className="text-sm text-slate-600 px-4">No call data yet. The funnel will appear when you have call attempts in the selected period.</p>
-                  </div>
-                ) : (
-                  <div style={{ width: '100%', height: 300 }}>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <FunnelChart data={funnelData} margin={{ top: 12, right: 24, left: 24, bottom: 12 }}>
-                        <Tooltip formatter={(value: number, name: string, props: { payload?: { name: string } }) => [value, props?.payload?.name ?? name]} />
-                        <Funnel data={funnelData} dataKey="value" nameKey="name" isAnimationActive>
-                          <LabelList dataKey="name" position="center" fill="#0f172a" fontSize={12} fontWeight={600} />
-                          <LabelList dataKey="value" position="center" fill="#0f172a" fontSize={11} offset={12} />
-                          {funnelData.map((entry, index) => (
-                            <Cell key={`funnel-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
-                          ))}
-                        </Funnel>
-                      </FunnelChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-[260px]">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Other outcomes (horizontal bars)</p>
-                {otherOutcomesData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={Math.max(120, otherOutcomesData.length * 44)}>
-                    <BarChart data={otherOutcomesData} layout="vertical" margin={{ top: 8, right: 32, left: 100, bottom: 8 }} barSize={24} barCategoryGap={12}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                      <XAxis type="number" domain={[0, maxOther]} allowDataOverflow tick={{ fontSize: 11 }} />
-                      <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value: number) => [value, '']} />
-                      <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]} isAnimationActive>
-                        {otherOutcomesData.map((entry, index) => (
-                          <Cell key={`other-${index}`} fill={entry.fill} stroke="#e2e8f0" strokeWidth={1} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-sm text-slate-500 py-4">No other outcomes (all zero).</p>
-                )}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[400px] text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 font-semibold text-slate-700">Call status</th>
+                    <th className="text-right py-2 px-3 font-semibold text-slate-700">Count</th>
+                    <th className="text-right py-2 px-3 font-semibold text-slate-700">% of attempted</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-700">Reduces validity?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: 'Connected', count: totals.totalConnected },
+                    { label: 'Disconnected', count: totals.disconnectedCount },
+                    { label: 'No Answer', count: totals.noAnswerCount },
+                    { label: 'Incoming N/A', count: totals.incomingNACount },
+                    { label: 'Invalid', count: totals.invalidCount, reducesValidity: true },
+                  ].map((row) => {
+                    const pct = totals.totalAttempted > 0 ? Math.round((row.count / totals.totalAttempted) * 100) : 0;
+                    return (
+                      <tr
+                        key={row.label}
+                        className={`border-b border-slate-100 ${(row as { reducesValidity?: boolean }).reducesValidity ? 'bg-red-50 font-medium text-red-800' : 'text-slate-700'}`}
+                      >
+                        <td className="py-2 px-3">{(row as { reducesValidity?: boolean }).reducesValidity ? 'Invalid' : row.label}</td>
+                        <td className="py-2 px-3 text-right">{row.count}</td>
+                        <td className="py-2 px-3 text-right">{pct}%</td>
+                        <td className="py-2 px-3">{(row as { reducesValidity?: boolean }).reducesValidity ? 'Yes' : 'No'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* Meeting Attendance Quality (100% stacked bar by group) */}
       {emsDetailRows.length > 0 && (
