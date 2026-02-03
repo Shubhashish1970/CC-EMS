@@ -676,9 +676,9 @@ const ActivityEmsProgressView: React.FC = () => {
         />
       </div>
 
-      {/* Mobile No. Validity breakdown – drill-down after KPI cards (respects current filters) */}
+      {/* Mobile No. Validity breakdown – 1st quadrant only, half page width (respects current filters) */}
       {totals && totals.totalAttempted > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
             <h3 className="text-lg font-black text-slate-900">Mobile No. Validity – Breakdown</h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -693,20 +693,7 @@ const ActivityEmsProgressView: React.FC = () => {
           </div>
           <div className="p-6 space-y-4">
             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Total Attempted</p>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-slate-700 whitespace-nowrap w-28">Total Attempted</span>
-                <div className="flex-1 h-5 min-w-0 rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-md bg-slate-500 border-r border-slate-400"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <span className="text-sm font-black text-slate-800 tabular-nums">{totals.totalAttempted}</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By call outcome (stacked)</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By call outcome</p>
               <ResponsiveContainer width="100%" height={36}>
                 <BarChart
                   data={[
@@ -749,8 +736,8 @@ const ActivityEmsProgressView: React.FC = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[380px] text-sm border-collapse">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left py-1.5 px-2 font-semibold text-slate-700">Call status</th>
