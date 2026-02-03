@@ -719,19 +719,19 @@ const ActivityEmsProgressView: React.FC = () => {
                     labelFormatter={() => 'Total Attempted'}
                   />
                   <Bar dataKey="Connected" stackId="a" name="Connected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="Disconnected" stackId="a" name="Disconnected" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="NoAnswer" stackId="a" name="No Answer" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="NoAnswer" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="NoAnswer" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="IncomingNA" stackId="a" name="Incoming N/A" fill="#94a3b8" radius={[0, 0, 0, 0]} isAnimationActive>
-                    <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#0f172a" />
+                    <LabelList dataKey="IncomingNA" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#0f172a" />
                   </Bar>
                   <Bar dataKey="Invalid" stackId="a" name="Invalid (reduces validity)" fill="#ef4444" radius={[0, 4, 4, 0]} isAnimationActive>
-                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v > 0 ? v : '')} fontSize={11} fill="#fff" />
+                    <LabelList dataKey="Invalid" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={11} fill="#fff" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
