@@ -2210,8 +2210,12 @@ router.get(
                     date: '$activity.date',
                     officerName: { $ifNull: ['$activity.officerName', 'Unknown'] },
                     territory: { $ifNull: ['$activity.territoryName', '$activity.territory'] },
+                    crops: { $ifNull: ['$activity.crops', []] },
+                    products: { $ifNull: ['$activity.products', []] },
                   },
                   status: 1,
+                  outcome: 1,
+                  sentiment: '$callLog.sentiment',
                   scheduledDate: 1,
                   createdAt: 1,
                   assignedAgentName: { $ifNull: ['$agent.name', null] },
@@ -2238,7 +2242,11 @@ router.get(
           ...t.activity,
           territory: t.activity?.territory ?? 'Unknown',
           date: t.activity?.date ?? t.createdAt,
+          crops: Array.isArray(t.activity?.crops) ? t.activity.crops : [],
+          products: Array.isArray(t.activity?.products) ? t.activity.products : [],
         },
+        outcome: t.outcome ?? null,
+        sentiment: t.sentiment ?? null,
       }));
 
       res.json({
@@ -2263,7 +2271,7 @@ router.get(
 // @desc    Team Lead: get agent queue detail for an agent in their team (opens Agent Queue detail view)
 // @query   language - optional: filter tasks by farmer preferredLanguage
 // @query   page, limit - optional: lazy load tasks (default limit 30, max 100)
-// @query   dateFrom, dateTo, bu, state - optional: filter by scheduled date and activity
+// @query   dateFrom, dateTo, bu, state, status, fda - optional: filter by scheduled date, activity, task status, FDA (officer)
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/dashboard/agent/:agentId',
@@ -2277,6 +2285,8 @@ router.get(
     query('dateTo').optional().isISO8601().toDate(),
     query('bu').optional().isString(),
     query('state').optional().isString(),
+    query('status').optional().isIn(['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
+    query('fda').optional().isString().trim(),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -2298,6 +2308,8 @@ router.get(
       const dateTo = req.query.dateTo != null ? String(req.query.dateTo).trim() : undefined;
       const bu = (req.query.bu as string)?.trim() || undefined;
       const state = (req.query.state as string)?.trim() || undefined;
+      const status = (req.query.status as string)?.trim() || undefined;
+      const fda = (req.query.fda as string)?.trim() || undefined;
 
       const agent = await User.findById(agentId).select('_id role teamLeadId').lean();
       if (!agent) {
@@ -2331,6 +2343,8 @@ router.get(
         dateTo,
         bu,
         state,
+        status,
+        fda,
       });
       res.json({
         success: true,

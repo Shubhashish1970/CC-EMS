@@ -782,7 +782,7 @@ const SamplingControlView: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold"
             disabled={isLoading}
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>

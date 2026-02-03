@@ -412,7 +412,7 @@ export const tasksAPI = {
     language?: string,
     page?: number,
     limit?: number,
-    filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string }
+    filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string; status?: string; fda?: string }
   ) => {
     const params = new URLSearchParams();
     if (language) params.set('language', language);
@@ -422,6 +422,8 @@ export const tasksAPI = {
     if (filters?.dateTo) params.set('dateTo', filters.dateTo);
     if (filters?.bu) params.set('bu', filters.bu);
     if (filters?.state) params.set('state', filters.state);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.fda) params.set('fda', filters.fda);
     const query = params.toString();
     return apiRequest(`/tasks/dashboard/agent/${encodeURIComponent(agentId)}${query ? `?${query}` : ''}`);
   },

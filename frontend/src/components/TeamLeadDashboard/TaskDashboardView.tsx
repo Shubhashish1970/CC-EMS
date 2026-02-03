@@ -53,6 +53,7 @@ interface AgentQueueDetailForTL {
   tasksTotal?: number;
   page?: number;
   limit?: number;
+  officerOptions?: string[];
 }
 
 interface LanguageQueueDetailForTL {
@@ -96,6 +97,7 @@ const TaskDashboardView: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [agentDetail, setAgentDetail] = useState<AgentQueueDetailForTL | null>(null);
+  const [agentDetailFilters, setAgentDetailFilters] = useState<{ status: string; fda: string }>({ status: '', fda: '' });
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   const [selectedLanguageQueue, setSelectedLanguageQueue] = useState<string | null>(null);
@@ -264,6 +266,8 @@ const TaskDashboardView: React.FC = () => {
             dateTo: filters.dateTo || undefined,
             bu: filters.bu || undefined,
             state: filters.state || undefined,
+            status: agentDetailFilters.status || undefined,
+            fda: agentDetailFilters.fda || undefined,
           }
         );
         if (!cancelled && res?.data) setAgentDetail(res.data);
@@ -282,7 +286,7 @@ const TaskDashboardView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedAgentId, selectedLanguage, filters.dateFrom, filters.dateTo, filters.bu, filters.state, taskPageSize, toast]);
+  }, [selectedAgentId, selectedLanguage, filters.dateFrom, filters.dateTo, filters.bu, filters.state, agentDetailFilters.status, agentDetailFilters.fda, taskPageSize, toast]);
 
   // Fetch language queue when Team Lead clicks a language in "Tasks by Language (Open)"
   useEffect(() => {
@@ -344,6 +348,8 @@ const TaskDashboardView: React.FC = () => {
           dateTo: filters.dateTo || undefined,
           bu: filters.bu || undefined,
           state: filters.state || undefined,
+          status: agentDetailFilters.status || undefined,
+          fda: agentDetailFilters.fda || undefined,
         }
       );
       if (res?.data?.tasks?.length)
@@ -361,7 +367,7 @@ const TaskDashboardView: React.FC = () => {
     } finally {
       setIsLoadingMoreAgent(false);
     }
-  }, [selectedAgentId, agentDetail, selectedLanguage, taskPageSize, filters, isLoadingMoreAgent, toast]);
+  }, [selectedAgentId, agentDetail, selectedLanguage, taskPageSize, filters, agentDetailFilters, isLoadingMoreAgent, toast]);
 
   const loadMoreLanguageTasks = React.useCallback(async () => {
     if (!languageQueueDetail || isLoadingMoreLanguage) return;
@@ -865,6 +871,8 @@ const TaskDashboardView: React.FC = () => {
                       dateTo: filters.dateTo || undefined,
                       bu: filters.bu || undefined,
                       state: filters.state || undefined,
+                      status: agentDetailFilters.status || undefined,
+                      fda: agentDetailFilters.fda || undefined,
                     }
                   )
                   .then((res: any) => res?.data && setAgentDetail(res.data))
@@ -879,8 +887,8 @@ const TaskDashboardView: React.FC = () => {
             </button>
           </div>
 
-          {/* Filters - same UI as main Task Dashboard */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          {/* Filters: Date, State, BU, Status, FDA */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
             <div className="md:col-span-2">
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
               <div className="relative" ref={datePickerRef}>
@@ -959,6 +967,15 @@ const TaskDashboardView: React.FC = () => {
               </div>
             </div>
             <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
+              <StyledSelect
+                value={filters.state}
+                onChange={(value) => setFilters((p) => ({ ...p, state: value }))}
+                options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.stateOptions || []).map((s: string) => ({ value: s, label: s }))]}
+                placeholder="All"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">BU</label>
               <StyledSelect
                 value={filters.bu}
@@ -968,11 +985,20 @@ const TaskDashboardView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">State</label>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
               <StyledSelect
-                value={filters.state}
-                onChange={(value) => setFilters((p) => ({ ...p, state: value }))}
-                options={[{ value: '', label: 'All' }, ...(data?.filterOptions?.stateOptions || []).map((s: string) => ({ value: s, label: s }))]}
+                value={agentDetailFilters.status}
+                onChange={(value) => setAgentDetailFilters((p) => ({ ...p, status: value }))}
+                options={[{ value: '', label: 'All' }, ...Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label }))]}
+                placeholder="All"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">FDA</label>
+              <StyledSelect
+                value={agentDetailFilters.fda}
+                onChange={(value) => setAgentDetailFilters((p) => ({ ...p, fda: value }))}
+                options={[{ value: '', label: 'All' }, ...(agentDetail?.officerOptions || []).map((name: string) => ({ value: name, label: name }))]}
                 placeholder="All"
               />
             </div>
@@ -1130,7 +1156,7 @@ const TaskDashboardView: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold"
             disabled={isLoading}
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>

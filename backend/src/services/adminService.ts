@@ -1146,7 +1146,7 @@ const TASK_PAGE_SIZE_MAX = 100;
  * @param options.language - optional: filter tasks by farmer preferredLanguage
  * @param options.page - optional: 1-based page for lazy load (requires limit)
  * @param options.limit - optional: page size (default 30, max 100)
- * @param options.dateFrom, dateTo, bu, state - optional: filter by scheduled date and activity
+ * @param options.dateFrom, dateTo, bu, state, status, fda - optional: filter by scheduled date, activity, task status, FDA (officer)
  */
 export const getAgentQueue = async (
   agentId: string,
@@ -1158,8 +1158,10 @@ export const getAgentQueue = async (
     dateTo?: string;
     bu?: string;
     state?: string;
+    status?: string;
+    fda?: string;
   }
-): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number }> => {
+): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number; officerOptions?: string[] }> => {
   try {
     // Validate agentId
     if (!mongoose.Types.ObjectId.isValid(agentId)) {
@@ -1205,12 +1207,14 @@ export const getAgentQueue = async (
     const activityFilter: Record<string, string> = {};
     if (options?.bu) activityFilter['activity.buName'] = String(options.bu).trim();
     if (options?.state) activityFilter['activity.state'] = String(options.state).trim();
+    if (options?.fda) activityFilter['activity.officerName'] = String(options.fda).trim();
+    const statusMatch = options?.status?.trim() ? { status: options.status.trim() as TaskStatus } : {};
 
     if (usePagination) {
       // Paginated path: aggregation for breakdown + total and one page of tasks (no full load)
       const skip = (page - 1) * limit;
       const basePipeline: mongoose.PipelineStage[] = [
-        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId), ...dateMatch } },
+        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId), ...dateMatch, ...statusMatch } },
         {
           $lookup: {
             from: activityCollection,
@@ -1281,8 +1285,12 @@ export const getAgentQueue = async (
                     territory: { $ifNull: ['$activity.territoryName', '$activity.territory'] },
                     zone: { $ifNull: ['$activity.zoneName', ''] },
                     bu: { $ifNull: ['$activity.buName', ''] },
+                    crops: { $ifNull: ['$activity.crops', []] },
+                    products: { $ifNull: ['$activity.products', []] },
                   },
                   status: 1,
+                  outcome: 1,
+                  sentiment: '$callLog.sentiment',
                   scheduledDate: 1,
                   createdAt: 1,
                 },
@@ -1310,11 +1318,32 @@ export const getAgentQueue = async (
           ...t.activity,
           territory: t.activity?.territory ?? 'Unknown',
           date: t.activity?.date ?? t.createdAt,
+          crops: Array.isArray(t.activity?.crops) ? t.activity.crops : [],
+          products: Array.isArray(t.activity?.products) ? t.activity.products : [],
         },
         status: t.status,
+        outcome: t.outcome ?? null,
+        sentiment: t.sentiment ?? null,
         scheduledDate: t.scheduledDate,
         createdAt: t.createdAt,
       }));
+
+      // Distinct FDA (officer) names for this agent's tasks (same date/bu/state, no status filter)
+      const activityFilterForOfficers: Record<string, string> = {};
+      if (options?.bu) activityFilterForOfficers['activity.buName'] = String(options.bu).trim();
+      if (options?.state) activityFilterForOfficers['activity.state'] = String(options.state).trim();
+      const officerOptAgg = await CallTask.aggregate([
+        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId), ...dateMatch } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activity' } },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        ...(Object.keys(activityFilterForOfficers).length ? [{ $match: activityFilterForOfficers }] : []),
+        { $group: { _id: '$activity.officerName' } },
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $sort: { _id: 1 } },
+        { $group: { _id: null, names: { $push: '$_id' } } },
+        { $project: { _id: 0, names: 1 } },
+      ]);
+      const officerOptions: string[] = officerOptAgg?.[0]?.names ?? [];
 
       return {
         agent: {
@@ -1329,15 +1358,17 @@ export const getAgentQueue = async (
         tasksTotal,
         page,
         limit,
+        officerOptions,
       };
     }
 
     // Non-paginated path: load all tasks (backward compatible)
     const findMatch: Record<string, unknown> = { assignedAgentId: new mongoose.Types.ObjectId(agentId) };
     if (Object.keys(dateMatch).length) Object.assign(findMatch, dateMatch);
+    if (options?.status?.trim()) (findMatch as any).status = options.status.trim();
     let tasks = await CallTask.find(findMatch)
       .populate('farmerId', 'name mobileNumber preferredLanguage location')
-      .populate('activityId', 'type date officerName territory territoryName zoneName buName state')
+      .populate('activityId', 'type date officerName territory territoryName zoneName buName state crops products')
       .sort({ scheduledDate: 1 });
 
     if (language) {
@@ -1346,11 +1377,12 @@ export const getAgentQueue = async (
         return farmer?.preferredLanguage === language;
       });
     }
-    if (options?.bu || options?.state) {
+    if (options?.bu || options?.state || options?.fda) {
       tasks = tasks.filter((task) => {
         const activity = task.activityId as any;
         if (options.bu && (activity?.buName ?? '') !== options.bu.trim()) return false;
         if (options.state && (activity?.state ?? '') !== options.state.trim()) return false;
+        if (options.fda && (activity?.officerName ?? '') !== options.fda.trim()) return false;
         return true;
       });
     }
@@ -1374,6 +1406,7 @@ export const getAgentQueue = async (
     const taskDetails = tasks.map((task) => {
       const farmer = task.farmerId as any;
       const activity = task.activityId as any;
+      const callTask = task as any;
 
       return {
         taskId: task._id.toString(),
@@ -1390,12 +1423,18 @@ export const getAgentQueue = async (
           territory: activity?.territoryName || activity?.territory || 'Unknown',
           zone: activity?.zoneName || '',
           bu: activity?.buName || '',
+          crops: Array.isArray(activity?.crops) ? activity.crops : [],
+          products: Array.isArray(activity?.products) ? activity.products : [],
         },
         status: task.status,
+        outcome: callTask.outcome ?? null,
+        sentiment: callTask.callLog?.sentiment ?? null,
         scheduledDate: task.scheduledDate,
         createdAt: task.createdAt,
       };
     });
+
+    const officerOptions = [...new Set(tasks.map((t) => (t.activityId as any)?.officerName).filter(Boolean))].sort();
 
     return {
       agent: {
@@ -1407,6 +1446,7 @@ export const getAgentQueue = async (
       },
       statusBreakdown,
       tasks: taskDetails,
+      officerOptions,
     };
   } catch (error) {
     logger.error(`Error fetching agent queue for ${agentId}:`, error);

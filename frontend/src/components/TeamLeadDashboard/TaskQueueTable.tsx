@@ -1,15 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { Calendar, ChevronDown, ChevronUp, Loader2, MapPin, Phone, User as UserIcon, Users as UsersIcon } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp, Loader2, MapPin, Phone, Package, MessageSquare, Users as UsersIcon } from 'lucide-react';
 import StyledSelect from '../shared/StyledSelect';
 
 export type TaskQueueTableTask = {
   taskId: string;
   farmer: { name?: string; mobileNumber?: string; preferredLanguage?: string; location?: string };
-  activity: { type?: string; date?: string; officerName?: string; territory?: string };
+  activity: {
+    type?: string;
+    date?: string;
+    officerName?: string;
+    territory?: string;
+    crops?: string[];
+    products?: string[];
+  };
   status: string;
   scheduledDate: string;
   createdAt?: string;
   assignedAgentName?: string | null;
+  /** Set when task is completed (outcome label e.g. Completed Conversation, Unsuccessful) */
+  outcome?: string | null;
+  /** Set when task is completed (from call log) */
+  sentiment?: string | null;
 };
 
 type TaskTableColumnKey =
@@ -262,30 +273,58 @@ const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
                               </div>
                               <div>
                                 <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
-                                  <UserIcon size={14} className="text-slate-500" />
-                                  Activity details
+                                  <Package size={14} className="text-slate-500" />
+                                  Activity details – Crop & Product
                                 </h4>
-                                <div className="flex flex-wrap gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                  <div>
-                                    <p className="text-[10px] text-slate-500 font-medium mb-0.5">Activity</p>
-                                    <p className="text-xs font-bold text-slate-900">{task.activity?.type ?? '—'}</p>
+                                <div className="flex flex-wrap gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-slate-500 font-medium mb-1">Crops</p>
+                                    {(task.activity as any)?.crops?.length ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {((task.activity as any).crops as string[]).map((c, i) => (
+                                          <span key={i} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-800 rounded text-[10px] font-medium border border-emerald-200">
+                                            {c}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-slate-500">—</p>
+                                    )}
                                   </div>
-                                  <div>
-                                    <p className="text-[10px] text-slate-500 font-medium mb-0.5">Officer</p>
-                                    <p className="text-xs font-bold text-slate-900">{task.activity?.officerName ?? '—'}</p>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-slate-500 font-medium mb-1">Products</p>
+                                    {(task.activity as any)?.products?.length ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {((task.activity as any).products as string[]).map((p, i) => (
+                                          <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-800 rounded text-[10px] font-medium border border-blue-200">
+                                            {p}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-slate-500">—</p>
+                                    )}
                                   </div>
-                                  <div>
-                                    <p className="text-[10px] text-slate-500 font-medium mb-0.5">Territory</p>
-                                    <p className="text-xs font-bold text-slate-900">{task.activity?.territory ?? '—'}</p>
-                                  </div>
-                                  {showAssignedColumn && task.assignedAgentName && (
-                                    <div>
-                                      <p className="text-[10px] text-slate-500 font-medium mb-0.5">Assigned to</p>
-                                      <p className="text-xs font-bold text-slate-900">{task.assignedAgentName}</p>
-                                    </div>
-                                  )}
                                 </div>
                               </div>
+                              {task.status === 'completed' && (
+                                <div>
+                                  <h4 className="text-xs font-black text-slate-700 mb-1 flex items-center gap-1.5">
+                                    <MessageSquare size={14} className="text-slate-500" />
+                                    Update (call outcome)
+                                  </h4>
+                                  <div className="flex flex-wrap gap-4 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div>
+                                      <p className="text-[10px] text-slate-500 font-medium mb-0.5">Status</p>
+                                      <p className="text-xs font-bold text-slate-900">{(task as any).outcome ?? '—'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] text-slate-500 font-medium mb-0.5">Sentiment</p>
+                                      <p className="text-xs font-bold text-slate-900">{(task as any).sentiment ?? '—'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
