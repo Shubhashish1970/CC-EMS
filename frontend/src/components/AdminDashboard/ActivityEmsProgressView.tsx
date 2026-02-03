@@ -705,7 +705,7 @@ const ActivityEmsProgressView: React.FC = () => {
                 Disconnected: '#94a3b8',
                 NoAnswer: '#64748b',
                 IncomingNA: '#475569',
-                Invalid: '#1e293b',
+                Invalid: '#ef4444',
               };
               return (
                 <>
@@ -776,7 +776,7 @@ const ActivityEmsProgressView: React.FC = () => {
                           return (
                             <tr
                               key={row.label}
-                              className={`border-b border-slate-100 ${(row as { isInvalid?: boolean }).isInvalid ? 'bg-slate-100 font-medium text-slate-800' : 'text-slate-700'}`}
+                              className={`border-b border-slate-100 ${(row as { isInvalid?: boolean }).isInvalid ? 'bg-red-50 font-medium text-red-800' : 'text-slate-700'}`}
                             >
                               <td className="py-1.5 px-2">{(row as { isInvalid?: boolean }).isInvalid ? 'Invalid' : row.label}</td>
                               <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
