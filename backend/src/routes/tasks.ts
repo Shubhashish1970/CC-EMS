@@ -2114,10 +2114,18 @@ router.get(
         role: 'cc_agent',
         isActive: true,
       })
-        .select('_id name email')
+        .select('_id name email languageCapabilities')
         .lean();
+      const languageNorm = (language || '').trim().toLowerCase();
+      const agentsForLanguage = languageNorm
+        ? (agents as any[]).filter((a) =>
+            (Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).some(
+              (cap: string) => String(cap || '').trim().toLowerCase() === languageNorm
+            )
+          )
+        : (agents as any[]);
       const agentIds = agents.map((a) => a._id);
-      const agentOptions = agents.map((a: any) => ({
+      const agentOptions = agentsForLanguage.map((a: any) => ({
         agentId: a._id.toString(),
         agentName: (a.name || a.email || 'Unknown').trim(),
       }));
