@@ -428,7 +428,7 @@ export const tasksAPI = {
 
   getDashboardByLanguage: async (
     language: string,
-    filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string },
+    filters?: { dateFrom?: string; dateTo?: string; bu?: string; state?: string; agentId?: string; status?: string },
     page?: number,
     limit?: number
   ) => {
@@ -438,6 +438,8 @@ export const tasksAPI = {
     if (filters?.dateTo) params.set('dateTo', filters.dateTo);
     if (filters?.bu) params.set('bu', filters.bu);
     if (filters?.state) params.set('state', filters.state);
+    if (filters?.agentId) params.set('agentId', filters.agentId);
+    if (filters?.status) params.set('status', filters.status);
     if (page != null && page >= 1) params.set('page', String(page));
     if (limit != null && limit >= 1) params.set('limit', String(limit));
     const query = params.toString();

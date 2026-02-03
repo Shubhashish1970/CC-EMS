@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI } from '../../services/api';
-import { Loader2, RefreshCw, Users as UsersIcon, Calendar, Phone, MapPin, CheckCircle, Clock, XCircle, AlertCircle, Search, ChevronRight } from 'lucide-react';
+import { Loader2, RefreshCw, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Search, ChevronRight } from 'lucide-react';
 import Button from '../shared/Button';
 import InfoBanner from '../shared/InfoBanner';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
+import TaskQueueTable from '../TeamLeadDashboard/TaskQueueTable';
+
+const AGENT_QUEUE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 interface AgentQueueSummary {
   agentId: string;
@@ -129,23 +132,6 @@ const AgentQueueView: React.FC = () => {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   // If agent detail is selected, show detail view
   if (agentDetail && selectedAgentId) {
     return (
@@ -215,59 +201,16 @@ const AgentQueueView: React.FC = () => {
           </div>
         </div>
 
-        {/* Tasks List */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-black text-slate-900 mb-4">Tasks ({agentDetail.tasks.length})</h3>
-          {agentDetail.tasks.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-sm text-slate-600 font-medium">No tasks in queue</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {agentDetail.tasks.map((task) => (
-                <div
-                  key={task.taskId}
-                  className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-base font-black text-slate-900">{task.farmer.name}</h4>
-                        {getStatusBadge(task.status)}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
-                        <div className="flex items-center gap-2">
-                          <Phone size={14} />
-                          <span>{task.farmer.mobileNumber}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin size={14} />
-                          <span>{task.farmer.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar size={14} />
-                          <span>Scheduled: {formatDate(task.scheduledDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>Language: {task.farmer.preferredLanguage}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-slate-200">
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <span>Activity: {task.activity.type}</span>
-                      <span>•</span>
-                      <span>Officer: {task.activity.officerName}</span>
-                      <span>•</span>
-                      <span>Territory: {task.activity.territory}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Tasks List - same table UX as Team Lead Task Queue (primary columns, expandable secondary) */}
+        <TaskQueueTable
+          tasks={agentDetail.tasks}
+          tasksTotal={agentDetail.tasks.length}
+          taskPageSize={agentDetail.tasks.length}
+          pageSizeOptions={AGENT_QUEUE_PAGE_SIZE_OPTIONS}
+          onPageSizeChange={() => {}}
+          showAssignedColumn={false}
+          getStatusBadge={getStatusBadge}
+        />
       </div>
     );
   }

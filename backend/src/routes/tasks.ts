@@ -2060,7 +2060,7 @@ router.get(
 
 // @route   GET /api/tasks/dashboard/by-language
 // @desc    Team Lead: queue statistics and task list for a single language (Tasks by Language drill-down)
-// @query   language (required), dateFrom, dateTo, bu, state, page, limit (lazy load; default limit 30, max 100)
+// @query   language (required), dateFrom, dateTo, bu, state, agentId, status, page, limit (lazy load; default limit 30, max 100)
 // @access  Private (Team Lead, MIS Admin)
 router.get(
   '/dashboard/by-language',
@@ -2071,6 +2071,8 @@ router.get(
     query('dateTo').optional().isISO8601().toDate(),
     query('bu').optional().isString(),
     query('state').optional().isString(),
+    query('agentId').optional().isMongoId(),
+    query('status').optional().isIn(['unassigned', 'sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number']),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
@@ -2087,7 +2089,7 @@ router.get(
       const authReq = req as AuthRequest;
       const teamLeadId = authReq.user._id.toString();
       const language = (req.query.language as string).trim();
-      const { dateFrom, dateTo, bu, state } = req.query as any;
+      const { dateFrom, dateTo, bu, state, agentId: queryAgentId, status: queryStatus } = req.query as any;
       const page = req.query.page != null ? Number(req.query.page) : 1;
       const limit = req.query.limit != null ? Math.min(Number(req.query.limit), 100) : 30;
       const skip = (page - 1) * limit;
@@ -2112,19 +2114,35 @@ router.get(
         role: 'cc_agent',
         isActive: true,
       })
-        .select('_id')
+        .select('_id name email')
         .lean();
       const agentIds = agents.map((a) => a._id);
+      const agentOptions = agents.map((a: any) => ({
+        agentId: a._id.toString(),
+        agentName: (a.name || a.email || 'Unknown').trim(),
+      }));
 
       const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
       const activityFilter: any = {};
       if (bu) activityFilter['activity.buName'] = String(bu);
       if (state) activityFilter['activity.state'] = String(state);
 
-      // All tasks: unassigned OR assigned to team (any status), then filter by language
+      // Assignee: either filter by one agent or allow unassigned + any team agent
+      const assigneeMatch: any =
+        queryAgentId
+          ? { assignedAgentId: new mongoose.Types.ObjectId(queryAgentId) }
+          : { $or: [{ status: 'unassigned' }, { assignedAgentId: { $in: agentIds } }] };
+      // Call status filter
+      const statusMatch: any =
+        queryStatus === 'unassigned'
+          ? { status: 'unassigned' }
+          : queryStatus
+            ? { status: String(queryStatus) }
+            : {};
       const baseMatch: any = {
         ...dateMatch,
-        $or: [{ status: 'unassigned' }, { assignedAgentId: { $in: agentIds } }],
+        ...assigneeMatch,
+        ...statusMatch,
       };
 
       const result = await CallTask.aggregate([
@@ -2232,6 +2250,7 @@ router.get(
           tasksTotal,
           page,
           limit,
+          agentOptions,
         },
       });
     } catch (error) {
