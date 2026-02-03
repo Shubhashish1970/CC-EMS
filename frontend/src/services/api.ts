@@ -803,8 +803,28 @@ export const adminAPI = {
     return apiRequest(`/admin/agent-queues${query ? `?${query}` : ''}`);
   },
 
-  getAgentQueue: async (agentId: string) => {
-    return apiRequest(`/admin/agent-queues/${agentId}`);
+  getAgentQueue: async (
+    agentId: string,
+    params?: {
+      dateFrom?: string;
+      dateTo?: string;
+      status?: string;
+      language?: string;
+      territory?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) => {
+    const search = new URLSearchParams();
+    if (params?.dateFrom) search.set('dateFrom', params.dateFrom);
+    if (params?.dateTo) search.set('dateTo', params.dateTo);
+    if (params?.status) search.set('status', params.status);
+    if (params?.language) search.set('language', params.language);
+    if (params?.territory) search.set('territory', params.territory);
+    if (params?.page != null) search.set('page', String(params.page));
+    if (params?.limit != null) search.set('limit', String(params.limit));
+    const q = search.toString();
+    return apiRequest(`/admin/agent-queues/${agentId}${q ? `?${q}` : ''}`);
   },
 };
 

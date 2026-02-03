@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI } from '../../services/api';
-import { Loader2, RefreshCw, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Search, ChevronRight } from 'lucide-react';
+import { Loader2, RefreshCw, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, ChevronRight, ChevronDown } from 'lucide-react';
 import Button from '../shared/Button';
+import StyledSelect from '../shared/StyledSelect';
 import InfoBanner from '../shared/InfoBanner';
 import { getTaskStatusLabel } from '../../utils/taskStatusLabels';
 import TaskQueueTable from '../TeamLeadDashboard/TaskQueueTable';
+import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/dateRangeUtils';
 
 const AGENT_QUEUE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -59,6 +61,9 @@ interface AgentQueueDetail {
     scheduledDate: string;
     createdAt: string;
   }>;
+  tasksTotal?: number;
+  officerOptions?: string[];
+  territoryOptions?: string[];
 }
 
 const AgentQueueView: React.FC = () => {
@@ -70,6 +75,35 @@ const AgentQueueView: React.FC = () => {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
+
+  const [detailFilters, setDetailFilters] = useState({
+    dateFrom: '',
+    dateTo: '',
+    status: '',
+    language: '',
+    territory: '',
+  });
+  const [detailDatePreset, setDetailDatePreset] = useState<DateRangePreset>('Last 7 days');
+  const [isDetailDateOpen, setIsDetailDateOpen] = useState(false);
+  const [draftDateStart, setDraftDateStart] = useState('');
+  const [draftDateEnd, setDraftDateEnd] = useState('');
+  const detailDateRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const r = getPresetRange('Last 7 days');
+    setDetailFilters((f) => ({ ...f, dateFrom: r.start, dateTo: r.end }));
+    setDraftDateStart(r.start);
+    setDraftDateEnd(r.end);
+  }, []);
+
+  useEffect(() => {
+    if (!isDetailDateOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (detailDateRef.current && !detailDateRef.current.contains(e.target as Node)) setIsDetailDateOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [isDetailDateOpen]);
 
   const fetchQueues = async () => {
     setIsLoading(true);
@@ -91,10 +125,26 @@ const AgentQueueView: React.FC = () => {
     }
   };
 
-  const fetchAgentDetail = async (agentId: string) => {
+  const fetchAgentDetail = async (
+    agentId: string,
+    applyFilters = true,
+    overrideFilters?: Partial<typeof detailFilters>
+  ) => {
     setIsLoadingDetail(true);
     try {
-      const response = await adminAPI.getAgentQueue(agentId) as any;
+      const filters = overrideFilters ? { ...detailFilters, ...overrideFilters } : detailFilters;
+      const params = applyFilters
+        ? {
+            dateFrom: filters.dateFrom || undefined,
+            dateTo: filters.dateTo || undefined,
+            status: filters.status || undefined,
+            language: filters.language || undefined,
+            territory: filters.territory || undefined,
+            page: 1,
+            limit: 100,
+          }
+        : undefined;
+      const response = (await adminAPI.getAgentQueue(agentId, params)) as any;
 
       if (response.success && response.data) {
         setAgentDetail(response.data);
@@ -147,7 +197,7 @@ const AgentQueueView: React.FC = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => fetchAgentDetail(selectedAgentId)}
+              onClick={() => fetchAgentDetail(selectedAgentId, true)}
               disabled={isLoadingDetail}
             >
               <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
@@ -201,10 +251,159 @@ const AgentQueueView: React.FC = () => {
           </div>
         </div>
 
+        {/* Filters: Date, Agent, Status, Language, Territory */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+              <div className="relative" ref={detailDateRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDetailDateOpen((p) => !p);
+                    if (!isDetailDateOpen) {
+                      setDraftDateStart(detailFilters.dateFrom);
+                      setDraftDateEnd(detailFilters.dateTo);
+                    }
+                  }}
+                  className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400 flex items-center justify-between"
+                >
+                  <span className="truncate">
+                    {detailDatePreset}
+                    {detailFilters.dateFrom && detailFilters.dateTo ? ` • ${formatPretty(detailFilters.dateFrom)} - ${formatPretty(detailFilters.dateTo)}` : ''}
+                  </span>
+                  <ChevronDown size={16} className="text-slate-400" />
+                </button>
+                {isDetailDateOpen && (
+                  <div className="absolute z-50 mt-2 w-[500px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex">
+                      <div className="w-44 border-r border-slate-200 bg-slate-50 p-2">
+                        {(['Custom', 'Today', 'Yesterday', 'Last 7 days', 'Last 14 days', 'Last 30 days', 'YTD'] as DateRangePreset[]).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setDetailDatePreset(p);
+                              const { start, end } = getPresetRange(p, detailFilters.dateFrom || undefined, detailFilters.dateTo || undefined);
+                              setDraftDateStart(start);
+                              setDraftDateEnd(end);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${detailDatePreset === p ? 'bg-white border border-slate-200 text-slate-900' : 'text-slate-700 hover:bg-white'}`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex-1 p-4">
+                        <div className="flex gap-3 mb-4">
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Start</p>
+                            <input
+                              type="date"
+                              value={draftDateStart}
+                              onChange={(e) => { setDetailDatePreset('Custom' as DateRangePreset); setDraftDateStart(e.target.value); }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">End</p>
+                            <input
+                              type="date"
+                              value={draftDateEnd}
+                              onChange={(e) => { setDetailDatePreset('Custom' as DateRangePreset); setDraftDateEnd(e.target.value); }}
+                              className="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                          <Button variant="secondary" size="sm" onClick={() => setIsDetailDateOpen(false)}>Cancel</Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDetailFilters((f) => ({ ...f, dateFrom: draftDateStart, dateTo: draftDateEnd }));
+                              setIsDetailDateOpen(false);
+                              fetchAgentDetail(selectedAgentId, true, { dateFrom: draftDateStart, dateTo: draftDateEnd });
+                            }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agent</label>
+              <StyledSelect
+                value={selectedAgentId}
+                onChange={(value) => {
+                  setSelectedAgentId(value);
+                  fetchAgentDetail(value, true);
+                }}
+                options={queues.map((q) => ({ value: q.agentId, label: q.agentName }))}
+                placeholder="Select agent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Status</label>
+              <StyledSelect
+                value={detailFilters.status}
+                onChange={(value) => {
+                  setDetailFilters((f) => ({ ...f, status: value }));
+                  fetchAgentDetail(selectedAgentId, true, { status: value });
+                }}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  { value: 'sampled_in_queue', label: 'Sampled - in queue' },
+                  { value: 'in_progress', label: 'In progress' },
+                  { value: 'completed', label: 'Completed' },
+                  { value: 'not_reachable', label: 'Not reachable' },
+                  { value: 'invalid_number', label: 'Invalid' },
+                ]}
+                placeholder="All Statuses"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Language</label>
+              <StyledSelect
+                value={detailFilters.language}
+                onChange={(value) => {
+                  setDetailFilters((f) => ({ ...f, language: value }));
+                  fetchAgentDetail(selectedAgentId, true, { language: value });
+                }}
+                options={[
+                  { value: '', label: 'All Languages' },
+                  ...(agentDetail?.agent?.languageCapabilities || []).map((lang) => ({ value: lang, label: lang })),
+                ]}
+                placeholder="All Languages"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Territory</label>
+              <StyledSelect
+                value={detailFilters.territory}
+                onChange={(value) => {
+                  setDetailFilters((f) => ({ ...f, territory: value }));
+                  fetchAgentDetail(selectedAgentId, true, { territory: value });
+                }}
+                options={[
+                  { value: '', label: 'All Territories' },
+                  ...((agentDetail as any)?.territoryOptions || []).map((t: string) => ({ value: t, label: t })),
+                ]}
+                placeholder="All Territories"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Tasks List - same table UX as Team Lead Task Queue (primary columns, expandable secondary) */}
         <TaskQueueTable
           tasks={agentDetail.tasks}
-          tasksTotal={agentDetail.tasks.length}
+          tasksTotal={(agentDetail as any).tasksTotal ?? agentDetail.tasks.length}
           taskPageSize={agentDetail.tasks.length}
           pageSizeOptions={AGENT_QUEUE_PAGE_SIZE_OPTIONS}
           onPageSizeChange={() => {}}

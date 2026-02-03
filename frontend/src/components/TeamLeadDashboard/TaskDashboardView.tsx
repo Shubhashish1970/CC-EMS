@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, RefreshCw, Loader2, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Phone, MapPin } from 'lucide-react';
+import { Calendar, RefreshCw, Loader2, Users as UsersIcon, CheckCircle, Clock, XCircle, AlertCircle, Phone, MapPin, ChevronUp, ChevronDown } from 'lucide-react';
 import { tasksAPI } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../shared/Modal';
@@ -240,11 +240,111 @@ const TaskDashboardView: React.FC = () => {
   const totals = useMemo(() => data?.totals || {}, [data]);
 
   const agentRows = useMemo(() => {
-    const rows = Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
-    // stable order: name asc (backend already sorts by name, but keep stable)
-    rows.sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || '')));
-    return rows;
+    return Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
   }, [data]);
+
+  type LanguageTableSortKey = 'language' | 'totalOpen' | 'unassigned' | 'sampledInQueue' | 'inProgress';
+  type AgentTableSortKey = 'agent' | 'employeeId' | 'languages' | 'sampledInQueue' | 'inProgress' | 'totalOpen';
+
+  const [languageTableSort, setLanguageTableSort] = useState<{ key: LanguageTableSortKey; dir: 'asc' | 'desc' }>(() => {
+    const raw = localStorage.getItem('teamLead.languageTable.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+    } catch {
+      // ignore
+    }
+    return { key: 'totalOpen', dir: 'desc' };
+  });
+  const [agentTableSort, setAgentTableSort] = useState<{ key: AgentTableSortKey; dir: 'asc' | 'desc' }>(() => {
+    const raw = localStorage.getItem('teamLead.agentWorkload.tableSort');
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+    } catch {
+      // ignore
+    }
+    return { key: 'agent', dir: 'asc' };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('teamLead.languageTable.tableSort', JSON.stringify(languageTableSort));
+  }, [languageTableSort]);
+  useEffect(() => {
+    localStorage.setItem('teamLead.agentWorkload.tableSort', JSON.stringify(agentTableSort));
+  }, [agentTableSort]);
+
+  const getLanguageSortValue = (r: any, key: LanguageTableSortKey): string | number => {
+    switch (key) {
+      case 'language':
+        return (r.language || '').toLowerCase();
+      case 'totalOpen':
+        return Number(r.totalOpen ?? 0);
+      case 'unassigned':
+        return Number(r.unassigned ?? 0);
+      case 'sampledInQueue':
+        return Number(r.sampledInQueue ?? 0);
+      case 'inProgress':
+        return Number(r.inProgress ?? 0);
+      default:
+        return '';
+    }
+  };
+  const getAgentSortValue = (a: any, key: AgentTableSortKey): string | number => {
+    switch (key) {
+      case 'agent':
+        return (a.name || '').toLowerCase();
+      case 'employeeId':
+        return (a.employeeId || '').toLowerCase();
+      case 'languages':
+        return (Array.isArray(a.languageCapabilities) ? a.languageCapabilities : []).join(',').toLowerCase();
+      case 'sampledInQueue':
+        return Number(a.sampledInQueue ?? 0);
+      case 'inProgress':
+        return Number(a.inProgress ?? 0);
+      case 'totalOpen':
+        return Number(a.sampledInQueue ?? 0) + Number(a.inProgress ?? 0);
+      default:
+        return '';
+    }
+  };
+
+  const sortedOpenByLanguage = useMemo(() => {
+    const rows = (data?.openByLanguage || []).map((r: any, idx: number) => ({ r, idx }));
+    const { key, dir } = languageTableSort;
+    rows.sort((x: { r: any; idx: number }, y: { r: any; idx: number }) => {
+      const va = getLanguageSortValue(x.r, key);
+      const vb = getLanguageSortValue(y.r, key);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      if (cmp === 0) return x.idx - y.idx;
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return rows.map((x: { r: any }) => x.r);
+  }, [data?.openByLanguage, languageTableSort]);
+
+  const sortedAgentRows = useMemo(() => {
+    const rows = agentRows.map((a: any, idx: number) => ({ a, idx }));
+    const { key, dir } = agentTableSort;
+    rows.sort((x: { a: any; idx: number }, y: { a: any; idx: number }) => {
+      const va = getAgentSortValue(x.a, key);
+      const vb = getAgentSortValue(y.a, key);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      if (cmp === 0) return x.idx - y.idx;
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return rows.map((x: { a: any }) => x.a);
+  }, [agentRows, agentTableSort]);
+
+  const handleLanguageHeaderClick = (key: LanguageTableSortKey) => {
+    setLanguageTableSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  };
+  const handleAgentHeaderClick = (key: AgentTableSortKey) => {
+    setAgentTableSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  };
 
   // Fetch agent queue detail when Team Lead clicks an agent (or a language link)
   useEffect(() => {
@@ -1453,15 +1553,34 @@ const TaskDashboardView: React.FC = () => {
           <table className="min-w-[780px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Language</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Unassigned</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
+                {(
+                  [
+                    { key: 'language' as LanguageTableSortKey, label: 'Language' },
+                    { key: 'totalOpen' as LanguageTableSortKey, label: 'Total Open' },
+                    { key: 'unassigned' as LanguageTableSortKey, label: 'Unassigned' },
+                    { key: 'sampledInQueue' as LanguageTableSortKey, label: 'Sampled-in-queue' },
+                    { key: 'inProgress' as LanguageTableSortKey, label: 'In-progress' },
+                  ] as Array<{ key: LanguageTableSortKey; label: string }>
+                ).map((col) => {
+                  const isSorted = languageTableSort.key === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      className="px-4 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none cursor-pointer hover:bg-slate-100"
+                      onClick={() => handleLanguageHeaderClick(col.key)}
+                      title="Click to sort"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{col.label}</span>
+                        {isSorted && (languageTableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(data?.openByLanguage || []).map((r: any) => (
+              {sortedOpenByLanguage.map((r: any) => (
                 <tr key={r.language}>
                   <td className="px-4 py-3">
                     <button
@@ -1478,7 +1597,7 @@ const TaskDashboardView: React.FC = () => {
                   <td className="px-4 py-3 font-bold text-slate-700">{r.inProgress}</td>
                 </tr>
               ))}
-              {(!data?.openByLanguage || data.openByLanguage.length === 0) && (
+              {sortedOpenByLanguage.length === 0 && (
                 <tr>
                   <td className="px-4 py-6 text-slate-600" colSpan={5}>
                     No open tasks found for this filter.
@@ -1499,17 +1618,36 @@ const TaskDashboardView: React.FC = () => {
           <table className="min-w-[980px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Agent</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Employee ID</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Languages</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Sampled-in-queue</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">In-progress</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Total Open</th>
-                <th className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Action</th>
+                {(
+                  [
+                    { key: 'agent' as AgentTableSortKey, label: 'Agent' },
+                    { key: 'employeeId' as AgentTableSortKey, label: 'Employee ID' },
+                    { key: 'languages' as AgentTableSortKey, label: 'Languages' },
+                    { key: 'sampledInQueue' as AgentTableSortKey, label: 'Sampled-in-queue' },
+                    { key: 'inProgress' as AgentTableSortKey, label: 'In-progress' },
+                    { key: 'totalOpen' as AgentTableSortKey, label: 'Total Open' },
+                  ] as Array<{ key: AgentTableSortKey; label: string }>
+                ).map((col) => {
+                  const isSorted = agentTableSort.key === col.key;
+                  return (
+                    <th
+                      key={col.key}
+                      className="px-4 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none cursor-pointer hover:bg-slate-100"
+                      onClick={() => handleAgentHeaderClick(col.key)}
+                      title="Click to sort"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{col.label}</span>
+                        {isSorted && (agentTableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="px-4 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {agentRows.map((a: any) => (
+              {sortedAgentRows.map((a: any) => (
                 <tr key={a.agentId}>
                   <td className="px-4 py-3">
                     <button
@@ -1567,7 +1705,7 @@ const TaskDashboardView: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {!agentRows.length && (
+              {!sortedAgentRows.length && (
                 <tr>
                   <td className="px-4 py-6 text-slate-600" colSpan={7}>
                     No agents found for this Team Lead.

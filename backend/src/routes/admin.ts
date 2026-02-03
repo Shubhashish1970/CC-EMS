@@ -345,7 +345,16 @@ router.get(
  */
 router.get(
   '/agent-queues/:agentId',
-  [param('agentId').isMongoId().withMessage('Invalid agent ID')],
+  [
+    param('agentId').isMongoId().withMessage('Invalid agent ID'),
+    query('dateFrom').optional().isString(),
+    query('dateTo').optional().isString(),
+    query('status').optional().isString(),
+    query('language').optional().isString(),
+    query('territory').optional().isString(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+  ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
@@ -357,8 +366,17 @@ router.get(
       }
 
       const { agentId } = req.params;
+      const { dateFrom, dateTo, status, language, territory, page, limit } = req.query as Record<string, string | undefined>;
 
-      const result = await getAgentQueue(agentId);
+      const result = await getAgentQueue(agentId, {
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        status: status || undefined,
+        language: language || undefined,
+        territory: territory || undefined,
+        page: page != null ? parseInt(String(page), 10) : undefined,
+        limit: limit != null ? parseInt(String(limit), 10) : undefined,
+      });
 
       res.json({
         success: true,

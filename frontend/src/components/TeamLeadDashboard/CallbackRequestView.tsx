@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowUpDown, RefreshCw, Phone, CheckSquare, Square, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
 import { tasksAPI } from '../../services/api';
@@ -534,7 +534,15 @@ const CallbackRequestView: React.FC = () => {
                     >
                       <div className="flex items-center gap-2">
                         <span>{col.label}</span>
-                        {isSorted && (tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                        {isSorted ? (
+                          tableSort.dir === 'asc' ? (
+                            <ChevronUp size={16} className="text-slate-700 shrink-0" aria-hidden />
+                          ) : (
+                            <ChevronDown size={16} className="text-slate-700 shrink-0" aria-hidden />
+                          )
+                        ) : (
+                          <ArrowUpDown size={14} className="text-slate-400 shrink-0 opacity-70" aria-hidden />
+                        )}
                       </div>
                     </th>
                   );

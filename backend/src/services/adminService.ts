@@ -1160,8 +1160,9 @@ export const getAgentQueue = async (
     state?: string;
     status?: string;
     fda?: string;
+    territory?: string;
   }
-): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number; officerOptions?: string[] }> => {
+): Promise<AgentQueueDetail & { tasksTotal?: number; page?: number; limit?: number; officerOptions?: string[]; territoryOptions?: string[] }> => {
   try {
     // Validate agentId
     if (!mongoose.Types.ObjectId.isValid(agentId)) {
@@ -1208,6 +1209,7 @@ export const getAgentQueue = async (
     if (options?.bu) activityFilter['activity.buName'] = String(options.bu).trim();
     if (options?.state) activityFilter['activity.state'] = String(options.state).trim();
     if (options?.fda) activityFilter['activity.officerName'] = String(options.fda).trim();
+    const territoryTrim = options?.territory?.trim();
     const statusMatch = options?.status?.trim() ? { status: options.status.trim() as TaskStatus } : {};
 
     if (usePagination) {
@@ -1225,6 +1227,7 @@ export const getAgentQueue = async (
         },
         { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
         ...(Object.keys(activityFilter).length ? [{ $match: activityFilter }] : []),
+        ...(territoryTrim ? [{ $match: { $or: [{ 'activity.territoryName': territoryTrim }, { 'activity.territory': territoryTrim }] } }] : []),
         {
           $lookup: {
             from: Farmer.collection.name,
@@ -1345,6 +1348,19 @@ export const getAgentQueue = async (
       ]);
       const officerOptions: string[] = officerOptAgg?.[0]?.names ?? [];
 
+      const territoryOptAgg = await CallTask.aggregate([
+        { $match: { assignedAgentId: new mongoose.Types.ObjectId(agentId), ...dateMatch } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activity' } },
+        { $unwind: { path: '$activity', preserveNullAndEmptyArrays: true } },
+        { $project: { territory: { $ifNull: ['$activity.territoryName', '$activity.territory'] } } },
+        { $match: { territory: { $nin: [null, ''] } } },
+        { $group: { _id: '$territory' } },
+        { $sort: { _id: 1 } },
+        { $group: { _id: null, names: { $push: '$_id' } } },
+        { $project: { _id: 0, names: 1 } },
+      ]);
+      const territoryOptions: string[] = territoryOptAgg?.[0]?.names ?? [];
+
       return {
         agent: {
           agentId: agent._id.toString(),
@@ -1359,6 +1375,7 @@ export const getAgentQueue = async (
         page,
         limit,
         officerOptions,
+        territoryOptions,
       };
     }
 
@@ -1377,12 +1394,13 @@ export const getAgentQueue = async (
         return farmer?.preferredLanguage === language;
       });
     }
-    if (options?.bu || options?.state || options?.fda) {
+    if (options?.bu || options?.state || options?.fda || territoryTrim) {
       tasks = tasks.filter((task) => {
         const activity = task.activityId as any;
-        if (options.bu && (activity?.buName ?? '') !== options.bu.trim()) return false;
-        if (options.state && (activity?.state ?? '') !== options.state.trim()) return false;
-        if (options.fda && (activity?.officerName ?? '') !== options.fda.trim()) return false;
+        if (options?.bu && (activity?.buName ?? '') !== options.bu.trim()) return false;
+        if (options?.state && (activity?.state ?? '') !== options.state.trim()) return false;
+        if (options?.fda && (activity?.officerName ?? '') !== options.fda.trim()) return false;
+        if (territoryTrim && (activity?.territoryName ?? activity?.territory ?? '') !== territoryTrim) return false;
         return true;
       });
     }
@@ -1435,6 +1453,7 @@ export const getAgentQueue = async (
     });
 
     const officerOptions = [...new Set(tasks.map((t) => (t.activityId as any)?.officerName).filter(Boolean))].sort();
+    const territoryOptions = [...new Set(tasks.map((t) => (t.activityId as any)?.territoryName || (t.activityId as any)?.territory).filter(Boolean))].sort();
 
     return {
       agent: {
@@ -1447,6 +1466,7 @@ export const getAgentQueue = async (
       statusBreakdown,
       tasks: taskDetails,
       officerOptions,
+      territoryOptions,
     };
   } catch (error) {
     logger.error(`Error fetching agent queue for ${agentId}:`, error);
