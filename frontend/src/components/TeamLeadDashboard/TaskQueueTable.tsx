@@ -151,19 +151,20 @@ const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
   const colCount = columns.length;
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-      <h3 className="text-lg font-black text-slate-900 mb-4">
-        {title ?? (
-          <>Tasks ({tasksTotal != null ? `${tasks.length} of ${tasksTotal}` : tasks?.length ?? 0})</>
-        )}
-      </h3>
-      {!sortedTasks.length ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-slate-600 font-medium">No tasks in queue.</p>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+    <>
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <h3 className="text-lg font-black text-slate-900 mb-4">
+          {title ?? (
+            <>Tasks ({tasksTotal != null ? `${tasks.length} of ${tasksTotal}` : tasks?.length ?? 0})</>
+          )}
+        </h3>
+        {!sortedTasks.length ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-slate-600 font-medium">No tasks in queue.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
             <table className="w-full table-fixed">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -336,24 +337,6 @@ const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
             </table>
           </div>
 
-          {/* Pagination bar */}
-          {tasksTotal != null && tasksTotal > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <p className="text-sm text-slate-600">Showing {tasks.length} of {tasksTotal} tasks</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
-                  <StyledSelect
-                    value={String(taskPageSize)}
-                    onChange={(v) => onPageSizeChange(Number(v))}
-                    options={pageSizeOptions.map((n) => ({ value: String(n), label: String(n) }))}
-                    className="w-20"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Load more */}
           {tasksTotal != null && tasks.length < tasksTotal && (
             <div ref={loadMoreRef} className="py-4 text-center">
@@ -380,7 +363,26 @@ const TaskQueueTable: React.FC<TaskQueueTableProps> = ({
           )}
         </>
       )}
-    </div>
+      </div>
+
+      {/* Pagination - separate card to match Activity Monitoring */}
+      {tasksTotal != null && tasksTotal > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mt-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-sm text-slate-600">Showing {tasks.length} of {tasksTotal} tasks</p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+              <StyledSelect
+                value={String(taskPageSize)}
+                onChange={(v) => onPageSizeChange(Number(v))}
+                options={pageSizeOptions.map((n) => ({ value: String(n), label: String(n) }))}
+                className="min-w-[80px]"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

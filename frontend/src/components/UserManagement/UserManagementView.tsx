@@ -8,6 +8,10 @@ import AgentLanguageMatrix from './AgentLanguageMatrix';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import StyledSelect from '../shared/StyledSelect';
 import InfoBanner from '../shared/InfoBanner';
+import Button from '../shared/Button';
+
+const USER_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const USER_PAGE_SIZE_DEFAULT = 20;
 
 interface User {
   _id: string;
@@ -40,6 +44,11 @@ const UserManagementView: React.FC = () => {
     search: '',
   });
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const raw = localStorage.getItem('admin.userManagement.pageSize');
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && USER_PAGE_SIZE_OPTIONS.includes(n as any) ? n : USER_PAGE_SIZE_DEFAULT;
+  });
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; user: User | null }>({
     isOpen: false,
@@ -65,7 +74,7 @@ const UserManagementView: React.FC = () => {
         role: filters.role || undefined,
         isActive: filters.isActive,
         page,
-        limit: pagination.limit,
+        limit: pageSize,
       });
 
       if (response.success && response.data) {
@@ -101,7 +110,7 @@ const UserManagementView: React.FC = () => {
         setUsers(filteredUsers);
         setPagination({
           page: response.data.pagination?.page || page,
-          limit: response.data.pagination?.limit || pagination.limit,
+          limit: response.data.pagination?.limit || pageSize,
           total: response.data.pagination?.total || filteredUsers.length,
           pages: response.data.pagination?.pages || 1,
         });
@@ -135,8 +144,8 @@ const UserManagementView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, [filters.role, filters.isActive]);
+    fetchUsers(1);
+  }, [filters.role, filters.isActive, pageSize]);
 
   useEffect(() => {
     fetchTeamLeads();
@@ -188,6 +197,10 @@ const UserManagementView: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   }, [filters.search]);
+
+  useEffect(() => {
+    localStorage.setItem('admin.userManagement.pageSize', String(pageSize));
+  }, [pageSize]);
 
   return (
     <div className="space-y-6">
@@ -306,30 +319,43 @@ const UserManagementView: React.FC = () => {
             currentUserId={currentUserId}
           />
 
-          {/* Pagination */}
-          {pagination.pages > 1 && (
-            <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-4">
-              <div className="text-sm text-slate-600">
-                Showing {users.length} of {pagination.total} users
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fetchUsers(pagination.page - 1)}
-                  disabled={pagination.page === 1}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <span className="px-4 py-2 text-sm font-medium text-slate-700">
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                <button
-                  onClick={() => fetchUsers(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.pages}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
+          {/* Pagination - consistent with Activity Monitoring / TaskList */}
+          {!isLoading && pagination.total > 0 && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <p className="text-sm text-slate-600">
+                  Page {pagination.page} of {pagination.pages} • {pagination.total} total users
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rows</span>
+                    <StyledSelect
+                      value={String(pageSize)}
+                      onChange={(v) => {
+                        setPageSize(Number(v));
+                        setPagination((p) => ({ ...p, page: 1 }));
+                      }}
+                      options={USER_PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+                      className="min-w-[80px]"
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => fetchUsers(pagination.page - 1)}
+                    disabled={pagination.page === 1 || pagination.pages <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => fetchUsers(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.pages || pagination.pages <= 1}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             </div>
           )}

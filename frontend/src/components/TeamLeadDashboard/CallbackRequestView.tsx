@@ -271,25 +271,25 @@ const CallbackRequestView: React.FC = () => {
   const allSelected = selectableTasks.length > 0 && selectedTaskIds.size === selectableTasks.length;
 
   return (
-    <div className="space-y-4">
-      {/* Header Card */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+    <div className="space-y-6">
+      {/* Header Card - match Activity Monitoring card style */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-black text-slate-900">Request Callbacks</h2>
-            <p className="text-xs text-slate-500">Select completed/unsuccessful calls to schedule callbacks</p>
+            <h2 className="text-xl font-black text-slate-900">Request Callbacks</h2>
+            <p className="text-sm text-slate-600 mt-1">Select completed/unsuccessful calls to schedule callbacks</p>
           </div>
           <Button variant="secondary" size="sm" onClick={() => loadTasks(true)} disabled={isLoading}>
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Filters - label style consistent with Activity Monitoring */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Date Range */}
           <div className="lg:col-span-2">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Date Range</label>
             <div className="relative" ref={datePickerRef}>
               <button
                 type="button"
@@ -373,7 +373,7 @@ const CallbackRequestView: React.FC = () => {
 
           {/* Outcome Filter */}
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outcome</label>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Outcome</label>
             <StyledSelect
               value={filters.outcome}
               onChange={(value) => setFilters(f => ({ ...f, outcome: value }))}
@@ -388,7 +388,7 @@ const CallbackRequestView: React.FC = () => {
 
           {/* Call Type Filter */}
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Call Type</label>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Call Type</label>
             <StyledSelect
               value={filters.callType}
               onChange={(value) => setFilters(f => ({ ...f, callType: value }))}
@@ -403,7 +403,7 @@ const CallbackRequestView: React.FC = () => {
 
           {/* Agent Filter */}
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Agent</label>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agent</label>
             <StyledSelect
               value={filters.agentId}
               onChange={(value) => setFilters(f => ({ ...f, agentId: value }))}
@@ -417,10 +417,10 @@ const CallbackRequestView: React.FC = () => {
         </div>
       </div>
 
-      {/* Tasks Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Tasks Table - card style match Activity Monitoring (rounded-3xl) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Action Bar */}
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -451,21 +451,21 @@ const CallbackRequestView: React.FC = () => {
           </button>
         </div>
 
-        {/* Table with scroll container */}
+        {/* Table - header style match Activity Monitoring */}
         <div ref={tableContainerRef} className="overflow-x-auto max-h-[60vh] overflow-y-auto">
           <table className="w-full">
-            <thead className="sticky top-0 bg-slate-50 z-10">
-              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                <th className="px-4 py-3 text-left w-10"></th>
-                <th className="px-4 py-3 text-left">Farmer</th>
-                <th className="px-4 py-3 text-left">Outcome</th>
-                <th className="px-4 py-3 text-left">Outbound</th>
-                <th className="px-4 py-3 text-left">Type</th>
-                <th className="px-4 py-3 text-left">Agent</th>
-                <th className="px-4 py-3 text-left">Date</th>
+            <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10">
+              <tr>
+                <th className="px-3 py-3 text-left w-10 text-xs font-black text-slate-500 uppercase tracking-widest"></th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Farmer</th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Outcome</th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Outbound</th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Type</th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Agent</th>
+                <th className="px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 border-b border-slate-100">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">
@@ -491,7 +491,7 @@ const CallbackRequestView: React.FC = () => {
                         key={task._id}
                         className={`hover:bg-slate-50 ${isMaxRetry ? 'opacity-50' : ''} ${isSelected ? 'bg-green-50' : ''}`}
                       >
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <button
                             type="button"
                             onClick={() => handleSelectTask(task._id)}
@@ -506,14 +506,14 @@ const CallbackRequestView: React.FC = () => {
                             )}
                           </button>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <div>
                             <p className="text-sm font-bold text-slate-900">{task.farmer?.name || 'Unknown'}</p>
                             <p className="text-xs text-slate-500">{task.farmer?.mobileNumber}</p>
                             <p className="text-[10px] text-slate-400">{task.farmer?.location}</p>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
                             task.outcome === 'Completed Conversation' 
                               ? 'bg-green-100 text-green-700' 
@@ -526,7 +526,7 @@ const CallbackRequestView: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-slate-700">
                           {task.callLog?.callStatus || '-'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           {task.isCallback ? (
                             <span className="px-2 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700">
                               Callback #{task.callbackNumber}
@@ -576,10 +576,12 @@ const CallbackRequestView: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
 
-        {/* Pagination bar - consistent with Task Queue / TaskList */}
-        {!isLoading && pagination.total > 0 && (
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* Pagination - separate card to match Activity Monitoring */}
+      {!isLoading && pagination.total > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <p className="text-sm text-slate-600">
               Showing {tasks.length} of {pagination.total} tasks
               {selectableTasks.length >= 0 && (
@@ -592,12 +594,12 @@ const CallbackRequestView: React.FC = () => {
                 value={String(pageSize)}
                 onChange={(v) => setPageSize(Number(v))}
                 options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
-                className="w-20"
+                className="min-w-[80px]"
               />
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

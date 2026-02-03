@@ -1005,7 +1005,7 @@ const TaskDashboardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 mt-8">
             <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
               <UsersIcon className="text-slate-400" size={32} />
             </div>
