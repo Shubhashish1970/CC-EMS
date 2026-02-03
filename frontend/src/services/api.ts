@@ -844,6 +844,7 @@ export interface EmsTrendRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
 }
 
 export interface EmsReportSummaryRow {
@@ -871,6 +872,9 @@ export interface EmsReportSummaryRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
+  activityQualitySum: number;
+  activityQualityCount: number;
   emsScore: number;
   relativeRemarks: string;
 }
@@ -903,6 +907,7 @@ export interface EmsReportLineRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
   emsScore: number;
   relativeRemarks: string;
 }

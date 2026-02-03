@@ -50,6 +50,7 @@ import {
   Target,
   X,
   Info,
+  Award,
 } from 'lucide-react';
 import Button from '../shared/Button';
 import StyledSelect from '../shared/StyledSelect';
@@ -76,6 +77,7 @@ export type EmsTotals = {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
   emsScore: number;
   validIdentity: number;
 };
@@ -119,11 +121,14 @@ function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
   let totalAttempted = 0, totalConnected = 0, disconnectedCount = 0, incomingNACount = 0, invalidCount = 0, noAnswerCount = 0;
   let identityWrongCount = 0, dontRecallCount = 0, noMissedCount = 0, notAFarmerCount = 0, yesAttendedCount = 0;
   let notPurchasedCount = 0, purchasedCount = 0, willingMaybeCount = 0, willingNoCount = 0, willingYesCount = 0, yesPlusPurchasedCount = 0;
+  let activityQualitySum = 0, activityQualityCount = 0;
   for (const r of rows) {
     totalAttempted += r.totalAttempted;
     totalConnected += r.totalConnected;
     invalidCount += r.invalidCount;
     identityWrongCount += (r as EmsReportSummaryRow & { identityWrongCount?: number }).identityWrongCount ?? 0;
+    activityQualitySum += (r as EmsReportSummaryRow & { activityQualitySum?: number }).activityQualitySum ?? 0;
+    activityQualityCount += (r as EmsReportSummaryRow & { activityQualityCount?: number }).activityQualityCount ?? 0;
     notAFarmerCount += r.notAFarmerCount;
     yesAttendedCount += r.yesAttendedCount;
     purchasedCount += r.purchasedCount;
@@ -146,13 +151,17 @@ function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
   const meetingValidityPct = totalConnected > 0 ? Math.round((yesAttendedCount / totalConnected) * 100) : 0;
   const meetingConversionPct = totalConnected > 0 ? Math.round((purchasedCount / totalConnected) * 100) : 0;
   const purchaseIntentionPct = totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
-  const emsScore = Math.round((mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4);
+  const cropSolutionsFocusPct =
+    activityQualityCount > 0 ? Math.round((activityQualitySum / activityQualityCount / 5) * 100) : 0;
+  const emsScore = Math.round(
+    (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
+  );
   const validIdentity = totalConnected - identityWrongCount - notAFarmerCount;
   return {
     totalAttempted, totalConnected, disconnectedCount, incomingNACount, invalidCount, noAnswerCount,
     identityWrongCount, dontRecallCount, noMissedCount, notAFarmerCount, yesAttendedCount,
     notPurchasedCount, purchasedCount, willingMaybeCount, willingNoCount, willingYesCount, yesPlusPurchasedCount,
-    mobileValidityPct, hygienePct, meetingValidityPct, meetingConversionPct, purchaseIntentionPct, emsScore, validIdentity,
+    mobileValidityPct, hygienePct, meetingValidityPct, meetingConversionPct, purchaseIntentionPct, cropSolutionsFocusPct, emsScore, validIdentity,
   };
 }
 
@@ -584,7 +593,7 @@ const ActivityEmsProgressView: React.FC = () => {
           <BarChart3 className="text-slate-600" size={18} />
           <h3 className="text-base font-black text-slate-900">EMS Totals</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           {isLoadingEmsDetail ? (
             <div className="col-span-full flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-slate-500" size={32} />
@@ -592,12 +601,13 @@ const ActivityEmsProgressView: React.FC = () => {
           ) : totals ? (
             <>
               {[
-              { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: '(Attempted − Invalid) / Attempted', icon: Smartphone },
+              { label: 'Mobile No. Validity (%)', value: totals.mobileValidityPct, formula: 'Out of all calls we tried, what % were to valid mobile numbers? (Hygiene – not in EMS Score.)', icon: Smartphone },
               { label: 'Hygiene (%)', value: totals.hygienePct, formula: '(Connected − Identity Wrong − Not Farmer) / Connected', icon: UserCheck },
-              { label: 'Meeting Validity (%)', value: totals.meetingValidityPct, formula: 'Yes Attended / Connected', icon: Users },
-              { label: 'Meeting Conversion (%)', value: totals.meetingConversionPct, formula: 'Purchased / Connected', icon: ShoppingCart },
-              { label: 'Purchase Intention (%)', value: totals.purchaseIntentionPct, formula: '(Willing Yes + Purchased) / Connected', icon: Target },
-              { label: 'EMS Score (Totals)', value: totals.emsScore, formula: 'Average of Mobile Validity %, Meeting Validity %, Meeting Conversion %, Purchase Intention %', icon: FileBarChart },
+              { label: 'Meeting Validity (%)', value: totals.meetingValidityPct, formula: 'Out of all farmers we successfully spoke to, how many actually attended the meeting or demo?', icon: Users },
+              { label: 'Meeting Conversion (%)', value: totals.meetingConversionPct, formula: 'Out of all farmers we successfully spoke to, how many actually bought the product?', icon: ShoppingCart },
+              { label: 'Purchase Intention (%)', value: totals.purchaseIntentionPct, formula: 'Out of all farmers we successfully spoke to, how many either bought or said they are willing to buy?', icon: Target },
+              { label: 'Crop Solutions Focus (%)', value: totals.cropSolutionsFocusPct, formula: 'How close were we to delivering a perfect crop solution experience, as judged by farmers (1–5 stars)?', icon: Award },
+              { label: 'EMS Score (Totals)', value: totals.emsScore, formula: 'Average of Meeting Validity %, Meeting Conversion %, Purchase Intention %, Crop Solutions Focus %.', icon: FileBarChart },
             ].map(({ label, value, formula, icon: Icon }) => {
               const isGood = value >= 70;
               const isModerate = value >= 50 && value < 70;
@@ -884,6 +894,7 @@ const ActivityEmsProgressView: React.FC = () => {
                 <Line type="monotone" dataKey="meetingValidityPct" name="Meeting Validity %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="meetingConversionPct" name="Meeting Conversion %" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="purchaseIntentionPct" name="Purchase Intention %" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="cropSolutionsFocusPct" name="Crop Solutions Focus %" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -924,6 +935,7 @@ const ActivityEmsProgressView: React.FC = () => {
                   <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('meetingValidityPct')}>Meeting Validity % {tableSortKey === 'meetingValidityPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
                   <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('meetingConversionPct')}>Meeting Conversion % {tableSortKey === 'meetingConversionPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
                   <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('purchaseIntentionPct')}>Purchase Intention % {tableSortKey === 'purchaseIntentionPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('cropSolutionsFocusPct')}>Crop Solutions Focus % {tableSortKey === 'cropSolutionsFocusPct' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
                   <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => toggleSort('emsScore')}>EMS Score {tableSortKey === 'emsScore' && (tableSortDir === 'asc' ? '↑' : '↓')}</th>
                   <th className="px-4 py-3 max-w-[200px]">Relative remarks</th>
                 </tr>
@@ -941,6 +953,7 @@ const ActivityEmsProgressView: React.FC = () => {
                     <td className="px-4 py-3 text-right text-slate-700">{row.meetingValidityPct}%</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.meetingConversionPct}%</td>
                     <td className="px-4 py-3 text-right text-slate-700">{row.purchaseIntentionPct}%</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{(row as EmsReportSummaryRow & { cropSolutionsFocusPct?: number }).cropSolutionsFocusPct ?? 0}%</td>
                     <td className="px-4 py-3 text-right">
                       <span className={row.emsScore >= 70 ? 'text-green-800 font-bold' : row.emsScore >= 50 ? 'text-amber-800 font-bold' : 'text-slate-700'}>
                         {row.emsScore}
@@ -991,6 +1004,7 @@ const ActivityEmsProgressView: React.FC = () => {
                       <th className="px-3 py-2 text-right">Meeting Validity %</th>
                       <th className="px-3 py-2 text-right">Meeting Conversion %</th>
                       <th className="px-3 py-2 text-right">Purchase Intention %</th>
+                      <th className="px-3 py-2 text-right">Crop Solutions Focus %</th>
                       <th className="px-3 py-2 text-right">EMS Score</th>
                       <th className="px-3 py-2 max-w-[180px]">Relative Remarks</th>
                     </tr>
@@ -1009,6 +1023,7 @@ const ActivityEmsProgressView: React.FC = () => {
                         <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.meetingValidityPct)}%</td>
                         <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.meetingConversionPct)}%</td>
                         <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.purchaseIntentionPct)}%</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{Math.round(r.cropSolutionsFocusPct ?? 0)}%</td>
                         <td className="px-3 py-2 text-right">
                           <span className={r.emsScore >= 70 ? 'text-green-800 font-bold' : r.emsScore >= 50 ? 'text-amber-800 font-bold' : 'text-slate-700'}>{r.emsScore}</span>
                         </td>

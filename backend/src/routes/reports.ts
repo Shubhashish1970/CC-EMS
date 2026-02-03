@@ -239,6 +239,8 @@ router.get(
             willingNoCount: acc.willingNoCount + r.willingNoCount,
             willingYesCount: acc.willingYesCount + r.willingYesCount,
             yesPlusPurchasedCount: acc.yesPlusPurchasedCount + r.yesPlusPurchasedCount,
+            activityQualitySum: acc.activityQualitySum + (r.activityQualitySum ?? 0),
+            activityQualityCount: acc.activityQualityCount + (r.activityQualityCount ?? 0),
           }),
           {
             totalAttempted: 0,
@@ -258,6 +260,8 @@ router.get(
             willingNoCount: 0,
             willingYesCount: 0,
             yesPlusPurchasedCount: 0,
+            activityQualitySum: 0,
+            activityQualityCount: 0,
           }
         );
         const nbuMobileValidityPct = nbu.totalAttempted > 0 ? Math.round(((nbu.totalAttempted - nbu.invalidCount) / nbu.totalAttempted) * 100) : 0;
@@ -265,7 +269,13 @@ router.get(
         const nbuMeetingValidityPct = nbu.totalConnected > 0 ? Math.round((nbu.yesAttendedCount / nbu.totalConnected) * 100) : 0;
         const nbuMeetingConversionPct = nbu.totalConnected > 0 ? Math.round((nbu.purchasedCount / nbu.totalConnected) * 100) : 0;
         const nbuPurchaseIntentionPct = nbu.totalConnected > 0 ? Math.round((nbu.yesPlusPurchasedCount / nbu.totalConnected) * 100) : 0;
-        const nbuEmsScore = Math.round((nbuMobileValidityPct + nbuMeetingValidityPct + nbuMeetingConversionPct + nbuPurchaseIntentionPct) / 4);
+        const nbuCropSolutionsFocusPct =
+          nbu.activityQualityCount > 0
+            ? Math.round((nbu.activityQualitySum / nbu.activityQualityCount / 5) * 100)
+            : 0;
+        const nbuEmsScore = Math.round(
+          (nbuMeetingValidityPct + nbuMeetingConversionPct + nbuPurchaseIntentionPct + nbuCropSolutionsFocusPct) / 4
+        );
 
         const metricRows: [string, ...(string | number)[]][] = [
           ['Connected', ...summaryRows.map((r) => r.totalConnected), nbu.totalConnected],
@@ -290,6 +300,7 @@ router.get(
           ['Yes', ...summaryRows.map((r) => r.willingYesCount), nbu.willingYesCount],
           ['Yes + Purchased', ...summaryRows.map((r) => r.yesPlusPurchasedCount), nbu.yesPlusPurchasedCount],
           ['Purchase Intention (%)', ...summaryRows.map((r) => r.purchaseIntentionPct), nbuPurchaseIntentionPct],
+          ['Crop Solutions Focus (%)', ...summaryRows.map((r) => r.cropSolutionsFocusPct), nbuCropSolutionsFocusPct],
           ['EMS Score', ...summaryRows.map((r) => r.emsScore), nbuEmsScore],
           ['Relative Remarks', ...summaryRows.map((r) => r.relativeRemarks), '—'],
         ];
@@ -317,6 +328,7 @@ router.get(
             'Meeting Validity (%)',
             'Meeting Conversion (%)',
             'Purchase Intention (%)',
+            'Crop Solutions Focus (%)',
             'EMS Score',
             'Relative Remarks',
           ],
@@ -338,6 +350,7 @@ router.get(
             r.meetingValidityPct,
             r.meetingConversionPct,
             r.purchaseIntentionPct,
+            r.cropSolutionsFocusPct,
             r.emsScore,
             r.relativeRemarks,
           ]),

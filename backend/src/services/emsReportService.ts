@@ -41,6 +41,9 @@ export interface EmsReportSummaryRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
+  activityQualitySum: number;
+  activityQualityCount: number;
   emsScore: number;
   relativeRemarks: string;
 }
@@ -73,6 +76,7 @@ export interface EmsReportLineRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
   emsScore: number;
   relativeRemarks: string;
 }
@@ -172,6 +176,12 @@ export async function getEmsReportSummary(
         __willingMaybe: { $and: [{ $ne: ['$callLog.willingToPurchase', true] }, { $ne: ['$callLog.willingToPurchase', false] }] },
         __willingNo: { $eq: ['$callLog.willingToPurchase', false] },
         __willingYes: { $eq: ['$callLog.willingToPurchase', true] },
+        __hasQualityRating: {
+          $and: [
+            { $gte: [{ $ifNull: ['$callLog.activityQuality', 0] }, 1] },
+            { $lte: [{ $ifNull: ['$callLog.activityQuality', 0] }, 5] },
+          ],
+        },
       },
     },
     {
@@ -193,6 +203,18 @@ export async function getEmsReportSummary(
         willingMaybeCount: { $sum: { $cond: ['$__willingMaybe', 1, 0] } },
         willingNoCount: { $sum: { $cond: ['$__willingNo', 1, 0] } },
         willingYesCount: { $sum: { $cond: ['$__willingYes', 1, 0] } },
+        activityQualitySum: {
+          $sum: {
+            $cond: [
+              { $and: ['$__isConnected', '$__hasQualityRating'] },
+              { $ifNull: ['$callLog.activityQuality', 0] },
+              0,
+            ],
+          },
+        },
+        activityQualityCount: {
+          $sum: { $cond: [{ $and: ['$__isConnected', '$__hasQualityRating'] }, 1, 0] },
+        },
       },
     },
   ]).exec();
@@ -216,6 +238,8 @@ export async function getEmsReportSummary(
     const willingMaybeCount = Number(row.willingMaybeCount || 0);
     const willingNoCount = Number(row.willingNoCount || 0);
     const willingYesCount = Number(row.willingYesCount || 0);
+    const activityQualitySum = Number(row.activityQualitySum || 0);
+    const activityQualityCount = Number(row.activityQualityCount || 0);
 
     const mobileValidityPct =
       totalAttempted > 0 ? Math.round(((totalAttempted - invalidCount) / totalAttempted) * 100) : 0;
@@ -227,8 +251,12 @@ export async function getEmsReportSummary(
     const meetingConversionPct = totalConnected > 0 ? Math.round((purchasedCount / totalConnected) * 100) : 0;
     const purchaseIntentionPct =
       totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
+    const cropSolutionsFocusPct =
+      activityQualityCount > 0
+        ? Math.round((activityQualitySum / activityQualityCount / 5) * 100)
+        : 0;
     const emsScore = Math.round(
-      (mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4
+      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
     );
     const yesPlusPurchasedCount = willingYesCount + purchasedCount;
     const relativeRemarks = buildRelativeRemarks(meetingValidityPct, meetingConversionPct, emsScore);
@@ -258,6 +286,9 @@ export async function getEmsReportSummary(
       meetingValidityPct,
       meetingConversionPct,
       purchaseIntentionPct,
+      cropSolutionsFocusPct,
+      activityQualitySum,
+      activityQualityCount,
       emsScore,
       relativeRemarks,
     });
@@ -313,8 +344,10 @@ export async function getEmsReportLineLevel(
     const meetingValidityPct = totalConnected > 0 ? (yesAttended / totalConnected) * 100 : 0;
     const meetingConversionPct = totalConnected > 0 ? (purchased / totalConnected) * 100 : 0;
     const purchaseIntentionPct = totalConnected > 0 ? ((willingYes + purchased) / totalConnected) * 100 : 0;
+    const q = log.activityQuality != null && log.activityQuality >= 1 && log.activityQuality <= 5 ? Number(log.activityQuality) : null;
+    const cropSolutionsFocusPct = totalConnected > 0 && q != null ? Math.round((q / 5) * 100) : 0;
     const emsScore = Math.round(
-      (mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4
+      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
     );
 
     const sentiment = log.sentiment != null ? String(log.sentiment) : 'N/A';
@@ -347,6 +380,7 @@ export async function getEmsReportLineLevel(
       meetingValidityPct,
       meetingConversionPct,
       purchaseIntentionPct,
+      cropSolutionsFocusPct,
       emsScore,
       relativeRemarks,
     });
@@ -366,6 +400,7 @@ export interface EmsTrendRow {
   meetingValidityPct: number;
   meetingConversionPct: number;
   purchaseIntentionPct: number;
+  cropSolutionsFocusPct: number;
 }
 
 /**
@@ -424,6 +459,12 @@ export async function getEmsReportTrends(
         __yesAttended: { $eq: ['$callLog.didAttend', 'Yes, I attended'] },
         __purchased: { $eq: ['$callLog.hasPurchased', true] },
         __willingYes: { $eq: ['$callLog.willingToPurchase', true] },
+        __hasQualityRating: {
+          $and: [
+            { $gte: [{ $ifNull: ['$callLog.activityQuality', 0] }, 1] },
+            { $lte: [{ $ifNull: ['$callLog.activityQuality', 0] }, 5] },
+          ],
+        },
       },
     },
     {
@@ -437,6 +478,18 @@ export async function getEmsReportTrends(
         yesAttendedCount: { $sum: { $cond: ['$__yesAttended', 1, 0] } },
         purchasedCount: { $sum: { $cond: ['$__purchased', 1, 0] } },
         willingYesCount: { $sum: { $cond: ['$__willingYes', 1, 0] } },
+        activityQualitySum: {
+          $sum: {
+            $cond: [
+              { $and: ['$__isConnected', '$__hasQualityRating'] },
+              { $ifNull: ['$callLog.activityQuality', 0] },
+              0,
+            ],
+          },
+        },
+        activityQualityCount: {
+          $sum: { $cond: [{ $and: ['$__isConnected', '$__hasQualityRating'] }, 1, 0] },
+        },
       },
     },
   ]).exec();
@@ -452,6 +505,8 @@ export async function getEmsReportTrends(
     const yesAttendedCount = Number(row.yesAttendedCount || 0);
     const purchasedCount = Number(row.purchasedCount || 0);
     const willingYesCount = Number(row.willingYesCount || 0);
+    const activityQualitySum = Number(row.activityQualitySum || 0);
+    const activityQualityCount = Number(row.activityQualityCount || 0);
 
     const mobileValidityPct =
       totalAttempted > 0 ? Math.round(((totalAttempted - invalidCount) / totalAttempted) * 100) : 0;
@@ -459,8 +514,12 @@ export async function getEmsReportTrends(
     const meetingConversionPct = totalConnected > 0 ? Math.round((purchasedCount / totalConnected) * 100) : 0;
     const purchaseIntentionPct =
       totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
+    const cropSolutionsFocusPct =
+      activityQualityCount > 0
+        ? Math.round((activityQualitySum / activityQualityCount / 5) * 100)
+        : 0;
     const emsScore = Math.round(
-      (mobileValidityPct + meetingValidityPct + meetingConversionPct + purchaseIntentionPct) / 4
+      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
     );
 
     rows.push({
@@ -472,6 +531,7 @@ export async function getEmsReportTrends(
       meetingValidityPct,
       meetingConversionPct,
       purchaseIntentionPct,
+      cropSolutionsFocusPct,
     });
   }
 
