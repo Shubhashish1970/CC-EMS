@@ -724,46 +724,48 @@ const TaskDashboardView: React.FC = () => {
               >
                 ← Back to Tasks by Language
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLoadingLanguageQueue(true);
-                  tasksAPI
-                    .getDashboardByLanguage(
-                      d.language,
-                      {
-                        dateFrom: filters.dateFrom || undefined,
-                        dateTo: filters.dateTo || undefined,
-                        bu: filters.bu || undefined,
-                        state: filters.state || undefined,
-                        agentId: languageQueueFilters.agentId || undefined,
-                        status: languageQueueFilters.status || undefined,
-                      },
-                      1,
-                      taskPageSize
-                    )
-                    .then((res: any) => res?.data && setLanguageQueueDetail(res.data))
-                    .catch(() => toast.showError('Failed to refresh'))
-                    .finally(() => setIsLoadingLanguageQueue(false));
-                }}
-                disabled={isLoadingLanguageQueue}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
-              >
-                <RefreshCw size={16} className={isLoadingLanguageQueue ? 'animate-spin' : ''} />
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLanguageQueueFilters((p) => !p)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  <Filter size={16} />
+                  {showLanguageQueueFilters ? 'Hide filters' : 'Filters'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoadingLanguageQueue(true);
+                    tasksAPI
+                      .getDashboardByLanguage(
+                        d.language,
+                        {
+                          dateFrom: filters.dateFrom || undefined,
+                          dateTo: filters.dateTo || undefined,
+                          bu: filters.bu || undefined,
+                          state: filters.state || undefined,
+                          agentId: languageQueueFilters.agentId || undefined,
+                          status: languageQueueFilters.status || undefined,
+                        },
+                        1,
+                        taskPageSize
+                      )
+                      .then((res: any) => res?.data && setLanguageQueueDetail(res.data))
+                      .catch(() => toast.showError('Failed to refresh'))
+                      .finally(() => setIsLoadingLanguageQueue(false));
+                  }}
+                  disabled={isLoadingLanguageQueue}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+                >
+                  <RefreshCw size={16} className={isLoadingLanguageQueue ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+              </div>
             </div>
             <h2 className="text-xl font-black text-slate-900">Queue for language: {d.language}</h2>
             <p className="text-sm text-slate-600 mt-1">Statistics and task list for this language only. Use filters below to narrow by date, agent, call status, BU, or State.</p>
 
-            <button
-              type="button"
-              onClick={() => setShowLanguageQueueFilters((p) => !p)}
-              className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <Filter size={16} />
-              {showLanguageQueueFilters ? 'Hide filters' : 'Filters'}
-            </button>
             {showLanguageQueueFilters && (
             <div className="mt-3 grid grid-cols-1 md:grid-cols-5 gap-3">
               <div className="md:col-span-2">
@@ -968,46 +970,48 @@ const TaskDashboardView: React.FC = () => {
             >
               ← Back to Workload
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!selectedAgentId) return;
-                setIsLoadingDetail(true);
-                tasksAPI
-                  .getDashboardAgent(
-                    selectedAgentId,
-                    selectedLanguage ?? undefined,
-                    1,
-                    taskPageSize,
-                    {
-                      dateFrom: filters.dateFrom || undefined,
-                      dateTo: filters.dateTo || undefined,
-                      bu: filters.bu || undefined,
-                      state: filters.state || undefined,
-                      status: agentDetailFilters.status || undefined,
-                      fda: agentDetailFilters.fda || undefined,
-                    }
-                  )
-                  .then((res: any) => res?.data && setAgentDetail(res.data))
-                  .catch(() => toast.showError('Failed to refresh'))
-                  .finally(() => setIsLoadingDetail(false));
-              }}
-              disabled={isLoadingDetail}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAgentDetailFilters((p) => !p)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                <Filter size={16} />
+                {showAgentDetailFilters ? 'Hide filters' : 'Filters'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedAgentId) return;
+                  setIsLoadingDetail(true);
+                  tasksAPI
+                    .getDashboardAgent(
+                      selectedAgentId,
+                      selectedLanguage ?? undefined,
+                      1,
+                      taskPageSize,
+                      {
+                        dateFrom: filters.dateFrom || undefined,
+                        dateTo: filters.dateTo || undefined,
+                        bu: filters.bu || undefined,
+                        state: filters.state || undefined,
+                        status: agentDetailFilters.status || undefined,
+                        fda: agentDetailFilters.fda || undefined,
+                      }
+                    )
+                    .then((res: any) => res?.data && setAgentDetail(res.data))
+                    .catch(() => toast.showError('Failed to refresh'))
+                    .finally(() => setIsLoadingDetail(false));
+                }}
+                disabled={isLoadingDetail}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={isLoadingDetail ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAgentDetailFilters((p) => !p)}
-            className="flex items-center gap-2 mt-4 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <Filter size={16} />
-            {showAgentDetailFilters ? 'Hide filters' : 'Filters'}
-          </button>
           {showAgentDetailFilters && (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
             <div className="md:col-span-2">
