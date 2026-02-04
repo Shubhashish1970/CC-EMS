@@ -978,30 +978,43 @@ const ActivityEmsProgressView: React.FC = () => {
                   <div className="flex flex-col sm:flex-row gap-4 items-start">
                     <div className="relative w-full sm:w-[260px] h-[260px] shrink-0 flex items-center justify-center">
                       <ResponsiveContainer width="100%" height={260}>
-                        <PieChart margin={{ top: 24, right: 24, bottom: 24, left: 24 }}>
+                        <PieChart margin={{ top: 28, right: 28, bottom: 28, left: 28 }}>
                           <Pie
                             data={donutData.filter((d) => d.value > 0)}
                             dataKey="value"
                             nameKey="name"
-                            innerRadius={60}
-                            outerRadius={90}
+                            innerRadius={52}
+                            outerRadius={78}
                             paddingAngle={1}
                             stroke="white"
                             strokeWidth={1}
-                            label={({ name, percent, x, y }) =>
-                              percent >= 0.03 ? (
-                                <text x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="#334155">
+                            label={({ name, percent, x, y }) => {
+                              if (percent < 0.03) return null;
+                              const cx = 130;
+                              const cy = 130;
+                              const dx = x - cx;
+                              const dy = y - cy;
+                              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                              const push = 22;
+                              const outX = cx + (dx / dist) * (dist + push);
+                              const outY = cy + (dy / dist) * (dist + push);
+                              return (
+                                <text x={outX} y={outY} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#334155">
                                   {name}: {(percent * 100).toFixed(0)}%
                                 </text>
-                              ) : null
-                            }
+                              );
+                            }}
                             labelLine={{ strokeWidth: 1, stroke: '#94a3b8' }}
                           >
                             {donutData.filter((d) => d.value > 0).map((d) => (
                               <Cell key={d.key} fill={statusColors[d.key]} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                          <Tooltip
+                            formatter={(value: number, name: string) => [value, name]}
+                            contentStyle={{ fontSize: 11, padding: '6px 8px' }}
+                            itemStyle={{ fontSize: 11 }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
