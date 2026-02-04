@@ -28,6 +28,8 @@ import {
   ZAxis,
   ReferenceLine,
   LabelList,
+  PieChart,
+  Pie,
 } from 'recharts';
 import {
   BarChart3,
@@ -937,50 +939,117 @@ const ActivityEmsProgressView: React.FC = () => {
           </div>
         </div>
         )}
-        </div>
-      )}
 
-      {/* Meeting Attendance Quality (100% stacked bar by group) */}
-      {emsDetailRows.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Meeting Validity – Breakdown (3rd quadrant): donut + table, same template, respects filters */}
+        {totals.totalConnected > 0 && (
+        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-black text-slate-900">Meeting Attendance Quality</h3>
-            <p className="text-xs text-slate-500 mt-1">100% stacked by group; label = Meeting Validity %</p>
+            <h3 className="text-lg font-black text-slate-900">Meeting Validity – Breakdown</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Formula: Meeting Validity = (Yes attended ÷ Connected) × 100 ={' '}
+              <span className="font-semibold text-slate-700">
+                {totals.yesAttendedCount} ÷ {totals.totalConnected} × 100 = {totals.meetingValidityPct}%
+              </span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Only <strong className="text-green-600">Yes, I attended</strong> counts toward Meeting Validity; No missed, Don&apos;t recall, Identity Wrong, and Not a Farmer lower the %.
+            </p>
           </div>
           <div className="p-6">
-            <ResponsiveContainer width="100%" height={Math.max(280, emsDetailRows.length * 36)}>
-              <BarChart data={emsDetailRows.map((r) => {
-                const total = (r.yesAttendedCount ?? 0) + (r.noMissedCount ?? 0) + (r.dontRecallCount ?? 0) + (r.identityWrongCount ?? 0) + (r.notAFarmerCount ?? 0) || 1;
-                return {
-                  name: r.groupLabel || r.groupKey,
-                  yes: Math.round(((r.yesAttendedCount ?? 0) / total) * 100),
-                  no: Math.round(((r.noMissedCount ?? 0) / total) * 100),
-                  maybe: Math.round(((r.dontRecallCount ?? 0) / total) * 100),
-                  identityWrong: Math.round(((r.identityWrongCount ?? 0) / total) * 100),
-                  notFarmer: Math.round(((r.notAFarmerCount ?? 0) / total) * 100),
-                  meetingValidityPct: r.meetingValidityPct,
-                };
-              })} layout="vertical" margin={{ top: 8, right: 24, left: 100, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [`${v}%`, '']} />
-                <Legend />
-                <Bar dataKey="yes" stackId="a" name="Yes attended" fill="#22c55e" />
-                <Bar dataKey="no" stackId="a" name="No (missed)" fill="#ef4444" />
-                <Bar dataKey="maybe" stackId="a" name="Maybe" fill="#f59e0b" />
-                <Bar dataKey="identityWrong" stackId="a" name="Identity Wrong" fill="#8b5cf6" />
-                <Bar dataKey="notFarmer" stackId="a" name="Not a Farmer" fill="#64748b" />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex flex-wrap gap-4 mt-2">
-              {emsDetailRows.slice(0, 12).map((r) => (
-                <span key={r.groupKey} className="text-xs text-slate-600">
-                  <strong>{r.groupLabel || r.groupKey}</strong>: {r.meetingValidityPct}%
-                </span>
-              ))}
-            </div>
+            {(() => {
+              const statusRows = [
+                { label: 'Yes, I attended', count: totals.yesAttendedCount, key: 'YesAttended', countsForValidity: true },
+                { label: 'No, I missed', count: totals.noMissedCount, key: 'NoMissed' },
+                { label: "Don't recall", count: totals.dontRecallCount, key: 'DontRecall' },
+                { label: 'Identity Wrong', count: totals.identityWrongCount, key: 'IdentityWrong' },
+                { label: 'Not a Farmer', count: totals.notAFarmerCount, key: 'NotAFarmer' },
+              ];
+              const statusColors: Record<string, string> = {
+                YesAttended: '#22c55e',
+                NoMissed: '#94a3b8',
+                DontRecall: '#64748b',
+                IdentityWrong: '#475569',
+                NotAFarmer: '#ef4444',
+              };
+              const donutData = statusRows.map((r) => ({ name: r.label, value: r.count, key: r.key }));
+              return (
+                <>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By status (did attend)</p>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    <div className="relative w-full sm:w-[200px] h-[200px] shrink-0">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={donutData.filter((d) => d.value > 0)}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={56}
+                            outerRadius={80}
+                            paddingAngle={1}
+                            stroke="white"
+                            strokeWidth={1}
+                            label={({ name, percent }) => (percent >= 0.08 ? `${name}: ${(percent * 100).toFixed(0)}%` : '')}
+                            labelLine={{ strokeWidth: 1 }}
+                          >
+                            {donutData.filter((d) => d.value > 0).map((d) => (
+                              <Cell key={d.key} fill={statusColors[d.key]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number, name: string) => [value, name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-2xl font-black text-slate-700">{totals.meetingValidityPct}%</span>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto flex-1 min-w-0">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200">
+                            <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[7rem]">Status</th>
+                            <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-14">Count</th>
+                            <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-20">%</th>
+                            <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[100px]">Bar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {statusRows.map((row) => {
+                            const pct = totals.totalConnected > 0 ? (row.count / totals.totalConnected) * 100 : 0;
+                            const pctRounded = Math.round(pct);
+                            const barColor = statusColors[row.key];
+                            const countsForValidity = (row as { countsForValidity?: boolean }).countsForValidity;
+                            return (
+                              <tr
+                                key={row.label}
+                                className={`border-b border-slate-100 ${countsForValidity ? 'bg-green-50 font-medium text-green-800' : 'text-slate-700'}`}
+                              >
+                                <td className="py-1.5 px-2">{row.label}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums">{pctRounded}%</td>
+                                <td className="py-1.5 px-2">
+                                  <div className="h-5 min-w-[60px] max-w-[140px] rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-md min-w-0"
+                                      style={{
+                                        width: `${pct}%`,
+                                        backgroundColor: barColor,
+                                      }}
+                                    />
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
+        </div>
+        )}
         </div>
       )}
 
