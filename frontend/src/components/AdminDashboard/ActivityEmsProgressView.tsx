@@ -678,12 +678,12 @@ const ActivityEmsProgressView: React.FC = () => {
         />
       </div>
 
-      {/* Quadrants 1 & 2: Mobile No. Validity and Hygiene breakdowns side by side (respects current filters) */}
+      {/* Quadrants 1 & 2: Mobile + Hygiene side by side (50% each); row 2: Meeting Validity below Mobile (respects filters) */}
       {totals && (
-        <div className="flex flex-wrap gap-4 w-full">
+        <div className="grid grid-cols-2 gap-4 w-full">
         {/* Mobile No. Validity – 1st quadrant */}
         {totals.totalAttempted > 0 && (
-        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
             <h3 className="text-lg font-black text-slate-900">Mobile No. Validity – Breakdown</h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -812,7 +812,7 @@ const ActivityEmsProgressView: React.FC = () => {
 
         {/* Hygiene – 2nd quadrant */}
         {totals.totalConnected > 0 && (
-        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
             <h3 className="text-lg font-black text-slate-900">Hygiene – Breakdown</h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -940,9 +940,9 @@ const ActivityEmsProgressView: React.FC = () => {
         </div>
         )}
 
-        {/* Meeting Validity – Breakdown (3rd quadrant): donut + table, same template, respects filters */}
+        {/* Meeting Validity – Breakdown: below Mobile (row 2, col 1), donut + table, respects filters */}
         {totals.totalConnected > 0 && (
-        <div className="flex-1 min-w-[320px] max-w-[50%] bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
             <h3 className="text-lg font-black text-slate-900">Meeting Validity – Breakdown</h3>
             <p className="text-xs text-slate-500 mt-1">
