@@ -976,20 +976,26 @@ const ActivityEmsProgressView: React.FC = () => {
                 <>
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By status (did attend)</p>
                   <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="relative w-full sm:w-[200px] h-[200px] shrink-0">
-                      <ResponsiveContainer width="100%" height={200}>
-                        <PieChart>
+                    <div className="relative w-full sm:w-[260px] h-[260px] shrink-0 flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height={260}>
+                        <PieChart margin={{ top: 24, right: 24, bottom: 24, left: 24 }}>
                           <Pie
                             data={donutData.filter((d) => d.value > 0)}
                             dataKey="value"
                             nameKey="name"
-                            innerRadius={56}
-                            outerRadius={80}
+                            innerRadius={60}
+                            outerRadius={90}
                             paddingAngle={1}
                             stroke="white"
                             strokeWidth={1}
-                            label={({ name, percent }) => (percent >= 0.08 ? `${name}: ${(percent * 100).toFixed(0)}%` : '')}
-                            labelLine={{ strokeWidth: 1 }}
+                            label={({ name, percent, x, y }) =>
+                              percent >= 0.03 ? (
+                                <text x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="#334155">
+                                  {name}: {(percent * 100).toFixed(0)}%
+                                </text>
+                              ) : null
+                            }
+                            labelLine={{ strokeWidth: 1, stroke: '#94a3b8' }}
                           >
                             {donutData.filter((d) => d.value > 0).map((d) => (
                               <Cell key={d.key} fill={statusColors[d.key]} />
@@ -1009,14 +1015,12 @@ const ActivityEmsProgressView: React.FC = () => {
                             <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[7rem]">Status</th>
                             <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-14">Count</th>
                             <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-20">%</th>
-                            <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[100px]">Bar</th>
                           </tr>
                         </thead>
                         <tbody>
                           {statusRows.map((row) => {
                             const pct = totals.totalConnected > 0 ? (row.count / totals.totalConnected) * 100 : 0;
                             const pctRounded = Math.round(pct);
-                            const barColor = statusColors[row.key];
                             const countsForValidity = (row as { countsForValidity?: boolean }).countsForValidity;
                             return (
                               <tr
@@ -1026,17 +1030,6 @@ const ActivityEmsProgressView: React.FC = () => {
                                 <td className="py-1.5 px-2">{row.label}</td>
                                 <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
                                 <td className="py-1.5 px-2 text-right tabular-nums">{pctRounded}%</td>
-                                <td className="py-1.5 px-2">
-                                  <div className="h-5 min-w-[60px] max-w-[140px] rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
-                                    <div
-                                      className="h-full rounded-md min-w-0"
-                                      style={{
-                                        width: `${pct}%`,
-                                        backgroundColor: barColor,
-                                      }}
-                                    />
-                                  </div>
-                                </td>
                               </tr>
                             );
                           })}
