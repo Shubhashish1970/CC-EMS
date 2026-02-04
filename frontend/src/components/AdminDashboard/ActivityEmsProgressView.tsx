@@ -69,6 +69,7 @@ export type EmsTotals = {
   noMissedCount: number;
   notAFarmerCount: number;
   yesAttendedCount: number;
+  notPurchasedCount: number;
   purchasedCount: number;
   willingYesCount: number;
   yesPlusPurchasedCount: number;
@@ -1049,6 +1050,118 @@ const ActivityEmsProgressView: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+        )}
+
+        {/* Meeting Conversion – Breakdown: row 2, col 2 (same template as Mobile No. Validity) */}
+        {totals.totalConnected > 0 && (
+        <div className="w-full min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-lg font-black text-slate-900">Meeting Conversion – Breakdown</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Formula: Meeting Conversion = (Purchased ÷ Connected) × 100 ={' '}
+              <span className="font-semibold text-slate-700">
+                {totals.purchasedCount} ÷ {totals.totalConnected} × 100 = {totals.meetingConversionPct}%
+              </span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Only <strong className="text-green-600">Purchased</strong> (hasPurchased = Yes) counts toward Meeting Conversion; <strong className="text-slate-600">Not Purchased</strong> (No) does not.
+            </p>
+          </div>
+          <div className="p-6">
+            {(() => {
+              const notPurchased = totals.notPurchasedCount ?? totals.totalConnected - totals.purchasedCount;
+              const statusRows = [
+                { label: 'Purchased', count: totals.purchasedCount, key: 'Purchased' },
+                { label: 'Not Purchased', count: notPurchased, key: 'NotPurchased' },
+              ];
+              const statusColors: Record<string, string> = {
+                Purchased: '#22c55e',
+                NotPurchased: '#94a3b8',
+              };
+              return (
+                <>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">By purchase status</p>
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[7rem]">Status</th>
+                          <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-14">Count</th>
+                          <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-20">%</th>
+                          <th className="text-left py-1.5 px-2 font-semibold text-slate-700 min-w-[120px]">Bar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-slate-100 align-middle">
+                          <td className="py-1.5 px-2 text-slate-700 font-medium">Connected</td>
+                          <td colSpan={3} className="py-1.5 px-2 align-middle">
+                            <div className="w-full" style={{ height: 36 }}>
+                              <ResponsiveContainer width="100%" height={36}>
+                                <BarChart
+                                  data={[
+                                    {
+                                      name: 'Connected',
+                                      Purchased: totals.purchasedCount,
+                                      NotPurchased: notPurchased,
+                                    },
+                                  ]}
+                                  layout="vertical"
+                                  margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
+                                  barSize={20}
+                                  barCategoryGap={4}
+                                >
+                                  <XAxis type="number" domain={[0, totals.totalConnected]} hide />
+                                  <YAxis type="category" dataKey="name" width={0} tick={false} />
+                                  <Tooltip
+                                    formatter={(value: number, name: string) => [value, name]}
+                                    contentStyle={{ fontSize: 12 }}
+                                    labelFormatter={() => 'Connected'}
+                                  />
+                                  <Bar dataKey="Purchased" stackId="a" name="Purchased" fill={statusColors.Purchased} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="Purchased" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
+                                  </Bar>
+                                  <Bar dataKey="NotPurchased" stackId="a" name="Not Purchased" fill={statusColors.NotPurchased} radius={[0, 4, 4, 0]} isAnimationActive>
+                                    <LabelList dataKey="NotPurchased" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </td>
+                        </tr>
+                        {statusRows.map((row) => {
+                          const pct = totals.totalConnected > 0 ? (row.count / totals.totalConnected) * 100 : 0;
+                          const pctRounded = Math.round(pct);
+                          const barColor = statusColors[row.key];
+                          return (
+                            <tr
+                              key={row.label}
+                              className={`border-b border-slate-100 ${row.key === 'Purchased' ? 'bg-green-50 font-medium text-green-800' : 'text-slate-700'}`}
+                            >
+                              <td className="py-1.5 px-2">{row.label}</td>
+                              <td className="py-1.5 px-2 text-right tabular-nums">{row.count}</td>
+                              <td className="py-1.5 px-2 text-right tabular-nums">{pctRounded}%</td>
+                              <td className="py-1.5 px-2">
+                                <div className="h-5 min-w-[80px] max-w-[180px] rounded-md bg-slate-100 border border-slate-200 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-md min-w-0"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: barColor,
+                                    }}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </>
               );
