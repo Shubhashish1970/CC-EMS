@@ -67,7 +67,12 @@ const apiRequest = async <T>(
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: { message: 'Request failed' } }));
-      throw new Error(error.error?.message || `Request failed with status ${response.status}`);
+      const msg = error.error?.message || `Request failed with status ${response.status}`;
+      const details = error.error?.errors;
+      const detailStr = Array.isArray(details) && details.length > 0
+        ? ': ' + details.map((e: { msg?: string; path?: string }) => e.msg || e.path || '').join('; ')
+        : '';
+      throw new Error(msg + detailStr);
     }
 
     return response.json();

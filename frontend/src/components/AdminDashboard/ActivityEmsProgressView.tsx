@@ -154,8 +154,9 @@ function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
   const purchaseIntentionPct = totalConnected > 0 ? Math.round(((willingYesCount + purchasedCount) / totalConnected) * 100) : 0;
   const cropSolutionsFocusPct =
     activityQualityCount > 0 ? Math.round((activityQualitySum / activityQualityCount / 5) * 100) : 0;
+  // EMS Score = 25% Meeting Conversion + 25% Purchase Intention + 50% Crop Solutions Focus (Meeting Validity & Hygiene not included)
   const emsScore = Math.round(
-    (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
+    0.25 * meetingConversionPct + 0.25 * purchaseIntentionPct + 0.5 * cropSolutionsFocusPct
   );
   const validIdentity = totalConnected - identityWrongCount - notAFarmerCount;
   return {
@@ -608,7 +609,7 @@ const ActivityEmsProgressView: React.FC = () => {
               { label: 'Meeting Conversion (%)', value: totals.meetingConversionPct, formula: 'Out of all farmers we successfully spoke to, how many actually bought the product?', icon: ShoppingCart },
               { label: 'Purchase Intention (%)', value: totals.purchaseIntentionPct, formula: 'Out of all farmers we successfully spoke to, how many either bought or said they are willing to buy?', icon: Target },
               { label: 'Crop Solutions Focus (%)', value: totals.cropSolutionsFocusPct, formula: 'How close were we to delivering a perfect crop solution experience, as judged by farmers (1–5 stars)?', icon: Award },
-              { label: 'EMS Score (Totals)', value: totals.emsScore, formula: 'Average of Meeting Validity %, Meeting Conversion %, Purchase Intention %, Crop Solutions Focus %.', icon: FileBarChart },
+              { label: 'EMS Score (Totals)', value: totals.emsScore, formula: '25% × Meeting Conversion % + 25% × Purchase Intention % + 50% × Crop Solutions Focus %. Meeting Validity and Hygiene are displayed but not included in EMS Score.', icon: FileBarChart },
             ].map(({ label, value, formula, icon: Icon }) => {
               const isGood = value >= 70;
               const isModerate = value >= 50 && value < 70;

@@ -255,8 +255,9 @@ export async function getEmsReportSummary(
       activityQualityCount > 0
         ? Math.round((activityQualitySum / activityQualityCount / 5) * 100)
         : 0;
+    // EMS Score = 25% Meeting Conversion + 25% Purchase Intention + 50% Crop Solutions Focus (Meeting Validity & Hygiene not included)
     const emsScore = Math.round(
-      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
+      0.25 * meetingConversionPct + 0.25 * purchaseIntentionPct + 0.5 * cropSolutionsFocusPct
     );
     const yesPlusPurchasedCount = willingYesCount + purchasedCount;
     const relativeRemarks = buildRelativeRemarks(meetingValidityPct, meetingConversionPct, emsScore);
@@ -346,8 +347,9 @@ export async function getEmsReportLineLevel(
     const purchaseIntentionPct = totalConnected > 0 ? ((willingYes + purchased) / totalConnected) * 100 : 0;
     const q = log.activityQuality != null && log.activityQuality >= 1 && log.activityQuality <= 5 ? Number(log.activityQuality) : null;
     const cropSolutionsFocusPct = totalConnected > 0 && q != null ? Math.round((q / 5) * 100) : 0;
+    // EMS Score = 25% Meeting Conversion + 25% Purchase Intention + 50% Crop Solutions Focus
     const emsScore = Math.round(
-      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
+      0.25 * meetingConversionPct + 0.25 * purchaseIntentionPct + 0.5 * cropSolutionsFocusPct
     );
 
     const sentiment = log.sentiment != null ? String(log.sentiment) : 'N/A';
@@ -404,7 +406,7 @@ export interface EmsTrendRow {
 }
 
 /**
- * EMS trends: time-series of NBU-level metrics by period (daily, weekly, monthly).
+ * EMS trends: time-series of aggregate metrics by period (daily, weekly, monthly).
  * Uses activity.date for bucketing. Same filters as EMS report.
  */
 export async function getEmsReportTrends(
@@ -518,8 +520,9 @@ export async function getEmsReportTrends(
       activityQualityCount > 0
         ? Math.round((activityQualitySum / activityQualityCount / 5) * 100)
         : 0;
+    // EMS Score = 25% Meeting Conversion + 25% Purchase Intention + 50% Crop Solutions Focus
     const emsScore = Math.round(
-      (meetingValidityPct + meetingConversionPct + purchaseIntentionPct + cropSolutionsFocusPct) / 4
+      0.25 * meetingConversionPct + 0.25 * purchaseIntentionPct + 0.5 * cropSolutionsFocusPct
     );
 
     rows.push({

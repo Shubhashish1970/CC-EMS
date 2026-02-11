@@ -220,7 +220,7 @@ router.get(
       if (level === 'summary') {
         const summaryRows = rows as EmsReportSummaryRow[];
         const groupLabels = summaryRows.map((r) => r.groupLabel);
-        const nbu = summaryRows.reduce(
+        const totals = summaryRows.reduce(
           (acc, r) => ({
             totalAttempted: acc.totalAttempted + r.totalAttempted,
             totalConnected: acc.totalConnected + r.totalConnected,
@@ -264,44 +264,45 @@ router.get(
             activityQualityCount: 0,
           }
         );
-        const nbuMobileValidityPct = nbu.totalAttempted > 0 ? Math.round(((nbu.totalAttempted - nbu.invalidCount) / nbu.totalAttempted) * 100) : 0;
-        const nbuHygienePct = nbu.totalConnected > 0 ? Math.round(((nbu.totalConnected - nbu.identityWrongCount - nbu.notAFarmerCount) / nbu.totalConnected) * 100) : 0;
-        const nbuMeetingValidityPct = nbu.totalConnected > 0 ? Math.round((nbu.yesAttendedCount / nbu.totalConnected) * 100) : 0;
-        const nbuMeetingConversionPct = nbu.totalConnected > 0 ? Math.round((nbu.purchasedCount / nbu.totalConnected) * 100) : 0;
-        const nbuPurchaseIntentionPct = nbu.totalConnected > 0 ? Math.round((nbu.yesPlusPurchasedCount / nbu.totalConnected) * 100) : 0;
-        const nbuCropSolutionsFocusPct =
-          nbu.activityQualityCount > 0
-            ? Math.round((nbu.activityQualitySum / nbu.activityQualityCount / 5) * 100)
+        const totalsMobileValidityPct = totals.totalAttempted > 0 ? Math.round(((totals.totalAttempted - totals.invalidCount) / totals.totalAttempted) * 100) : 0;
+        const totalsHygienePct = totals.totalConnected > 0 ? Math.round(((totals.totalConnected - totals.identityWrongCount - totals.notAFarmerCount) / totals.totalConnected) * 100) : 0;
+        const totalsMeetingValidityPct = totals.totalConnected > 0 ? Math.round((totals.yesAttendedCount / totals.totalConnected) * 100) : 0;
+        const totalsMeetingConversionPct = totals.totalConnected > 0 ? Math.round((totals.purchasedCount / totals.totalConnected) * 100) : 0;
+        const totalsPurchaseIntentionPct = totals.totalConnected > 0 ? Math.round((totals.yesPlusPurchasedCount / totals.totalConnected) * 100) : 0;
+        const totalsCropSolutionsFocusPct =
+          totals.activityQualityCount > 0
+            ? Math.round((totals.activityQualitySum / totals.activityQualityCount / 5) * 100)
             : 0;
-        const nbuEmsScore = Math.round(
-          (nbuMeetingValidityPct + nbuMeetingConversionPct + nbuPurchaseIntentionPct + nbuCropSolutionsFocusPct) / 4
+        // EMS Score = 25% Meeting Conversion + 25% Purchase Intention + 50% Crop Solutions Focus (Meeting Validity & Hygiene not included)
+        const totalsEmsScore = Math.round(
+          0.25 * totalsMeetingConversionPct + 0.25 * totalsPurchaseIntentionPct + 0.5 * totalsCropSolutionsFocusPct
         );
 
         const metricRows: [string, ...(string | number)[]][] = [
-          ['Connected', ...summaryRows.map((r) => r.totalConnected), nbu.totalConnected],
-          ['Disconnected', ...summaryRows.map((r) => r.disconnectedCount), nbu.disconnectedCount],
-          ['Incoming not allowed', ...summaryRows.map((r) => r.incomingNACount), nbu.incomingNACount],
-          ['Invalid', ...summaryRows.map((r) => r.invalidCount), nbu.invalidCount],
-          ['No Ans', ...summaryRows.map((r) => r.noAnswerCount), nbu.noAnswerCount],
-          ['Total calls made', ...summaryRows.map((r) => r.totalAttempted), nbu.totalAttempted],
-          ['Mobile no. validity (%)', ...summaryRows.map((r) => r.mobileValidityPct), nbuMobileValidityPct],
-          ['Identity Wrong', ...summaryRows.map((r) => r.identityWrongCount), nbu.identityWrongCount],
-          ['Maybe', ...summaryRows.map((r) => r.dontRecallCount), nbu.dontRecallCount],
-          ['No', ...summaryRows.map((r) => r.noMissedCount), nbu.noMissedCount],
-          ['Not a Farmer', ...summaryRows.map((r) => r.notAFarmerCount), nbu.notAFarmerCount],
-          ['Yes', ...summaryRows.map((r) => r.yesAttendedCount), nbu.yesAttendedCount],
-          ['Hygiene (%)', ...summaryRows.map((r) => r.hygienePct), nbuHygienePct],
-          ['Meeting validity (%)', ...summaryRows.map((r) => r.meetingValidityPct), nbuMeetingValidityPct],
-          ['Not Purchased', ...summaryRows.map((r) => r.notPurchasedCount), nbu.notPurchasedCount],
-          ['Purchased', ...summaryRows.map((r) => r.purchasedCount), nbu.purchasedCount],
-          ['Meeting conversion (%)', ...summaryRows.map((r) => r.meetingConversionPct), nbuMeetingConversionPct],
-          ['Maybe', ...summaryRows.map((r) => r.willingMaybeCount), nbu.willingMaybeCount],
-          ['No', ...summaryRows.map((r) => r.willingNoCount), nbu.willingNoCount],
-          ['Yes', ...summaryRows.map((r) => r.willingYesCount), nbu.willingYesCount],
-          ['Yes + Purchased', ...summaryRows.map((r) => r.yesPlusPurchasedCount), nbu.yesPlusPurchasedCount],
-          ['Purchase Intention (%)', ...summaryRows.map((r) => r.purchaseIntentionPct), nbuPurchaseIntentionPct],
-          ['Crop Solutions Focus (%)', ...summaryRows.map((r) => r.cropSolutionsFocusPct), nbuCropSolutionsFocusPct],
-          ['EMS Score', ...summaryRows.map((r) => r.emsScore), nbuEmsScore],
+          ['Connected', ...summaryRows.map((r) => r.totalConnected), totals.totalConnected],
+          ['Disconnected', ...summaryRows.map((r) => r.disconnectedCount), totals.disconnectedCount],
+          ['Incoming not allowed', ...summaryRows.map((r) => r.incomingNACount), totals.incomingNACount],
+          ['Invalid', ...summaryRows.map((r) => r.invalidCount), totals.invalidCount],
+          ['No Ans', ...summaryRows.map((r) => r.noAnswerCount), totals.noAnswerCount],
+          ['Total calls made', ...summaryRows.map((r) => r.totalAttempted), totals.totalAttempted],
+          ['Mobile no. validity (%)', ...summaryRows.map((r) => r.mobileValidityPct), totalsMobileValidityPct],
+          ['Identity Wrong', ...summaryRows.map((r) => r.identityWrongCount), totals.identityWrongCount],
+          ['Maybe', ...summaryRows.map((r) => r.dontRecallCount), totals.dontRecallCount],
+          ['No', ...summaryRows.map((r) => r.noMissedCount), totals.noMissedCount],
+          ['Not a Farmer', ...summaryRows.map((r) => r.notAFarmerCount), totals.notAFarmerCount],
+          ['Yes', ...summaryRows.map((r) => r.yesAttendedCount), totals.yesAttendedCount],
+          ['Hygiene (%)', ...summaryRows.map((r) => r.hygienePct), totalsHygienePct],
+          ['Meeting validity (%)', ...summaryRows.map((r) => r.meetingValidityPct), totalsMeetingValidityPct],
+          ['Not Purchased', ...summaryRows.map((r) => r.notPurchasedCount), totals.notPurchasedCount],
+          ['Purchased', ...summaryRows.map((r) => r.purchasedCount), totals.purchasedCount],
+          ['Meeting conversion (%)', ...summaryRows.map((r) => r.meetingConversionPct), totalsMeetingConversionPct],
+          ['Maybe', ...summaryRows.map((r) => r.willingMaybeCount), totals.willingMaybeCount],
+          ['No', ...summaryRows.map((r) => r.willingNoCount), totals.willingNoCount],
+          ['Yes', ...summaryRows.map((r) => r.willingYesCount), totals.willingYesCount],
+          ['Yes + Purchased', ...summaryRows.map((r) => r.yesPlusPurchasedCount), totals.yesPlusPurchasedCount],
+          ['Purchase Intention (%)', ...summaryRows.map((r) => r.purchaseIntentionPct), totalsPurchaseIntentionPct],
+          ['Crop Solutions Focus (%)', ...summaryRows.map((r) => r.cropSolutionsFocusPct), totalsCropSolutionsFocusPct],
+          ['EMS Score', ...summaryRows.map((r) => r.emsScore), totalsEmsScore],
           ['Relative Remarks', ...summaryRows.map((r) => r.relativeRemarks), '—'],
         ];
         const headerRow = ['', ...groupLabels, 'Totals'];

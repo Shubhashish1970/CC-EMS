@@ -375,7 +375,7 @@ router.put(
     body('eligibleActivityTypes').optional().isArray(),
     body('autoRunEnabled').optional().isBoolean(),
     body('autoRunThreshold').optional().isInt({ min: 1, max: 100000 }),
-    body('autoRunActivateFrom').optional().isISO8601(),
+    body('autoRunActivateFrom').optional({ checkFalsy: true }).isISO8601(),
     body('taskDueInDays').optional().isInt({ min: 0, max: 365 }),
   ],
   async (req: Request, res: Response, next: NextFunction) => {
@@ -389,11 +389,12 @@ router.put(
       }
 
       const authUserId = (req as any).user?._id;
+      const body = req.body as any;
       const update: any = {
-        ...req.body,
+        ...body,
         updatedByUserId: authUserId || null,
       };
-      if (req.body.autoRunActivateFrom === '' || req.body.autoRunActivateFrom === null) {
+      if (body.autoRunActivateFrom === '' || body.autoRunActivateFrom === null || body.autoRunActivateFrom === undefined) {
         update.autoRunActivateFrom = null;
       }
 

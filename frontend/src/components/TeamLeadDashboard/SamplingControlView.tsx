@@ -341,16 +341,17 @@ const SamplingControlView: React.FC = () => {
   const handleSaveConfig = async () => {
     setIsLoading(true);
     try {
-      await samplingAPI.updateConfig({
+      const payload: Parameters<typeof samplingAPI.updateConfig>[0] = {
         eligibleActivityTypes: eligibleTypes,
-        activityCoolingDays,
-        farmerCoolingDays,
-        defaultPercentage,
+        activityCoolingDays: Math.max(0, Math.min(365, activityCoolingDays)),
+        farmerCoolingDays: Math.max(0, Math.min(365, farmerCoolingDays)),
+        defaultPercentage: Math.max(1, Math.min(100, defaultPercentage)),
         autoRunEnabled,
-        autoRunThreshold,
-        autoRunActivateFrom: autoRunActivateFrom || null,
+        autoRunThreshold: Math.max(1, Math.min(100000, autoRunThreshold)),
         taskDueInDays: Math.max(0, Math.min(365, taskDueInDays)),
-      });
+      };
+      if (autoRunActivateFrom?.trim()) payload.autoRunActivateFrom = autoRunActivateFrom.trim();
+      await samplingAPI.updateConfig(payload);
       // Requirement: if a type is not selected, activities of that type should move to Not Eligible.
       await samplingAPI.applyEligibility(eligibleTypes);
       toast.showSuccess('Saved & applied');
