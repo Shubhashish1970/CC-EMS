@@ -306,7 +306,11 @@ router.get(
           ['Relative Remarks', ...summaryRows.map((r) => r.relativeRemarks), '—'],
         ];
         const headerRow = ['', ...groupLabels, 'Totals'];
-        const sheetData = [headerRow, ...metricRows];
+        const totalsNote =
+          'Note: Totals = sum of counts across groups. Percentage rows = (sum of numerator) / (sum of denominator), not average of group %.';
+        const taskAllocNote =
+          'When date range is used, EMS uses task scheduled date so Total calls made = Completed + Not reachable + Invalid from Team Lead Task Allocation (same scope).';
+        const sheetData = [headerRow, [totalsNote], [taskAllocNote], ...metricRows];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), 'EMS Report');
       } else {
         const lineRows = rows as EmsReportLineRow[];

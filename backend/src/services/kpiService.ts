@@ -35,6 +35,23 @@ export function buildActivityMatch(filters: EmsProgressFilters | undefined): Rec
   return match;
 }
 
+/** Activity match without date (used when filtering by task scheduledDate so EMS totals tally with Task Allocation). */
+export function buildActivityMatchWithoutDate(filters: EmsProgressFilters | undefined): Record<string, unknown> {
+  const match: Record<string, unknown> = {};
+  if (!filters) return match;
+  if (filters.activityType) match.type = filters.activityType;
+  if (filters.state) match.state = filters.state;
+  if (filters.territory) {
+    match.$or = [
+      { territoryName: filters.territory },
+      { territory: filters.territory },
+    ];
+  }
+  if (filters.zone) match.zoneName = filters.zone;
+  if (filters.bu) match.buName = filters.bu;
+  return match;
+}
+
 export interface EmsProgressSummary {
   activities: {
     total: number;
