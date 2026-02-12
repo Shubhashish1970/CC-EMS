@@ -1819,9 +1819,8 @@ router.get(
       if (bu) activityFilter['activity.buName'] = String(bu);
       if (state) activityFilter['activity.state'] = String(state);
 
-      // Scope for dashboard totals:
-      // - Unassigned tasks (pool to allocate)
-      // - Plus team-assigned open tasks (sampled_in_queue + in_progress) to show agent workload
+      // Scope for dashboard: all task statuses so totals add up (unassigned, sampled_in_queue, in_progress, completed, not_reachable, invalid_number)
+      const allMatch: any = { ...dateMatch };
       const openMatch: any = {
         ...dateMatch,
         status: { $in: ['unassigned', 'sampled_in_queue', 'in_progress'] },
@@ -1875,9 +1874,9 @@ router.get(
 
       const totalUnassigned = byLanguage.reduce((sum: number, r: any) => sum + (r.unassigned || 0), 0);
 
-      // 2) Open totals + by-language breakdown (unassigned + team sampled_in_queue + team in_progress)
+      // 2) By-language breakdown: all statuses so Total = unassigned + sampled_in_queue + in_progress + completed + not_reachable + invalid_number
       const openByLanguage = await CallTask.aggregate([
-        { $match: openMatch },
+        { $match: allMatch },
         {
           $lookup: {
             from: Farmer.collection.name,
@@ -1900,42 +1899,51 @@ router.get(
         {
           $group: {
             _id: { $ifNull: ['$farmer.preferredLanguage', 'Unknown'] },
-            totalOpen: { $sum: 1 },
+            total: { $sum: 1 },
             unassigned: { $sum: { $cond: [{ $eq: ['$status', 'unassigned'] }, 1, 0] } },
             sampledInQueue: { $sum: { $cond: [{ $eq: ['$status', 'sampled_in_queue'] }, 1, 0] } },
             inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+            completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            notReachable: { $sum: { $cond: [{ $eq: ['$status', 'not_reachable'] }, 1, 0] } },
+            invalidNumber: { $sum: { $cond: [{ $eq: ['$status', 'invalid_number'] }, 1, 0] } },
           },
         },
         {
           $project: {
             _id: 0,
             language: '$_id',
-            totalOpen: 1,
+            total: 1,
             unassigned: 1,
             sampledInQueue: 1,
             inProgress: 1,
+            completed: 1,
+            notReachable: 1,
+            invalidNumber: 1,
           },
         },
       ]);
 
       const openTotals = openByLanguage.reduce(
         (acc: any, r: any) => {
-          acc.totalOpen += r.totalOpen || 0;
+          acc.total += r.total || 0;
           acc.unassigned += r.unassigned || 0;
           acc.sampledInQueue += r.sampledInQueue || 0;
           acc.inProgress += r.inProgress || 0;
+          acc.completed += r.completed || 0;
+          acc.notReachable += r.notReachable || 0;
+          acc.invalidNumber += r.invalidNumber || 0;
           return acc;
         },
-        { totalOpen: 0, unassigned: 0, sampledInQueue: 0, inProgress: 0 }
+        { total: 0, unassigned: 0, sampledInQueue: 0, inProgress: 0, completed: 0, notReachable: 0, invalidNumber: 0 }
       );
 
-      // 3) Agent workload: sampled_in_queue + in_progress (with BU/State activity filter)
+      // 3) Agent workload: all statuses (sampled_in_queue, in_progress, completed, not_reachable, invalid_number) so Total adds up
       const workloadAgg = agentIds.length
         ? await CallTask.aggregate([
             {
               $match: {
                 assignedAgentId: { $in: agentIds },
-                status: { $in: ['sampled_in_queue', 'in_progress'] },
+                status: { $in: ['sampled_in_queue', 'in_progress', 'completed', 'not_reachable', 'invalid_number'] },
                 ...dateMatch,
               },
             },
@@ -1958,18 +1966,24 @@ router.get(
           ])
         : [];
 
-      const workloadMap = new Map<string, { sampled_in_queue: number; in_progress: number }>();
+      type WorkloadCounts = { sampled_in_queue: number; in_progress: number; completed: number; not_reachable: number; invalid_number: number };
+      const workloadMap = new Map<string, WorkloadCounts>();
       for (const row of workloadAgg) {
         const agentId = row._id?.agentId?.toString();
-        const status = row._id?.status as 'sampled_in_queue' | 'in_progress';
+        const status = row._id?.status as keyof WorkloadCounts;
         if (!agentId) continue;
-        const current = workloadMap.get(agentId) || { sampled_in_queue: 0, in_progress: 0 };
-        current[status] = row.count || 0;
+        const current = workloadMap.get(agentId) || {
+          sampled_in_queue: 0, in_progress: 0, completed: 0, not_reachable: 0, invalid_number: 0,
+        };
+        if (current.hasOwnProperty(status)) current[status] = row.count || 0;
         workloadMap.set(agentId, current);
       }
 
       const agentWorkload = agents.map((a) => {
-        const c = workloadMap.get(a._id.toString()) || { sampled_in_queue: 0, in_progress: 0 };
+        const c = workloadMap.get(a._id.toString()) || {
+          sampled_in_queue: 0, in_progress: 0, completed: 0, not_reachable: 0, invalid_number: 0,
+        };
+        const total = c.sampled_in_queue + c.in_progress + c.completed + c.not_reachable + c.invalid_number;
         return {
           agentId: a._id.toString(),
           name: a.name,
@@ -1978,7 +1992,10 @@ router.get(
           languageCapabilities: Array.isArray((a as any).languageCapabilities) ? (a as any).languageCapabilities : [],
           sampledInQueue: c.sampled_in_queue,
           inProgress: c.in_progress,
-          totalOpen: c.sampled_in_queue + c.in_progress,
+          completed: c.completed,
+          notReachable: c.not_reachable,
+          invalidNumber: c.invalid_number,
+          totalOpen: total,
         };
       });
 
@@ -2042,11 +2059,13 @@ router.get(
           unassignedByLanguage: byLanguage,
           totals: {
             totalUnassigned, // filtered unassigned pool (BU/State applied)
-            totalOpen: openTotals.totalOpen,
+            total: openTotals.total,
             unassigned: openTotals.unassigned,
             sampledInQueue: openTotals.sampledInQueue,
             inProgress: openTotals.inProgress,
-            assigned: openTotals.sampledInQueue + openTotals.inProgress,
+            completed: openTotals.completed,
+            notReachable: openTotals.notReachable,
+            invalidNumber: openTotals.invalidNumber,
           },
           openByLanguage,
           agentWorkload,

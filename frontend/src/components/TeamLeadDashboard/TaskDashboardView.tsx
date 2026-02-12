@@ -246,18 +246,21 @@ const TaskDashboardView: React.FC = () => {
     return Array.isArray(data?.agentWorkload) ? [...data.agentWorkload] : [];
   }, [data]);
 
-  type LanguageTableSortKey = 'language' | 'totalOpen' | 'unassigned' | 'sampledInQueue' | 'inProgress';
-  type AgentTableSortKey = 'agent' | 'employeeId' | 'languages' | 'sampledInQueue' | 'inProgress' | 'totalOpen';
+  type LanguageTableSortKey = 'language' | 'total' | 'unassigned' | 'sampledInQueue' | 'inProgress' | 'completed' | 'notReachable' | 'invalidNumber';
+  type AgentTableSortKey = 'agent' | 'employeeId' | 'languages' | 'sampledInQueue' | 'inProgress' | 'completed' | 'notReachable' | 'invalidNumber' | 'totalOpen';
 
   const [languageTableSort, setLanguageTableSort] = useState<{ key: LanguageTableSortKey; dir: 'asc' | 'desc' }>(() => {
     const raw = localStorage.getItem('teamLead.languageTable.tableSort');
     try {
       const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) return parsed;
+      if (parsed?.key && (parsed.dir === 'asc' || parsed.dir === 'desc')) {
+        const key = parsed.key === 'totalOpen' ? 'total' : parsed.key;
+        return { key: key as LanguageTableSortKey, dir: parsed.dir };
+      }
     } catch {
       // ignore
     }
-    return { key: 'totalOpen', dir: 'desc' };
+    return { key: 'total', dir: 'desc' };
   });
   const [agentTableSort, setAgentTableSort] = useState<{ key: AgentTableSortKey; dir: 'asc' | 'desc' }>(() => {
     const raw = localStorage.getItem('teamLead.agentWorkload.tableSort');
@@ -281,14 +284,20 @@ const TaskDashboardView: React.FC = () => {
     switch (key) {
       case 'language':
         return (r.language || '').toLowerCase();
-      case 'totalOpen':
-        return Number(r.totalOpen ?? 0);
+      case 'total':
+        return Number(r.total ?? r.totalOpen ?? 0);
       case 'unassigned':
         return Number(r.unassigned ?? 0);
       case 'sampledInQueue':
         return Number(r.sampledInQueue ?? 0);
       case 'inProgress':
         return Number(r.inProgress ?? 0);
+      case 'completed':
+        return Number(r.completed ?? 0);
+      case 'notReachable':
+        return Number(r.notReachable ?? 0);
+      case 'invalidNumber':
+        return Number(r.invalidNumber ?? 0);
       default:
         return '';
     }
@@ -305,8 +314,14 @@ const TaskDashboardView: React.FC = () => {
         return Number(a.sampledInQueue ?? 0);
       case 'inProgress':
         return Number(a.inProgress ?? 0);
+      case 'completed':
+        return Number(a.completed ?? 0);
+      case 'notReachable':
+        return Number(a.notReachable ?? 0);
+      case 'invalidNumber':
+        return Number(a.invalidNumber ?? 0);
       case 'totalOpen':
-        return Number(a.sampledInQueue ?? 0) + Number(a.inProgress ?? 0);
+        return Number(a.totalOpen ?? 0);
       default:
         return '';
     }
@@ -1471,15 +1486,16 @@ const TaskDashboardView: React.FC = () => {
         )}
       </div>
 
-      {/* Unassigned by language */}
+      {/* Tasks by language – full status breakdown so Total adds up */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black text-slate-900">Tasks by Language (Open)</h3>
+          <h3 className="text-lg font-black text-slate-900">Tasks by Language</h3>
           <div className="text-sm font-bold text-slate-600">
             Total Unassigned: <span className="font-black text-slate-900">{data?.totals?.totalUnassigned ?? 0}</span>
+            <span className="ml-4 text-slate-500">Total tasks: <span className="font-black text-slate-700">{data?.totals?.total ?? 0}</span></span>
           </div>
         </div>
-        <p className="text-sm text-slate-600 mt-1">Click a language to view Queue Statistics and task list for that language only.</p>
+        <p className="text-sm text-slate-600 mt-1">Full status breakdown so Total = Unassigned + Sampled-in-queue + In-progress + Completed + Not reachable + Invalid. Click a language to view queue and task list.</p>
 
         {/* Allocation controls */}
         <div className="mt-4 flex flex-col md:flex-row md:items-end gap-3 md:justify-between">
@@ -1585,16 +1601,19 @@ const TaskDashboardView: React.FC = () => {
         </div>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
-          <table className="min-w-[780px] w-full text-sm">
+          <table className="min-w-[900px] w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 {(
                   [
                     { key: 'language' as LanguageTableSortKey, label: 'Language' },
-                    { key: 'totalOpen' as LanguageTableSortKey, label: 'Total Open' },
+                    { key: 'total' as LanguageTableSortKey, label: 'Total' },
                     { key: 'unassigned' as LanguageTableSortKey, label: 'Unassigned' },
                     { key: 'sampledInQueue' as LanguageTableSortKey, label: 'Sampled-in-queue' },
                     { key: 'inProgress' as LanguageTableSortKey, label: 'In-progress' },
+                    { key: 'completed' as LanguageTableSortKey, label: 'Completed' },
+                    { key: 'notReachable' as LanguageTableSortKey, label: 'Not reachable' },
+                    { key: 'invalidNumber' as LanguageTableSortKey, label: 'Invalid' },
                   ] as Array<{ key: LanguageTableSortKey; label: string }>
                 ).map((col) => {
                   const isSorted = languageTableSort.key === col.key;
@@ -1626,16 +1645,19 @@ const TaskDashboardView: React.FC = () => {
                       {r.language}
                     </button>
                   </td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{r.totalOpen}</td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned}</td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{r.sampledInQueue}</td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{r.inProgress}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.total ?? r.totalOpen ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.unassigned ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.sampledInQueue ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.inProgress ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.completed ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.notReachable ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{r.invalidNumber ?? 0}</td>
                 </tr>
               ))}
               {sortedOpenByLanguage.length === 0 && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={5}>
-                    No open tasks found for this filter.
+                  <td className="px-4 py-6 text-slate-600" colSpan={8}>
+                    No tasks found for this filter.
                   </td>
                 </tr>
               )}
@@ -1644,10 +1666,10 @@ const TaskDashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Agent workload */}
+      {/* Agent workload – full status so Total adds up */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-black text-slate-900">Agent Workload</h3>
-        <p className="text-sm text-slate-600 mt-1">Assigned workload = Sampled-in-queue + In-progress. Click an agent name to view their queue, or click a language to open their queue filtered by that language.</p>
+        <p className="text-sm text-slate-600 mt-1">Total = Sampled-in-queue + In-progress + Completed + Not reachable + Invalid. Click an agent name to view their queue, or click a language to filter.</p>
 
         <div className="mt-4 overflow-x-auto border border-slate-200 rounded-2xl">
           <table className="min-w-[980px] w-full text-sm">
@@ -1660,7 +1682,10 @@ const TaskDashboardView: React.FC = () => {
                     { key: 'languages' as AgentTableSortKey, label: 'Languages' },
                     { key: 'sampledInQueue' as AgentTableSortKey, label: 'Sampled-in-queue' },
                     { key: 'inProgress' as AgentTableSortKey, label: 'In-progress' },
-                    { key: 'totalOpen' as AgentTableSortKey, label: 'Total Open' },
+                    { key: 'completed' as AgentTableSortKey, label: 'Completed' },
+                    { key: 'notReachable' as AgentTableSortKey, label: 'Not reachable' },
+                    { key: 'invalidNumber' as AgentTableSortKey, label: 'Invalid' },
+                    { key: 'totalOpen' as AgentTableSortKey, label: 'Total' },
                   ] as Array<{ key: AgentTableSortKey; label: string }>
                 ).map((col) => {
                   const isSorted = agentTableSort.key === col.key;
@@ -1720,11 +1745,12 @@ const TaskDashboardView: React.FC = () => {
                       '—'
                     )}
                   </td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue}</td>
-                  <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress}</td>
-                  <td className="px-4 py-3 font-black text-slate-900">
-                    {Number(a.sampledInQueue || 0) + Number(a.inProgress || 0)}
-                  </td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{a.sampledInQueue ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{a.inProgress ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{a.completed ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{a.notReachable ?? 0}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">{a.invalidNumber ?? 0}</td>
+                  <td className="px-4 py-3 font-black text-slate-900">{a.totalOpen ?? 0}</td>
                   <td className="px-4 py-3">
                     {Number(a.sampledInQueue || 0) > 0 ? (
                       <button
@@ -1742,7 +1768,7 @@ const TaskDashboardView: React.FC = () => {
               ))}
               {!sortedAgentRows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-slate-600" colSpan={7}>
+                  <td className="px-4 py-6 text-slate-600" colSpan={10}>
                     No agents found for this Team Lead.
                   </td>
                 </tr>
