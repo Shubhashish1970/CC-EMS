@@ -823,17 +823,40 @@ const ActivitySamplingView: React.FC = () => {
                   setIsImportingExcel(true);
                   setImportReport(null);
                   try {
-                    const json = await ffaAPI.importExcel(outFile);
-                    const data = (json && typeof json === 'object' && 'data' in json ? (json as any).data : json) ?? json;
-                    setImportReport(data);
-                    showSuccess((json as any)?.message || 'Excel imported successfully');
-                    await fetchActivities(1);
-                    await fetchSyncStatus();
-                    return {
-                      ok: true,
-                      message: (json as any)?.message || 'Excel imported successfully.',
-                      data,
-                    };
+                    // Start async job (202) and poll progress until completion.
+                    const start = await ffaAPI.importExcel(outFile);
+                    showSuccess((start as any)?.message || 'Excel import started');
+
+                    const startTs = Date.now();
+                    const MAX_WAIT_MS = 20 * 60 * 1000; // 20 minutes
+                    while (Date.now() - startTs < MAX_WAIT_MS) {
+                      // eslint-disable-next-line no-await-in-loop
+                      await new Promise((r) => setTimeout(r, 1500));
+                      // eslint-disable-next-line no-await-in-loop
+                      const pr = (await ffaAPI.getImportExcelProgress()) as any;
+                      const progress = pr?.data ?? pr;
+                      if (!progress?.running && progress?.lastResult) {
+                        setImportReport(progress.lastResult);
+                        if ((progress.lastResult?.errorsCount ?? 0) > 0) {
+                          showError(`Imported with ${progress.lastResult.errorsCount} errors`);
+                        } else {
+                          showSuccess('Excel imported successfully');
+                        }
+                        // Refresh UI
+                        // eslint-disable-next-line no-await-in-loop
+                        await fetchActivities(1);
+                        // eslint-disable-next-line no-await-in-loop
+                        await fetchSyncStatus();
+                        return {
+                          ok: true,
+                          message: progress.message || 'Excel import completed.',
+                          data: progress.lastResult,
+                        };
+                      }
+                    }
+
+                    showError('Excel import is still running. Please refresh and check Import Summary in a moment.');
+                    return { ok: false, message: 'Excel import still running.' };
                   } catch (err: any) {
                     showError(err?.message || 'Failed to import Excel');
                     return { ok: false, message: err?.message || 'Failed to import Excel' };

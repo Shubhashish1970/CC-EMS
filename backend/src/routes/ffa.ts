@@ -13,6 +13,7 @@ import { StateLanguageMapping } from '../models/StateLanguageMapping.js';
 import { SamplingRun } from '../models/SamplingRun.js';
 import { AllocationRun } from '../models/AllocationRun.js';
 import { InboundQuery } from '../models/InboundQuery.js';
+import { getImportExcelProgress, startImportExcelJob } from '../services/excelImport.js';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { getLanguageForState } from '../utils/stateLanguageMapper.js';
@@ -392,167 +393,32 @@ router.post(
       if (!file) {
         return res.status(400).json({ success: false, error: { message: 'Missing file. Use multipart/form-data with field name "file".' } });
       }
-
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-      const activitiesSheetName = workbook.SheetNames.find((n) => n.toLowerCase() === 'activities');
-      const farmersSheetName = workbook.SheetNames.find((n) => n.toLowerCase() === 'farmers');
-
-      if (!activitiesSheetName || !farmersSheetName) {
-        return res.status(400).json({
+      const started = await startImportExcelJob(file.buffer);
+      if (!started.started) {
+        return res.status(409).json({
           success: false,
-          error: { message: 'Workbook must include 2 sheets named exactly: Activities, Farmers' },
+          error: { message: started.message },
+          data: { jobId: started.jobId, running: true },
         });
       }
 
-      const activitiesSheet = workbook.Sheets[activitiesSheetName];
-      const farmersSheet = workbook.Sheets[farmersSheetName];
-
-      const activitiesRows = XLSX.utils.sheet_to_json<ExcelActivityRow>(activitiesSheet, { defval: '', raw: true });
-      const farmersRows = XLSX.utils.sheet_to_json<ExcelFarmerRow>(farmersSheet, { defval: '', raw: true });
-
-      const errors: Array<{ sheet: 'Activities' | 'Farmers'; row: number; message: string }> = [];
-
-      // Build activity map
-      const activityById = new Map<string, ExcelActivityRow>();
-      activitiesRows.forEach((r, idx) => {
-        const rowNum = idx + 2; // header row + 1
-        const activityId = normalizeStr((r as any).activityId);
-        if (!activityId) {
-          errors.push({ sheet: 'Activities', row: rowNum, message: 'Missing activityId' });
-          return;
-        }
-        activityById.set(activityId, r);
-      });
-
-      let activitiesUpserted = 0;
-      let farmersUpserted = 0;
-      let linksUpdated = 0;
-
-      // Group farmers by activityId
-      const farmersByActivity = new Map<string, ExcelFarmerRow[]>();
-      farmersRows.forEach((r, idx) => {
-        const rowNum = idx + 2;
-        const activityId = normalizeStr((r as any).activityId);
-        if (!activityId) {
-          errors.push({ sheet: 'Farmers', row: rowNum, message: 'Missing activityId' });
-          return;
-        }
-        if (!farmersByActivity.has(activityId)) farmersByActivity.set(activityId, []);
-        farmersByActivity.get(activityId)!.push(r);
-      });
-
-      for (const [activityId, activityRow] of activityById.entries()) {
-        try {
-          const type = normalizeStr((activityRow as any).type);
-          const officerId = normalizeStr((activityRow as any).officerId);
-          const officerName = normalizeStr((activityRow as any).officerName);
-          const location = normalizeStr((activityRow as any).location);
-          const territory = normalizeStr((activityRow as any).territory);
-          const state = normalizeStr((activityRow as any).state);
-
-          if (!type || !officerId || !officerName || !location || !territory || !state) {
-            throw new Error('Missing one or more required fields: type, officerId, officerName, location, territory, state');
-          }
-
-          const date = parseExcelDate((activityRow as any).date);
-
-          const preferredLanguage = await getLanguageForState(state);
-
-          const upserted = await Activity.findOneAndUpdate(
-            { activityId },
-            {
-              $set: {
-                activityId,
-                type,
-                date,
-                officerId,
-                officerName,
-                location,
-                territory,
-                state,
-                territoryName: normalizeStr((activityRow as any).territoryName || territory),
-                zoneName: normalizeStr((activityRow as any).zoneName || ''),
-                buName: normalizeStr((activityRow as any).buName || ''),
-                tmEmpCode: normalizeStr((activityRow as any).tmEmpCode || ''),
-                tmName: normalizeStr((activityRow as any).tmName || ''),
-                crops: splitCSVCell((activityRow as any).crops),
-                products: splitCSVCell((activityRow as any).products),
-                syncedAt: new Date(),
-              },
-              $setOnInsert: {
-                lifecycleStatus: 'active',
-                lifecycleUpdatedAt: new Date(),
-              },
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-          );
-          activitiesUpserted += 1;
-
-          const farmerRowsForActivity = farmersByActivity.get(activityId) || [];
-          const farmerIds: any[] = [];
-          const seenMobile = new Set<string>();
-
-          for (let i = 0; i < farmerRowsForActivity.length; i++) {
-            const fr = farmerRowsForActivity[i];
-            const rowNum = farmersRows.indexOf(fr) + 2; // approximate row number
-
-            const name = normalizeStr((fr as any).name);
-            const mobileNumber = normalizeStr((fr as any).mobileNumber);
-            const farmerLocation = normalizeStr((fr as any).location);
-            // Farmer-level territory column is not expected in Excel anymore; derive from Activity.
-            const farmerTerritory = normalizeStr(upserted.territoryName || upserted.territory);
-            const photoUrl = normalizeStr((fr as any).photoUrl || '');
-
-            if (!name || !mobileNumber || !farmerLocation) {
-              errors.push({ sheet: 'Farmers', row: rowNum, message: `Missing required farmer fields (name/mobileNumber/location) for activityId=${activityId}` });
-              continue;
-            }
-            if (seenMobile.has(mobileNumber)) continue;
-            seenMobile.add(mobileNumber);
-
-            const farmer = await Farmer.findOneAndUpdate(
-              { mobileNumber },
-              {
-                name,
-                mobileNumber,
-                location: farmerLocation,
-                preferredLanguage,
-                territory: farmerTerritory || 'Unknown',
-                photoUrl: photoUrl || undefined,
-              },
-              { upsert: true, new: true }
-            );
-            farmersUpserted += 1;
-            farmerIds.push(farmer._id);
-          }
-
-          // Replace/Set farmerIds from Excel for this activity (deduped)
-          upserted.farmerIds = farmerIds;
-          await upserted.save();
-          linksUpdated += 1;
-        } catch (e: any) {
-          errors.push({ sheet: 'Activities', row: 0, message: `activityId=${activityId}: ${e?.message || String(e)}` });
-        }
-      }
-
-      res.json({
+      return res.status(202).json({
         success: true,
-        message: `Excel import completed: ${activitiesUpserted} activities processed, ${farmersUpserted} farmers upserted`,
-        data: {
-          activitiesRows: activitiesRows.length,
-          farmersRows: farmersRows.length,
-          activitiesUpserted,
-          farmersUpserted,
-          linksUpdated,
-          errorsCount: errors.length,
-          errors: errors.slice(0, 200),
-        },
+        message: started.message,
+        data: { jobId: started.jobId },
       });
     } catch (error) {
       next(error);
     }
   }
 );
+
+// @route   GET /api/ffa/import-excel-progress
+// @desc    Get current Excel import progress (for progress bar / polling)
+// @access  Private (MIS Admin)
+router.get('/import-excel-progress', requirePermission('config.ffa'), (req: Request, res: Response) => {
+  res.json({ success: true, data: getImportExcelProgress() });
+});
 
 // @route   GET /api/ffa/status
 // @desc    Get FFA sync status

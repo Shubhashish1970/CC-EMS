@@ -1282,6 +1282,10 @@ export const ffaAPI = {
     return json;
   },
 
+  getImportExcelProgress: async () => {
+    return apiRequest('/ffa/import-excel-progress');
+  },
+
   downloadExcelTemplate: async () => {
     const headers = getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/ffa/excel-template`, {
