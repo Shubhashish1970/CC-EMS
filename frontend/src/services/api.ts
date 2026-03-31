@@ -212,7 +212,7 @@ export const tasksAPI = {
   },
 
   downloadOwnHistoryExport: async (filters?: { status?: string; territory?: string; activityType?: string; search?: string; dateFrom?: string; dateTo?: string; limit?: number }) => {
-    const token = getAuthToken();
+    const headers = getAuthHeaders();
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     if (filters?.territory) params.append('territory', filters.territory);
@@ -225,7 +225,7 @@ export const tasksAPI = {
 
     const res = await fetch(`${API_BASE_URL}/tasks/own/history/export${query ? `?${query}` : ''}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers,
     });
 
     if (!res.ok) {
@@ -305,7 +305,7 @@ export const tasksAPI = {
   },
 
   downloadPendingTasksExport: async (filters?: { agentId?: string; territory?: string; zone?: string; bu?: string; search?: string; dateFrom?: string; dateTo?: string; exportAll?: boolean; page?: number; limit?: number }) => {
-    const token = getAuthToken();
+    const headers = getAuthHeaders();
     const params = new URLSearchParams();
     if (filters?.agentId) params.append('agentId', filters.agentId);
     if (filters?.territory) params.append('territory', filters.territory);
@@ -321,7 +321,7 @@ export const tasksAPI = {
     const query = params.toString();
     const res = await fetch(`${API_BASE_URL}/tasks/pending/export${query ? `?${query}` : ''}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers,
     });
 
     if (!res.ok) {
@@ -757,7 +757,7 @@ export const adminAPI = {
     page?: number;
     limit?: number;
   }) => {
-    const token = getAuthToken();
+    const headers = getAuthHeaders();
     const params = new URLSearchParams();
     if (filters?.activityType) params.append('activityType', filters.activityType);
     if (filters?.territory) params.append('territory', filters.territory);
@@ -772,7 +772,7 @@ export const adminAPI = {
     const query = params.toString();
     const res = await fetch(`${API_BASE_URL}/admin/activities-sampling/export${query ? `?${query}` : ''}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers,
     });
 
     if (!res.ok) {
