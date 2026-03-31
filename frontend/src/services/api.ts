@@ -1200,10 +1200,19 @@ export const ffaAPI = {
     return apiRequest('/ffa/sync-progress');
   },
 
-  clearData: async (clearTransactions: boolean, clearMasters: boolean) => {
-    return apiRequest<{ success: boolean; message: string; data: Record<string, number> }>('/ffa/clear-data', {
+  clearData: async (
+    clearTransactions: boolean,
+    clearMasters: boolean,
+    opts?: { transactionEntities?: string[]; masterEntities?: string[] }
+  ) => {
+    return apiRequest<{ success: boolean; message: string; data: Record<string, number>; meta?: any }>('/ffa/clear-data', {
       method: 'POST',
-      body: JSON.stringify({ clearTransactions, clearMasters }),
+      body: JSON.stringify({
+        clearTransactions,
+        clearMasters,
+        ...(opts?.transactionEntities?.length ? { transactionEntities: opts.transactionEntities } : null),
+        ...(opts?.masterEntities?.length ? { masterEntities: opts.masterEntities } : null),
+      }),
     });
   },
 

@@ -9,19 +9,107 @@ import { HIERARCHY_MAP_FIELDS } from '../../constants/excelUploadFields';
 
 const DataManagementView: React.FC = () => {
   const { showToast } = useToast();
-  const [clearTransactions, setClearTransactions] = useState(true);
-  const [clearMasters, setClearMasters] = useState(false);
+  type TxEntity =
+    | 'tasks'
+    | 'samplingAudits'
+    | 'coolingPeriods'
+    | 'samplingConfigs'
+    | 'samplingRuns'
+    | 'allocationRuns'
+    | 'inboundQueries'
+    | 'activities'
+    | 'farmers';
+  type MasterEntity = 'crops' | 'products' | 'nonPurchaseReasons' | 'sentiments' | 'languages' | 'stateLanguageMappings';
+
+  const TX_OPTIONS: Array<{ key: TxEntity; label: string; detail: string }> = [
+    { key: 'activities', label: 'Activities', detail: 'FFA activities imported/synced' },
+    { key: 'farmers', label: 'Farmers', detail: 'Farmer profiles imported/synced' },
+    { key: 'tasks', label: 'Tasks', detail: 'Call tasks / assignments' },
+    { key: 'samplingAudits', label: 'Sampling audits', detail: 'Sampling audit trail' },
+    { key: 'samplingRuns', label: 'Sampling runs', detail: 'Sampling run history' },
+    { key: 'allocationRuns', label: 'Allocation runs', detail: 'Allocation run history' },
+    { key: 'samplingConfigs', label: 'Sampling configs', detail: 'Sampling configuration records' },
+    { key: 'coolingPeriods', label: 'Cooling periods', detail: 'Cooling/lockout data' },
+    { key: 'inboundQueries', label: 'Inbound queries', detail: 'Inbound query records' },
+  ];
+
+  const MASTER_OPTIONS: Array<{ key: MasterEntity; label: string; detail: string }> = [
+    { key: 'crops', label: 'Crops', detail: 'Crop master' },
+    { key: 'products', label: 'Products', detail: 'Product master' },
+    { key: 'nonPurchaseReasons', label: 'Non-purchase reasons', detail: 'Reasons master' },
+    { key: 'sentiments', label: 'Sentiments', detail: 'Sentiments master' },
+    { key: 'languages', label: 'Languages', detail: 'Language master' },
+    { key: 'stateLanguageMappings', label: 'State-language mappings', detail: 'State-language mapping master' },
+  ];
+
+  const [selectedTx, setSelectedTx] = useState<Record<TxEntity, boolean>>(() => ({
+    activities: true,
+    farmers: true,
+    tasks: true,
+    samplingAudits: true,
+    samplingRuns: true,
+    allocationRuns: true,
+    samplingConfigs: true,
+    coolingPeriods: true,
+    inboundQueries: true,
+  }));
+  const [selectedMasters, setSelectedMasters] = useState<Record<MasterEntity, boolean>>(() => ({
+    crops: false,
+    products: false,
+    nonPurchaseReasons: false,
+    sentiments: false,
+    languages: false,
+    stateLanguageMappings: false,
+  }));
+  const [autoSelectedNote, setAutoSelectedNote] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
 
   const [activityCount, setActivityCount] = useState(50);
   const [farmersPerActivity, setFarmersPerActivity] = useState(12);
 
+  const txSelectedKeys = Object.entries(selectedTx)
+    .filter(([, v]) => v)
+    .map(([k]) => k as TxEntity);
+  const masterSelectedKeys = Object.entries(selectedMasters)
+    .filter(([, v]) => v)
+    .map(([k]) => k as MasterEntity);
+
+  const applyPreset = (preset: '1A' | '2A') => {
+    setAutoSelectedNote(null);
+    if (preset === '1A') {
+      // 1A: Clear ALL transaction entities (safe “reset operational data”)
+      setSelectedTx((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, true])) as any);
+      setSelectedMasters((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, false])) as any);
+      return;
+    }
+    // 2A: Clear ALL transaction + ALL master entities (full wipe)
+    setSelectedTx((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, true])) as any);
+    setSelectedMasters((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, true])) as any);
+  };
+
+  const toggleTx = (key: TxEntity, checked: boolean) => {
+    setSelectedTx((prev) => {
+      const next = { ...prev, [key]: checked };
+      // Auto-select dependency: Activities implies Farmers.
+      if (key === 'activities' && checked && !next.farmers) {
+        next.farmers = true;
+        setAutoSelectedNote('Auto-selected: Farmers (required when clearing Activities).');
+      } else {
+        setAutoSelectedNote(null);
+      }
+      return next;
+    });
+  };
+
   const handleClear = async () => {
     setShowClearConfirm(false);
     setClearing(true);
     try {
-      const res = await ffaAPI.clearData(clearTransactions, clearMasters);
+      const res = await ffaAPI.clearData(txSelectedKeys.length > 0, masterSelectedKeys.length > 0, {
+        transactionEntities: txSelectedKeys,
+        masterEntities: masterSelectedKeys,
+      });
       const counts = res.data ? Object.entries(res.data).filter(([, v]) => typeof v === 'number' && v > 0) : [];
       const msg = counts.length
         ? `Cleared: ${counts.map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').trim()}: ${v}`).join(', ')}`
@@ -33,6 +121,18 @@ const DataManagementView: React.FC = () => {
       setClearing(false);
     }
   };
+
+  const buildConfirmMessage = () => {
+    const txLabels = TX_OPTIONS.filter((o) => selectedTx[o.key]).map((o) => o.label);
+    const masterLabels = MASTER_OPTIONS.filter((o) => selectedMasters[o.key]).map((o) => o.label);
+    const parts: string[] = [];
+    if (txLabels.length) parts.push(`Transaction data: ${txLabels.join(', ')}.`);
+    if (masterLabels.length) parts.push(`Master data: ${masterLabels.join(', ')}.`);
+    if (!parts.length) return 'Please select at least one entity to clear.';
+    return `${parts.join(' ')} This cannot be undone.`;
+  };
+
+  const disableClear = txSelectedKeys.length === 0 && masterSelectedKeys.length === 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -54,34 +154,101 @@ const DataManagementView: React.FC = () => {
           </div>
         </div>
         <div className="p-6 space-y-4">
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={clearTransactions}
-                onChange={(e) => setClearTransactions(e.target.checked)}
-                className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-              />
-              <span className="text-sm font-medium text-slate-800">Clear transaction data</span>
-            </label>
-            <span className="text-xs text-slate-500">(activities, farmers, tasks, sampling, cooling, etc.)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Quick select</span>
+            <Button variant="secondary" size="sm" onClick={() => applyPreset('1A')}>
+              1A — Clear all transaction data
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => applyPreset('2A')}>
+              2A — Clear transaction + master data
+            </Button>
           </div>
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={clearMasters}
-                onChange={(e) => setClearMasters(e.target.checked)}
-                className="w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
-              />
-              <span className="text-sm font-medium text-slate-800">Clear master data</span>
-            </label>
-            <span className="text-xs text-slate-500">(crops, products, languages, sentiments, state-language, etc.)</span>
+
+          {autoSelectedNote && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              {autoSelectedNote}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="border border-slate-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-black text-slate-900">Transaction data</p>
+                  <p className="text-xs text-slate-500">Choose exactly what to clear</p>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900"
+                  onClick={() => {
+                    setAutoSelectedNote(null);
+                    setSelectedTx((prev) =>
+                      Object.fromEntries(Object.keys(prev).map((k) => [k, false])) as any
+                    );
+                  }}
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="space-y-2">
+                {TX_OPTIONS.map((o) => (
+                  <label key={o.key} className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedTx[o.key]}
+                      onChange={(e) => toggleTx(o.key, e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-800">{o.label}</div>
+                      <div className="text-xs text-slate-500">{o.detail}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="border border-slate-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-black text-slate-900">Master data</p>
+                  <p className="text-xs text-slate-500">Choose exactly what to clear</p>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900"
+                  onClick={() =>
+                    setSelectedMasters((prev) =>
+                      Object.fromEntries(Object.keys(prev).map((k) => [k, false])) as any
+                    )
+                  }
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="space-y-2">
+                {MASTER_OPTIONS.map((o) => (
+                  <label key={o.key} className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedMasters[o.key]}
+                      onChange={(e) => setSelectedMasters((prev) => ({ ...prev, [o.key]: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded border border-slate-200 text-lime-600 focus:ring-2 focus:ring-lime-400 focus:border-lime-400"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-800">{o.label}</div>
+                      <div className="text-xs text-slate-500">{o.detail}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
+
           <Button
             variant="danger"
             onClick={() => setShowClearConfirm(true)}
-            disabled={(!clearTransactions && !clearMasters) || clearing}
+            disabled={disableClear || clearing}
           >
             {clearing ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             <span>{clearing ? 'Clearing…' : 'Clear'}</span>
@@ -175,13 +342,7 @@ const DataManagementView: React.FC = () => {
         onClose={() => setShowClearConfirm(false)}
         onConfirm={handleClear}
         title="Clear database"
-        message={
-          clearTransactions && clearMasters
-            ? 'This will permanently delete all transaction data and all master data. This cannot be undone.'
-            : clearTransactions
-              ? 'This will permanently delete all transaction data (activities, farmers, tasks, sampling, etc.). Masters will be kept.'
-              : 'This will permanently delete all master data (crops, products, languages, etc.). Transaction data will be kept.'
-        }
+        message={buildConfirmMessage()}
         confirmText="Clear"
         confirmVariant="danger"
         isLoading={clearing}

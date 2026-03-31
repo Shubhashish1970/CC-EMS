@@ -521,62 +521,111 @@ router.post(
   requirePermission('config.ffa'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { clearTransactions = false, clearMasters = false } = req.body as { clearTransactions?: boolean; clearMasters?: boolean };
-      if (!clearTransactions && !clearMasters) {
+      type ClearEntity =
+        | 'tasks'
+        | 'samplingAudits'
+        | 'coolingPeriods'
+        | 'samplingConfigs'
+        | 'samplingRuns'
+        | 'allocationRuns'
+        | 'inboundQueries'
+        | 'activities'
+        | 'farmers'
+        | 'crops'
+        | 'products'
+        | 'nonPurchaseReasons'
+        | 'sentiments'
+        | 'languages'
+        | 'stateLanguageMappings';
+
+      const body = (req.body || {}) as {
+        clearTransactions?: boolean;
+        clearMasters?: boolean;
+        transactionEntities?: ClearEntity[];
+        masterEntities?: ClearEntity[];
+      };
+
+      const clearTransactions = Boolean(body.clearTransactions);
+      const clearMasters = Boolean(body.clearMasters);
+
+      const txAll: ClearEntity[] = [
+        'tasks',
+        'samplingAudits',
+        'coolingPeriods',
+        'samplingConfigs',
+        'samplingRuns',
+        'allocationRuns',
+        'inboundQueries',
+        'activities',
+        'farmers',
+      ];
+      const masterAll: ClearEntity[] = [
+        'crops',
+        'products',
+        'nonPurchaseReasons',
+        'sentiments',
+        'languages',
+        'stateLanguageMappings',
+      ];
+
+      const requestedTx = Array.isArray(body.transactionEntities) ? body.transactionEntities : [];
+      const requestedMaster = Array.isArray(body.masterEntities) ? body.masterEntities : [];
+
+      // Backward compat: if no explicit entity arrays, fall back to legacy booleans.
+      let txEntities: ClearEntity[] = requestedTx.length > 0 ? requestedTx : clearTransactions ? txAll : [];
+      let masterEntities: ClearEntity[] = requestedMaster.length > 0 ? requestedMaster : clearMasters ? masterAll : [];
+
+      if (txEntities.length === 0 && masterEntities.length === 0) {
         return res.status(400).json({
           success: false,
-          error: { message: 'Set at least one of clearTransactions or clearMasters to true.' },
+          error: { message: 'Select at least one entity (or set clearTransactions/clearMasters).' },
         });
       }
 
       const data: Record<string, number> = {};
+      const autoSelected: { addedTransactionEntities: ClearEntity[]; addedMasterEntities: ClearEntity[] } = {
+        addedTransactionEntities: [],
+        addedMasterEntities: [],
+      };
 
-      if (clearTransactions) {
-        const taskResult = await CallTask.deleteMany({});
-        const auditResult = await SamplingAudit.deleteMany({});
-        const coolingResult = await CoolingPeriod.deleteMany({});
-        const samplingConfigResult = await SamplingConfig.deleteMany({});
-        const samplingRunResult = await SamplingRun.deleteMany({});
-        const allocationRunResult = await AllocationRun.deleteMany({});
-        const inboundResult = await InboundQuery.deleteMany({});
-        const activityResult = await Activity.deleteMany({});
-        const farmerResult = await Farmer.deleteMany({});
-        Object.assign(data, {
-          tasksDeleted: taskResult.deletedCount,
-          samplingAuditsDeleted: auditResult.deletedCount,
-          coolingPeriodsDeleted: coolingResult.deletedCount,
-          samplingConfigsDeleted: samplingConfigResult.deletedCount,
-          samplingRunsDeleted: samplingRunResult.deletedCount,
-          allocationRunsDeleted: allocationRunResult.deletedCount,
-          inboundQueriesDeleted: inboundResult.deletedCount,
-          farmersDeleted: farmerResult.deletedCount,
-          activitiesDeleted: activityResult.deletedCount,
-        });
-        logger.info('[FFA] Cleared transaction data', data);
+      // Auto-selection (dependency safety):
+      // - Clearing activities requires clearing farmers too (activities store farmerIds and farmers are only meaningful with activities).
+      if (txEntities.includes('activities') && !txEntities.includes('farmers')) {
+        txEntities = [...txEntities, 'farmers'];
+        autoSelected.addedTransactionEntities.push('farmers');
       }
 
-      if (clearMasters) {
-        const cropResult = await MasterCrop.deleteMany({});
-        const productResult = await MasterProduct.deleteMany({});
-        const nprResult = await NonPurchaseReason.deleteMany({});
-        const sentimentResult = await Sentiment.deleteMany({});
-        const langResult = await MasterLanguage.deleteMany({});
-        const slmResult = await StateLanguageMapping.deleteMany({});
-        Object.assign(data, {
-          cropsDeleted: cropResult.deletedCount,
-          productsDeleted: productResult.deletedCount,
-          nonPurchaseReasonsDeleted: nprResult.deletedCount,
-          sentimentsDeleted: sentimentResult.deletedCount,
-          languagesDeleted: langResult.deletedCount,
-          stateLanguageMappingsDeleted: slmResult.deletedCount,
-        });
-        logger.info('[FFA] Cleared master data', data);
+      const txSet = new Set<ClearEntity>(txEntities);
+      if (txSet.size > 0) {
+        // Delete in dependency-friendly order.
+        if (txSet.has('tasks')) data.tasksDeleted = (await CallTask.deleteMany({})).deletedCount;
+        if (txSet.has('samplingAudits')) data.samplingAuditsDeleted = (await SamplingAudit.deleteMany({})).deletedCount;
+        if (txSet.has('coolingPeriods')) data.coolingPeriodsDeleted = (await CoolingPeriod.deleteMany({})).deletedCount;
+        if (txSet.has('samplingConfigs')) data.samplingConfigsDeleted = (await SamplingConfig.deleteMany({})).deletedCount;
+        if (txSet.has('samplingRuns')) data.samplingRunsDeleted = (await SamplingRun.deleteMany({})).deletedCount;
+        if (txSet.has('allocationRuns')) data.allocationRunsDeleted = (await AllocationRun.deleteMany({})).deletedCount;
+        if (txSet.has('inboundQueries')) data.inboundQueriesDeleted = (await InboundQuery.deleteMany({})).deletedCount;
+        if (txSet.has('activities')) data.activitiesDeleted = (await Activity.deleteMany({})).deletedCount;
+        if (txSet.has('farmers')) data.farmersDeleted = (await Farmer.deleteMany({})).deletedCount;
+        logger.info('[FFA] Cleared selected transaction entities', { entities: Array.from(txSet), data, autoSelected });
+      }
+
+      const masterSet = new Set<ClearEntity>(masterEntities);
+      if (masterSet.size > 0) {
+        if (masterSet.has('crops')) data.cropsDeleted = (await MasterCrop.deleteMany({})).deletedCount;
+        if (masterSet.has('products')) data.productsDeleted = (await MasterProduct.deleteMany({})).deletedCount;
+        if (masterSet.has('nonPurchaseReasons')) data.nonPurchaseReasonsDeleted = (await NonPurchaseReason.deleteMany({})).deletedCount;
+        if (masterSet.has('sentiments')) data.sentimentsDeleted = (await Sentiment.deleteMany({})).deletedCount;
+        if (masterSet.has('languages')) data.languagesDeleted = (await MasterLanguage.deleteMany({})).deletedCount;
+        if (masterSet.has('stateLanguageMappings')) data.stateLanguageMappingsDeleted = (await StateLanguageMapping.deleteMany({})).deletedCount;
+        logger.info('[FFA] Cleared selected master entities', { entities: Array.from(masterSet), data, autoSelected });
       }
 
       res.json({
         success: true,
         message: 'Database clear completed.',
         data,
+        meta: autoSelected.addedTransactionEntities.length || autoSelected.addedMasterEntities.length ? { autoSelected } : undefined,
       });
     } catch (error) {
       next(error);

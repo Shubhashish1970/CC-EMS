@@ -40,7 +40,7 @@ const UserManagementView: React.FC = () => {
   const [showUserForm, setShowUserForm] = useState(false);
   const [filters, setFilters] = useState({
     role: '' as UserRole | '',
-    isActive: undefined as boolean | undefined,
+    isActive: true as boolean | undefined,
     search: '',
   });
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
