@@ -13,6 +13,7 @@ import { StateLanguageMapping } from '../models/StateLanguageMapping.js';
 import { SamplingRun } from '../models/SamplingRun.js';
 import { AllocationRun } from '../models/AllocationRun.js';
 import { InboundQuery } from '../models/InboundQuery.js';
+import { User } from '../models/User.js';
 import { getImportExcelProgress, startImportExcelJob } from '../services/excelImport.js';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
@@ -531,6 +532,7 @@ router.post(
         | 'inboundQueries'
         | 'activities'
         | 'farmers'
+        | 'users'
         | 'crops'
         | 'products'
         | 'nonPurchaseReasons'
@@ -566,6 +568,7 @@ router.post(
         'sentiments',
         'languages',
         'stateLanguageMappings',
+        'users',
       ];
 
       const requestedTx = Array.isArray(body.transactionEntities) ? body.transactionEntities : [];
@@ -618,6 +621,21 @@ router.post(
         if (masterSet.has('sentiments')) data.sentimentsDeleted = (await Sentiment.deleteMany({})).deletedCount;
         if (masterSet.has('languages')) data.languagesDeleted = (await MasterLanguage.deleteMany({})).deletedCount;
         if (masterSet.has('stateLanguageMappings')) data.stateLanguageMappingsDeleted = (await StateLanguageMapping.deleteMany({})).deletedCount;
+        if (masterSet.has('users')) {
+          // Hard delete all users except System Administrator and the currently logged-in user.
+          const keepEmails = ['shubhashish@kweka.ai'];
+          const keepEmployeeIds = ['ADMIN001'];
+          const currentUserId = req.user?._id?.toString();
+
+          const resUsers = await User.deleteMany({
+            $and: [
+              currentUserId ? { _id: { $ne: currentUserId } } : {},
+              { email: { $nin: keepEmails } },
+              { employeeId: { $nin: keepEmployeeIds } },
+            ],
+          });
+          data.usersDeleted = resUsers.deletedCount;
+        }
         logger.info('[FFA] Cleared selected master entities', { entities: Array.from(masterSet), data, autoSelected });
       }
 

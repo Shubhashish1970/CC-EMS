@@ -19,7 +19,14 @@ const DataManagementView: React.FC = () => {
     | 'inboundQueries'
     | 'activities'
     | 'farmers';
-  type MasterEntity = 'crops' | 'products' | 'nonPurchaseReasons' | 'sentiments' | 'languages' | 'stateLanguageMappings';
+  type MasterEntity =
+    | 'crops'
+    | 'products'
+    | 'nonPurchaseReasons'
+    | 'sentiments'
+    | 'languages'
+    | 'stateLanguageMappings'
+    | 'users';
 
   const TX_OPTIONS: Array<{ key: TxEntity; label: string; detail: string }> = [
     { key: 'activities', label: 'Activities', detail: 'FFA activities imported/synced' },
@@ -40,6 +47,7 @@ const DataManagementView: React.FC = () => {
     { key: 'sentiments', label: 'Sentiments', detail: 'Sentiments master' },
     { key: 'languages', label: 'Languages', detail: 'Language master' },
     { key: 'stateLanguageMappings', label: 'State-language mappings', detail: 'State-language mapping master' },
+    { key: 'users', label: 'Users (hard delete)', detail: 'Deletes all users except System Administrator and your account' },
   ];
 
   const [selectedTx, setSelectedTx] = useState<Record<TxEntity, boolean>>(() => ({
@@ -60,6 +68,7 @@ const DataManagementView: React.FC = () => {
     sentiments: false,
     languages: false,
     stateLanguageMappings: false,
+    users: false,
   }));
   const [autoSelectedNote, setAutoSelectedNote] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
