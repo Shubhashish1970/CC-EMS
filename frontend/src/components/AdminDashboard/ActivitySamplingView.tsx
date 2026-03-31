@@ -449,8 +449,6 @@ const ActivitySamplingView: React.FC = () => {
         samplingStatus: filters.samplingStatus || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
-        page: pagination.page,
-        limit: pageSize,
       });
       showSuccess('Excel downloaded');
     } catch (err: any) {
@@ -1169,7 +1167,7 @@ const ActivitySamplingView: React.FC = () => {
                   ? 'bg-green-50 border-green-200 text-green-700'
                   : 'bg-white border-slate-200 text-green-700 hover:bg-slate-50'
               }`}
-              title="Download Excel (matches current filters and page)"
+              title="Download Excel (matches current filters)"
             >
               <ArrowDownToLine size={18} className={isExporting ? 'animate-spin' : ''} />
             </button>
