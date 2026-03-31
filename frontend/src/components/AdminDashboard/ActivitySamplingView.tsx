@@ -133,6 +133,15 @@ const ActivitySamplingView: React.FC = () => {
     return v === 'excel' ? 'excel' : 'api';
   });
   const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    running: boolean;
+    activitiesProcessed: number;
+    totalActivities: number;
+    farmersProcessed: number;
+    totalFarmers: number;
+    errorCount: number;
+    message: string;
+  } | null>(null);
   const [importReport, setImportReport] = useState<any | null>(null);
   const [tableSort, setTableSort] = useState<{ key: ActivityTableColumnKey; dir: 'asc' | 'desc' }>(() => {
     const raw = localStorage.getItem('admin.activitySampling.tableSort');
@@ -821,6 +830,7 @@ const ActivitySamplingView: React.FC = () => {
                 farmerFields={FFA_FARMER_MAP_FIELDS}
                 onImportFile={async (outFile) => {
                   setIsImportingExcel(true);
+                  setImportProgress(null);
                   setImportReport(null);
                   try {
                     // Start async job (202) and poll progress until completion.
@@ -835,7 +845,19 @@ const ActivitySamplingView: React.FC = () => {
                       // eslint-disable-next-line no-await-in-loop
                       const pr = (await ffaAPI.getImportExcelProgress()) as any;
                       const progress = pr?.data ?? pr;
+                      if (progress) {
+                        setImportProgress({
+                          running: !!progress.running,
+                          activitiesProcessed: Number(progress.activitiesProcessed || 0),
+                          totalActivities: Number(progress.totalActivities || 0),
+                          farmersProcessed: Number(progress.farmersProcessed || 0),
+                          totalFarmers: Number(progress.totalFarmers || 0),
+                          errorCount: Number(progress.errorCount || 0),
+                          message: String(progress.message || ''),
+                        });
+                      }
                       if (!progress?.running && progress?.lastResult) {
+                        setImportProgress(null);
                         setImportReport(progress.lastResult);
                         if ((progress.lastResult?.errorsCount ?? 0) > 0) {
                           showError(`Imported with ${progress.lastResult.errorsCount} errors`);
@@ -859,12 +881,42 @@ const ActivitySamplingView: React.FC = () => {
                     return { ok: false, message: 'Excel import still running.' };
                   } catch (err: any) {
                     showError(err?.message || 'Failed to import Excel');
+                    setImportProgress(null);
                     return { ok: false, message: err?.message || 'Failed to import Excel' };
                   } finally {
                     setIsImportingExcel(false);
                   }
                 }}
               />
+
+              {importProgress?.running && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-slate-700">Importing Excel…</span>
+                    <span className="text-sm font-bold text-slate-600">
+                      {importProgress.activitiesProcessed}/{importProgress.totalActivities} activities •{' '}
+                      {importProgress.farmersProcessed}/{importProgress.totalFarmers} farmers
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-lime-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                      style={{
+                        width: `${(() => {
+                          const a = importProgress.totalActivities ? importProgress.activitiesProcessed / importProgress.totalActivities : 0;
+                          const f = importProgress.totalFarmers ? importProgress.farmersProcessed / importProgress.totalFarmers : 0;
+                          const pct = Math.max(0, Math.min(1, (a + f) / 2));
+                          return Math.round(pct * 100);
+                        })()}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {importProgress.message || 'Working…'}
+                    {importProgress.errorCount > 0 ? ` • ${importProgress.errorCount} errors so far` : ''}
+                  </p>
+                </div>
+              )}
 
               {importReport && (
                 <div className="mt-4 text-sm text-slate-700">
