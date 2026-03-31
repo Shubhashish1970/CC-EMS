@@ -209,6 +209,11 @@ export async function startImportExcelJob(fileBuffer: Buffer): Promise<{ started
           errors.push({ sheet: 'Farmers', row: rowNum, message: 'Missing activityId' });
           return;
         }
+        if (!activityById.has(activityId)) {
+          // This farmer row will never be processed (no matching activity), so surface it clearly.
+          errors.push({ sheet: 'Farmers', row: rowNum, message: `Unknown activityId (not found in Activities sheet): ${activityId}` });
+          return;
+        }
         if (!farmersByActivity.has(activityId)) farmersByActivity.set(activityId, []);
         farmersByActivity.get(activityId)!.push({ row: r, rowNum });
       });
