@@ -1183,7 +1183,7 @@ const ActivitySamplingView: React.FC = () => {
               <p className="text-xl font-black text-slate-900">{statistics.totalActivities}</p>
               <p className="text-xs text-slate-500 mt-0.5 text-left">activities</p>
               <p className="text-xl font-black text-slate-900 mt-1">{statistics.totalFarmers}</p>
-              <p className="text-xs text-slate-500 mt-0.5 text-left">total farmers</p>
+              <p className="text-xs text-slate-500 mt-0.5 text-left">unique farmers (by mobile)</p>
             </div>
             {/* With Sampling + Farmers Sampled */}
             <div className="bg-green-50 rounded-xl p-3 border border-green-200 min-w-0 overflow-visible">
@@ -1194,7 +1194,7 @@ const ActivitySamplingView: React.FC = () => {
               </p>
               <p className="text-xl font-black text-green-800 text-left mt-1">{statistics.farmersSampled}</p>
               <p className="text-xs text-green-600 text-left break-words leading-tight">
-                farmers sampled{statistics.totalFarmers > 0 ? ` (${Math.round((statistics.farmersSampled / statistics.totalFarmers) * 100)}%)` : ''}
+                farmers sampled{statistics.totalFarmerLinks > 0 ? ` (${Math.round((statistics.farmersSampled / statistics.totalFarmerLinks) * 100)}% of farmer-links)` : ''}
               </p>
               {((statistics.activitiesWithSamplingAdhoc ?? 0) > 0 || (statistics.farmersSampledAdhoc ?? 0) > 0) && (
                 <p className="text-xs text-green-600/80 mt-0.5 text-left break-words leading-tight">

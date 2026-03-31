@@ -744,7 +744,10 @@ export const getActivitiesSamplingStats = async (filters?: {
   activitiesFullySampled: number;
   activitiesPartiallySampled: number;
   activitiesNotSampled: number;
+  /** Unique farmers by mobileNumber across matched activities */
   totalFarmers: number;
+  /** Legacy: sum of farmerIds per activity (counts duplicates across activities) */
+  totalFarmerLinks: number;
   farmersSampled: number;
   totalTasks: number;
   tasksSampledInQueue: number;
@@ -783,6 +786,7 @@ export const getActivitiesSamplingStats = async (filters?: {
   }
 
   const samplingAuditCollection = SamplingAudit.collection.name;
+  const farmerCollection = Farmer.collection.name;
 
   const activityAggPipeline: any[] = [
     { $match: activityQuery },
@@ -837,6 +841,22 @@ export const getActivitiesSamplingStats = async (filters?: {
             },
           },
         ],
+        uniqueFarmers: [
+          { $project: { farmerIds: 1 } },
+          { $unwind: { path: '$farmerIds', preserveNullAndEmptyArrays: false } },
+          {
+            $lookup: {
+              from: farmerCollection,
+              localField: 'farmerIds',
+              foreignField: '_id',
+              as: 'farmer',
+              pipeline: [{ $project: { _id: 0, mobileNumber: 1 } }],
+            },
+          },
+          { $unwind: { path: '$farmer', preserveNullAndEmptyArrays: false } },
+          { $group: { _id: '$farmer.mobileNumber' } },
+          { $count: 'count' },
+        ],
         ids: [{ $project: { _id: 1 } }],
       },
     },
@@ -845,6 +865,7 @@ export const getActivitiesSamplingStats = async (filters?: {
   const activityAggResult = await Activity.aggregate(activityAggPipeline);
   const facetRow = activityAggResult?.[0];
   const a0 = (facetRow?.stats?.[0] as Record<string, unknown>) || {};
+  const uniqueFarmersCount = Number((facetRow?.uniqueFarmers?.[0]?.count as any) || 0);
   const matchingActivityIds: mongoose.Types.ObjectId[] = (facetRow?.ids ?? []).map(
     (d: { _id: mongoose.Types.ObjectId }) => d._id
   );
@@ -884,7 +905,8 @@ export const getActivitiesSamplingStats = async (filters?: {
     activitiesFullySampled: Number(a0.activitiesFullySampled || 0),
     activitiesPartiallySampled: Number(a0.activitiesPartiallySampled || 0),
     activitiesNotSampled: Number(a0.activitiesNotSampled || 0),
-    totalFarmers: Number(a0.totalFarmers || 0),
+    totalFarmers: uniqueFarmersCount,
+    totalFarmerLinks: Number(a0.totalFarmers || 0),
     farmersSampled: Number(a0.farmersSampled || 0),
     totalTasks,
     tasksSampledInQueue: Number(byStatus.sampled_in_queue || 0),
