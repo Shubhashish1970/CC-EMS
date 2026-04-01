@@ -30,6 +30,8 @@ export interface IActivity extends Document {
   crops: string[]; // Crops discussed in the activity
   products: string[]; // NACL products discussed in the activity
   syncedAt: Date;
+  /** Set on each Excel import or FFA sync so rows can be removed per ingest batch before sampling/tasks exist */
+  dataBatchId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,6 +142,12 @@ const ActivitySchema = new Schema<IActivity>(
     syncedAt: {
       type: Date,
       default: Date.now,
+    },
+    dataBatchId: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
     },
   },
   {

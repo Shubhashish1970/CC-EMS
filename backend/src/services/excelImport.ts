@@ -373,6 +373,7 @@ export async function startImportExcelJob(fileBuffer: Buffer): Promise<{ started
                   products: splitCSVCell((activityRow as any).products),
                   farmerIds,
                   syncedAt: new Date(),
+                  dataBatchId: jobId,
                 },
                 $setOnInsert: {
                   lifecycleStatus: 'active',

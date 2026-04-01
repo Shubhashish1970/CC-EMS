@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { adminAPI, ffaAPI } from '../../services/api';
-import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, UserCheck, Package, BarChart } from 'lucide-react';
+import { Loader2, Filter, RefreshCw, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Users as UsersIcon, Activity as ActivityIcon, Phone, User as UserIcon, CheckCircle2, Download, BarChart3, ArrowDownToLine, UserCheck, Package, BarChart, Trash2 } from 'lucide-react';
 import Button from '../shared/Button';
+import ConfirmationModal from '../shared/ConfirmationModal';
 import StyledSelect from '../shared/StyledSelect';
 import ExcelUploadFlow from '../shared/ExcelUploadFlow';
 import { FFA_ACTIVITY_MAP_FIELDS, FFA_FARMER_MAP_FIELDS } from '../../constants/excelUploadFields';
@@ -143,6 +144,19 @@ const ActivitySamplingView: React.FC = () => {
     message: string;
   } | null>(null);
   const [importReport, setImportReport] = useState<any | null>(null);
+  const [dataBatches, setDataBatches] = useState<
+    Array<{
+      batchId: string;
+      activityCount: number;
+      lastSyncedAt: string | null;
+      source: 'excel' | 'sync' | 'unknown';
+      canDelete: boolean;
+      blockReason?: string;
+    }>
+  >([]);
+  const [dataBatchesLoading, setDataBatchesLoading] = useState(false);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<string | null>(null);
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
   const [tableSort, setTableSort] = useState<{ key: ActivityTableColumnKey; dir: 'asc' | 'desc' }>(() => {
     const raw = localStorage.getItem('admin.activitySampling.tableSort');
     try {
@@ -315,6 +329,7 @@ const ActivitySamplingView: React.FC = () => {
     fetchActivities(1);
     fetchSyncStatus();
     fetchStats();
+    fetchDataBatches();
   }, [filters.activityType, filters.territory, filters.zone, filters.bu, filters.samplingStatus, filters.dateFrom, filters.dateTo, pageSize]);
 
   useEffect(() => {
@@ -354,12 +369,27 @@ const ActivitySamplingView: React.FC = () => {
     }
   };
 
+  const fetchDataBatches = async () => {
+    setDataBatchesLoading(true);
+    try {
+      const res = (await ffaAPI.getDataBatches()) as any;
+      if (res?.success && Array.isArray(res?.data?.batches)) {
+        setDataBatches(res.data.batches);
+      }
+    } catch (err) {
+      console.error('Failed to fetch data batches:', err);
+    } finally {
+      setDataBatchesLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     await Promise.all([
       fetchActivities(pagination.page, true),
       fetchStats(),
       fetchSyncStatus(),
       fetchFilterOptions(),
+      fetchDataBatches(),
     ]);
   };
 
@@ -391,6 +421,7 @@ const ActivitySamplingView: React.FC = () => {
         setSyncProgress(null);
         await fetchActivities(pagination.page);
         await fetchSyncStatus();
+        await fetchDataBatches();
         if (fullSync) setIsFullSyncing(false);
         else setIsIncrementalSyncing(false);
         return;
@@ -423,6 +454,7 @@ const ActivitySamplingView: React.FC = () => {
             }
             await fetchActivities(pagination.page);
             await fetchSyncStatus();
+            await fetchDataBatches();
             if (fullSync) setIsFullSyncing(false);
             else setIsIncrementalSyncing(false);
           }
@@ -438,6 +470,28 @@ const ActivitySamplingView: React.FC = () => {
       setSyncProgress(null);
       if (fullSync) setIsFullSyncing(false);
       else setIsIncrementalSyncing(false);
+    }
+  };
+
+  const confirmDeleteDataBatch = async () => {
+    if (!batchDeleteConfirm) return;
+    setDeletingBatchId(batchDeleteConfirm);
+    try {
+      const res = (await ffaAPI.deleteDataBatch(batchDeleteConfirm)) as any;
+      showSuccess(
+        res?.message
+          ? `${res.message} Removed ${res?.data?.deletedActivities ?? 0} activities, ${res?.data?.deletedFarmers ?? 0} farmers.`
+          : 'Batch deleted.'
+      );
+      setBatchDeleteConfirm(null);
+      await fetchDataBatches();
+      await fetchActivities(pagination.page);
+      await fetchStats();
+      await fetchSyncStatus();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to delete batch');
+    } finally {
+      setDeletingBatchId(null);
     }
   };
 
@@ -867,6 +921,8 @@ const ActivitySamplingView: React.FC = () => {
                         await fetchActivities(1);
                         // eslint-disable-next-line no-await-in-loop
                         await fetchSyncStatus();
+                        // eslint-disable-next-line no-await-in-loop
+                        await fetchDataBatches();
                         return {
                           ok: true,
                           message: progress.message || 'Excel import completed.',
@@ -976,6 +1032,77 @@ const ActivitySamplingView: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Recent ingest batches (Excel + API sync) — delete allowed until sampling/tasks exist for that batch */}
+        <div className="mt-3 pt-3 border-t border-slate-200">
+          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <label className="block text-xs font-black text-amber-900 uppercase tracking-widest">Recent ingest batches</label>
+                <p className="text-xs text-amber-800/90 mt-0.5">
+                  Each Excel import or FFA sync run tags activities with a batch ID. You can remove a whole batch only if sampling has not created audits or call tasks for those activities yet.
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => fetchDataBatches()} disabled={dataBatchesLoading}>
+                {dataBatchesLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Refresh
+              </Button>
+            </div>
+            {dataBatchesLoading && dataBatches.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-amber-900">
+                <Loader2 size={16} className="animate-spin" /> Loading batches…
+              </div>
+            ) : dataBatches.length === 0 ? (
+              <p className="text-sm text-amber-900/80">No batches yet (import Excel or run an API sync). Older activities may not have a batch ID.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-amber-200/80 bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-100/60 text-left text-[10px] font-black uppercase tracking-widest text-amber-900">
+                    <tr>
+                      <th className="px-3 py-2">Source</th>
+                      <th className="px-3 py-2">Activities</th>
+                      <th className="px-3 py-2">Last synced</th>
+                      <th className="px-3 py-2">Batch ID</th>
+                      <th className="px-3 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {dataBatches.map((b) => (
+                      <tr key={b.batchId} className="text-slate-800">
+                        <td className="px-3 py-2 font-medium capitalize">{b.source}</td>
+                        <td className="px-3 py-2">{b.activityCount}</td>
+                        <td className="px-3 py-2 text-xs text-slate-600">
+                          {b.lastSyncedAt ? new Date(b.lastSyncedAt).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-600 max-w-[200px] truncate" title={b.batchId}>
+                          {b.batchId}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {b.canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() => setBatchDeleteConfirm(b.batchId)}
+                              disabled={!!deletingBatchId}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold text-red-700 hover:bg-red-50 border border-red-200 disabled:opacity-50"
+                              title="Delete this batch"
+                            >
+                              {deletingBatchId === b.batchId ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              Delete batch
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-500 text-left inline-block max-w-[220px]" title={b.blockReason}>
+                              Not available{b.blockReason ? `: ${b.blockReason}` : ''}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Filters – expand when Filter button clicked */}
         {showFilters && (
@@ -1747,6 +1874,21 @@ const ActivitySamplingView: React.FC = () => {
           </div>
         </>
       )}
+
+      <ConfirmationModal
+        isOpen={!!batchDeleteConfirm}
+        onClose={() => setBatchDeleteConfirm(null)}
+        onConfirm={confirmDeleteDataBatch}
+        title="Delete ingest batch"
+        message={
+          batchDeleteConfirm
+            ? `This permanently removes all activities in this batch and farmers only referenced by them. Blocked if sampling audits or call tasks exist for those activities. Batch: ${batchDeleteConfirm}`
+            : ''
+        }
+        confirmText="Delete batch"
+        confirmVariant="danger"
+        isLoading={!!deletingBatchId}
+      />
     </div>
   );
 };

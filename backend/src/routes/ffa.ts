@@ -15,6 +15,7 @@ import { AllocationRun } from '../models/AllocationRun.js';
 import { InboundQuery } from '../models/InboundQuery.js';
 import { User } from '../models/User.js';
 import { getImportExcelProgress, startImportExcelJob } from '../services/excelImport.js';
+import { deleteDataBatch, listDataBatches } from '../services/dataBatchService.js';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { getLanguageForState } from '../utils/stateLanguageMapper.js';
@@ -419,6 +420,53 @@ router.post(
 // @access  Private (MIS Admin)
 router.get('/import-excel-progress', requirePermission('config.ffa'), (req: Request, res: Response) => {
   res.json({ success: true, data: getImportExcelProgress() });
+});
+
+// @route   GET /api/ffa/data-batches
+// @desc    List ingest batches (Excel / FFA sync) for selective delete before sampling
+// @access  Private (MIS Admin)
+router.get('/data-batches', requirePermission('config.ffa'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const batches = await listDataBatches(25);
+    res.json({ success: true, data: { batches } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/ffa/delete-data-batch
+// @desc    Delete all activities (and orphan farmers) for a batch; blocked if sampling audit or tasks exist
+// @access  Private (MIS Admin)
+router.post('/delete-data-batch', requirePermission('config.ffa'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const batchId = (req.body as { batchId?: string })?.batchId;
+    if (!batchId || typeof batchId !== 'string' || !batchId.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'batchId is required' },
+      });
+    }
+    const result = await deleteDataBatch(batchId.trim());
+    res.json({
+      success: true,
+      message: 'Batch deleted.',
+      data: result,
+    });
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    if (msg.includes('No activities found')) {
+      return res.status(404).json({ success: false, error: { message: msg } });
+    }
+    if (
+      msg.includes('not allowed') ||
+      msg.includes('Sampling has run') ||
+      msg.includes('Call tasks exist') ||
+      msg.includes('No activities in this batch')
+    ) {
+      return res.status(409).json({ success: false, error: { message: msg } });
+    }
+    next(error);
+  }
 });
 
 // @route   GET /api/ffa/status

@@ -213,8 +213,9 @@ const fetchFFAActivities = async (dateFrom?: Date): Promise<FFAActivity[]> => {
 
 /**
  * Sync a single activity from FFA
+ * @param dataBatchId - Same id for all activities in one sync run (for per-batch delete before sampling)
  */
-const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
+const syncActivity = async (ffaActivity: FFAActivity, dataBatchId: string): Promise<IActivity> => {
   try {
     // Determine state (prefer FFA `state`, fallback to territory parsing for backward compatibility)
     // NOTE: In steady state, Activity API v2 must always provide `state`.
@@ -251,6 +252,7 @@ const syncActivity = async (ffaActivity: FFAActivity): Promise<IActivity> => {
         crops: ffaActivity.crops || [],
         products: ffaActivity.products || [],
         syncedAt: new Date(),
+        dataBatchId,
       },
         $setOnInsert: {
           lifecycleStatus: 'active',
@@ -531,6 +533,8 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
       message: `Syncing activities (${fullSync ? 'full' : 'incremental'})...`,
     };
 
+    const dataBatchId = `sync-${Date.now()}`;
+
     for (const ffaActivity of newActivities) {
       try {
         if (!ffaActivity.activityId) {
@@ -540,7 +544,7 @@ export const syncFFAData = async (fullSync: boolean = false): Promise<{
           continue;
         }
 
-        const activity = await syncActivity(ffaActivity);
+        const activity = await syncActivity(ffaActivity, dataBatchId);
         activitiesSynced++;
         farmersSynced += activity.farmerIds.length;
         syncProgress.activitiesSynced = activitiesSynced;

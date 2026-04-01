@@ -1291,6 +1291,43 @@ export const ffaAPI = {
     return apiRequest('/ffa/import-excel-progress');
   },
 
+  getDataBatches: async () => {
+    return apiRequest<{
+      success: boolean;
+      data: {
+        batches: Array<{
+          batchId: string;
+          activityCount: number;
+          lastSyncedAt: string | null;
+          source: 'excel' | 'sync' | 'unknown';
+          canDelete: boolean;
+          blockReason?: string;
+        }>;
+      };
+    }>('/ffa/data-batches');
+  },
+
+  deleteDataBatch: async (batchId: string) => {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+      data: {
+        deletedActivities: number;
+        deletedTasks: number;
+        deletedAudits: number;
+        deletedFarmers: number;
+      };
+    }>(
+      '/ffa/delete-data-batch',
+      {
+        method: 'POST',
+        body: JSON.stringify({ batchId }),
+      },
+      undefined,
+      120000
+    );
+  },
+
   downloadExcelTemplate: async () => {
     const headers = getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/ffa/excel-template`, {
