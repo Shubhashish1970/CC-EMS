@@ -857,6 +857,8 @@ const ActivitySamplingView: React.FC = () => {
           </div>
         )}
 
+        
+
         {dataSource === 'excel' && (
           <div className="mt-3 pt-3 border-t border-slate-200">
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
