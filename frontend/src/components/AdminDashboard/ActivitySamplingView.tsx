@@ -964,10 +964,10 @@ const ActivitySamplingView: React.FC = () => {
                             ? importProgress.farmersProcessed / importProgress.totalFarmers
                             : 0;
 
-                          // Progress semantics: Activities fill first 50%, then Farmers fill next 50%.
-                          const aPct = Math.max(0, Math.min(1, aRatio)) * 50;
+                          // Progress semantics: Farmers fill first 50%, then Activities fill next 50%.
                           const fPct = Math.max(0, Math.min(1, fRatio)) * 50;
-                          const pct = aPct + (aRatio >= 1 ? fPct : 0);
+                          const aPct = Math.max(0, Math.min(1, aRatio)) * 50;
+                          const pct = fPct + (fRatio >= 1 ? aPct : 0); // Activities progress only after farmers hit 100%
                           return Math.round(Math.max(0, Math.min(100, pct)));
                         })()}%`,
                       }}

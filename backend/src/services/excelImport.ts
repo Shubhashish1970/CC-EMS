@@ -398,7 +398,12 @@ export async function startImportExcelJob(fileBuffer: Buffer): Promise<{ started
           activitiesUpserted += (res.upsertedCount || 0) + (res.modifiedCount || 0);
         },
         (done) => {
-          importProgress.activitiesProcessed = Math.min(done, activityOps.length);
+          // activitiesProcessed is also used during parsing; never allow progress to go backwards
+          // when switching phases (parsing -> upserting).
+          importProgress.activitiesProcessed = Math.max(
+            importProgress.activitiesProcessed,
+            Math.min(done, activityOps.length)
+          );
         }
       );
 
