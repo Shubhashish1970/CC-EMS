@@ -140,6 +140,10 @@ const ActivitySamplingView: React.FC = () => {
     totalActivities: number;
     farmersProcessed: number;
     totalFarmers: number;
+    totalQualifiedActivities?: number;
+    totalQualifiedFarmers?: number;
+    loadedQualifiedActivities?: number;
+    loadedQualifiedFarmers?: number;
     errorCount: number;
     message: string;
   } | null>(null);
@@ -904,6 +908,10 @@ const ActivitySamplingView: React.FC = () => {
                           totalActivities: Number(progress.totalActivities || 0),
                           farmersProcessed: Number(progress.farmersProcessed || 0),
                           totalFarmers: Number(progress.totalFarmers || 0),
+                          totalQualifiedActivities: progress.totalQualifiedActivities == null ? undefined : Number(progress.totalQualifiedActivities || 0),
+                          totalQualifiedFarmers: progress.totalQualifiedFarmers == null ? undefined : Number(progress.totalQualifiedFarmers || 0),
+                          loadedQualifiedActivities: progress.loadedQualifiedActivities == null ? undefined : Number(progress.loadedQualifiedActivities || 0),
+                          loadedQualifiedFarmers: progress.loadedQualifiedFarmers == null ? undefined : Number(progress.loadedQualifiedFarmers || 0),
                           errorCount: Number(progress.errorCount || 0),
                           message: String(progress.message || ''),
                         });

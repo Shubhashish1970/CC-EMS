@@ -427,6 +427,10 @@ export async function startImportExcelJob(fileBuffer: Buffer): Promise<{ started
         }
       }
 
+      // Qualified activities == those we actually attempt to upsert.
+      importProgress.totalQualifiedActivities = activityOps.length;
+      importProgress.loadedQualifiedActivities = 0;
+
       let activitiesUpserted = 0;
       await bulkWriteInChunks(
         activityOps,
