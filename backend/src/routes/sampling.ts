@@ -217,12 +217,26 @@ router.get(
               },
             },
             tasksCreated: { $size: { $ifNull: ['$tasks', []] } },
+            // Not "status === unassigned" only: treat missing status as unassigned (legacy docs) and count any
+            // non-terminal task with no assignedAgentId (orphan sampled_in_queue / in_progress still needs a team lead).
             unassignedTasks: {
               $size: {
                 $filter: {
                   input: { $ifNull: ['$tasks', []] },
                   as: 't',
-                  cond: { $eq: ['$$t.status', 'unassigned'] },
+                  cond: {
+                    $and: [
+                      {
+                        $not: {
+                          $in: [
+                            { $ifNull: ['$$t.status', 'unassigned'] },
+                            ['completed', 'not_reachable', 'invalid_number'],
+                          ],
+                        },
+                      },
+                      { $eq: [{ $ifNull: ['$$t.assignedAgentId', null] }, null] },
+                    ],
+                  },
                 },
               },
             },

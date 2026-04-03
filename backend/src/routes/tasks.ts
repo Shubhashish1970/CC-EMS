@@ -16,6 +16,7 @@ import {
   getUnassignedTasks,
   assignTaskToAgent,
   updateTaskStatus,
+  callTaskNeedsAgentMongoFilter,
 } from '../services/taskService.js';
 import { getOutcomeFromStatus } from '../utils/outcomeHelper.js';
 import { getAgentQueue } from '../services/adminService.js';
@@ -1829,7 +1830,7 @@ router.get(
 
       // 1) Unassigned tasks by farmer preferredLanguage (with BU/State activity filter)
       const byLanguageRaw = await CallTask.aggregate([
-        { $match: { status: 'unassigned', ...dateMatch } },
+        { $match: { ...dateMatch, ...callTaskNeedsAgentMongoFilter() } },
         {
           $lookup: {
             from: Farmer.collection.name,
@@ -2477,7 +2478,7 @@ router.post(
 
       // Find unassigned tasks for farmers of this language
       const basePipeline: any[] = [
-        { $match: { status: 'unassigned', ...dateMatch } },
+        { $match: { ...dateMatch, ...callTaskNeedsAgentMongoFilter() } },
         {
           $lookup: {
             from: Farmer.collection.name,
@@ -2583,7 +2584,6 @@ router.post(
       });
 
       // Round-robin assignment across capable agents
-      const STATUS_UNASSIGNED: TaskStatus = 'unassigned';
       const STATUS_QUEUED: TaskStatus = 'sampled_in_queue';
 
       const languageAgentCursor = new Map<string, number>();
@@ -2644,7 +2644,7 @@ router.post(
 
           batchOps.push({
           updateOne: {
-            filter: { _id: taskId, status: STATUS_UNASSIGNED },
+            filter: { _id: taskId, ...callTaskNeedsAgentMongoFilter() },
             update: {
               $set: {
                 assignedAgentId: agent._id,

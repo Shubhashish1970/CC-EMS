@@ -13,6 +13,15 @@ export interface TaskAssignmentOptions {
 }
 
 /**
+ * Call tasks that still need a CC agent (Sampling stats "Unassigned", unassigned task list, allocation pool).
+ * Uses assignedAgentId, not only status === 'unassigned', so legacy docs without status and orphan queued tasks count.
+ */
+export const callTaskNeedsAgentMongoFilter = (): Record<string, unknown> => ({
+  status: { $nin: ['completed', 'not_reachable', 'invalid_number'] },
+  $or: [{ assignedAgentId: null }, { assignedAgentId: { $exists: false } }],
+});
+
+/**
  * Get all tasks for an agent that can be shown in the dialer (queue/in-progress + completed outcomes)
  * Returns list of tasks sorted by scheduledDate (earliest first)
  * Note: Returns lean documents (plain objects) for better performance
@@ -602,7 +611,7 @@ export const getUnassignedTasks = async (filters?: {
     const { dateFrom, dateTo, page = 1, limit = 20 } = filters || {};
     const skip = (page - 1) * limit;
 
-    const query: any = { status: 'unassigned' };
+    const query: any = { ...callTaskNeedsAgentMongoFilter() };
 
     if (dateFrom || dateTo) {
       query.scheduledDate = {};

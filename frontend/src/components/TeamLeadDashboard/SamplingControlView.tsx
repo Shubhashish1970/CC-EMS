@@ -1261,112 +1261,131 @@ const SamplingControlView: React.FC = () => {
           <div className="bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-black text-slate-700">By Activity Type</div>
             <div className="text-xs text-slate-500 min-w-0 max-w-3xl">
-              <span className="font-semibold text-slate-600">Activity columns</span> (Total through Not eligible) = number of{' '}
-              <span className="font-semibold text-slate-600">activity records</span> in this date range, by lifecycle.{' '}
-              <span className="font-semibold text-slate-600">Farmer columns</span> = distinct people by mobile (per type in each row; top KPI = unique across all types).{' '}
-              <span className="font-semibold text-slate-600">Tasks</span> = call tasks created; many farmers can appear on several activities, so farmer totals are not meant to match activity totals.
+              Table groups: <span className="font-semibold text-slate-600">Activities</span> = event rows by lifecycle;{' '}
+              <span className="font-semibold text-slate-600">Farmers</span> = distinct people (mobile);{' '}
+              <span className="font-semibold text-slate-600">Call tasks</span> = outreach tasks. One farmer can join many activities, so activity counts and farmer counts are not meant to match.
             </div>
           </div>
           <div className="overflow-x-auto min-w-0 -mx-px">
-            <table className="min-w-[1040px] w-full text-sm">
-              <thead className="bg-white border-b border-slate-200">
-                <tr className="text-left align-bottom">
-                    <th className="px-3 py-3 text-xs font-black text-slate-400 uppercase tracking-widest w-[1%] whitespace-nowrap">
-                      <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('type')}>
-                        Activity type{sortIndicator('type')}
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button
-                        type="button"
-                        className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left"
-                        onClick={() => toggleByTypeSort('totalActivities')}
-                      >
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Total activities{sortIndicator('totalActivities')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">in date range</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('active')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Active{sortIndicator('active')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">activities</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('sampled')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Sampled{sortIndicator('sampled')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">activities</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('inactive')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Inactive{sortIndicator('inactive')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">activities</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('notEligible')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Not eligible{sortIndicator('notEligible')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">activities</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left border-l border-slate-200">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('farmersTotal')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Distinct farmers{sortIndicator('farmersTotal')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">linked (by mobile)</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('sampledFarmers')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Farmers w/ tasks{sortIndicator('sampledFarmers')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">at least one call task</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left border-l border-slate-200">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('tasksCreated')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Call tasks{sortIndicator('tasksCreated')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">created</span>
-                      </button>
-                    </th>
-                    <th className="px-3 py-3 text-left">
-                      <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('unassignedTasks')}>
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
-                          Unassigned{sortIndicator('unassignedTasks')}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">call tasks</span>
-                      </button>
-                    </th>
+            <table className="min-w-[1180px] w-full text-sm">
+              <thead className="bg-white">
+                <tr className="text-center">
+                  <th
+                    rowSpan={2}
+                    className="px-3 py-3 text-left align-middle border-b border-slate-200 bg-white min-w-[14rem] w-[14rem] sm:min-w-[16rem] sm:w-[16rem] whitespace-nowrap"
+                  >
+                    <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('type')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Activity type{sortIndicator('type')}</span>
+                    </button>
+                  </th>
+                  <th
+                    colSpan={5}
+                    className="px-2 py-2.5 border-b border-slate-200 border-r border-slate-300 bg-slate-100/90"
+                  >
+                    <div className="text-xs font-black text-slate-600 uppercase tracking-widest">Activities</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-snug">
+                      Activity records in the date range, split by lifecycle status
+                    </div>
+                  </th>
+                  <th colSpan={2} className="px-2 py-2.5 border-b border-slate-200 border-r border-slate-300 bg-emerald-50/80">
+                    <div className="text-xs font-black text-emerald-900 uppercase tracking-widest">Farmers</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-emerald-800/90 normal-case tracking-normal leading-snug">
+                      Distinct people (mobile). Row = this type only; top KPI = all types combined.
+                    </div>
+                  </th>
+                  <th colSpan={2} className="px-2 py-2.5 border-b border-slate-200 bg-sky-50/80">
+                    <div className="text-xs font-black text-sky-900 uppercase tracking-widest">Call tasks</div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-sky-800/90 normal-case tracking-normal leading-snug">
+                      Tasks created for calling. Unassigned = no CC agent on the task yet (matches Task Allocation pool; excludes completed / not reachable / invalid number)
+                    </div>
+                  </th>
+                </tr>
+                <tr className="text-left align-bottom border-b border-slate-200">
+                  <th className="px-3 py-2.5 bg-slate-50/50">
+                    <button
+                      type="button"
+                      className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left"
+                      onClick={() => toggleByTypeSort('totalActivities')}
+                    >
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Total{sortIndicator('totalActivities')}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">in range</span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-slate-50/50">
+                    <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('active')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Active{sortIndicator('active')}
+                      </span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-slate-50/50">
+                    <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('sampled')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Sampled{sortIndicator('sampled')}
+                      </span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-slate-50/50">
+                    <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('inactive')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Inactive{sortIndicator('inactive')}
+                      </span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 border-r border-slate-300 bg-slate-50/50">
+                    <button type="button" className="hover:text-slate-700 text-left" onClick={() => toggleByTypeSort('notEligible')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Not eligible{sortIndicator('notEligible')}
+                      </span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-emerald-50/40">
+                    <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('farmersTotal')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Distinct{sortIndicator('farmersTotal')}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">by mobile</span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 border-r border-slate-300 bg-emerald-50/40">
+                    <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('sampledFarmers')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        With tasks{sortIndicator('sampledFarmers')}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 normal-case tracking-normal leading-tight">≥1 call task</span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-sky-50/40">
+                    <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('tasksCreated')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Created{sortIndicator('tasksCreated')}
+                      </span>
+                    </button>
+                  </th>
+                  <th className="px-3 py-2.5 bg-sky-50/40">
+                    <button type="button" className="hover:text-slate-700 flex flex-col items-start gap-0.5 text-left" onClick={() => toggleByTypeSort('unassignedTasks')}>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Unassigned{sortIndicator('unassignedTasks')}
+                      </span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                   {sortedByTypeRows.map((row: any) => (
                   <tr key={row.type} className="bg-white">
-                    <td className="px-4 py-3 font-black text-slate-900">{row.type}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.totalActivities}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.active}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampled}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.inactive}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.notEligible}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.farmersTotal}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.sampledFarmers}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.tasksCreated}</td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{row.unassignedTasks}</td>
+                    <td className="px-3 py-3 font-black text-slate-900 whitespace-nowrap min-w-[14rem] sm:min-w-[16rem]">{row.type}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-slate-50/30">{row.totalActivities}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-slate-50/30">{row.active}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-slate-50/30">{row.sampled}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-slate-50/30">{row.inactive}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-slate-50/30 border-r border-slate-200">{row.notEligible}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-emerald-50/20">{row.farmersTotal}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-emerald-50/20 border-r border-slate-200">{row.sampledFarmers}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-sky-50/20">{row.tasksCreated}</td>
+                    <td className="px-3 py-3 font-bold text-slate-700 bg-sky-50/20">{row.unassignedTasks}</td>
                   </tr>
                 ))}
                   {(!sortedByTypeRows || sortedByTypeRows.length === 0) && (
@@ -1377,6 +1396,34 @@ const SamplingControlView: React.FC = () => {
                   </tr>
                 )}
               </tbody>
+              {stats?.totals && (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-400 bg-slate-100 text-slate-900">
+                    <td
+                      className="px-3 py-3 font-black whitespace-nowrap min-w-[14rem] sm:min-w-[16rem] align-top"
+                      title="These totals are the same values as the metric cards above. Distinct farmers is globally unique (not the sum of per-type rows)."
+                    >
+                      <span className="block text-xs uppercase tracking-widest text-slate-600">Total</span>
+                      <span className="mt-0.5 block text-[10px] font-semibold normal-case tracking-normal text-slate-500 leading-snug">
+                        Matches KPI cards
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-slate-200/50">{stats.totals.totalActivities ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-slate-200/50">{stats.totals.active ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-slate-200/50">{stats.totals.sampled ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-slate-200/50">{stats.totals.inactive ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-slate-200/50 border-r border-slate-300">
+                      {stats.totals.notEligible ?? 0}
+                    </td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-emerald-100/60">{stats.totals.farmersTotal ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-emerald-100/60 border-r border-slate-300">
+                      {stats.totals.sampledFarmers ?? 0}
+                    </td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-sky-100/60">{stats.totals.tasksCreated ?? 0}</td>
+                    <td className="px-3 py-3 font-black text-slate-800 bg-sky-100/60">{stats.totals.unassignedTasks ?? 0}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
