@@ -139,6 +139,58 @@ async function buildFdaGroups(
 // Sampling Control (Team Lead + MIS Admin)
 // ============================================================================
 
+async function getDistinctActivityTypeStrings(): Promise<string[]> {
+  const raw = await Activity.distinct('type');
+  return (raw as unknown[])
+    .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+    .map((t) => t.trim());
+}
+
+// @route   GET /api/sampling/activity-types
+// @desc    Distinct activity `type` values in the database for Sampling Control (optional date range)
+// @access  Private (Team Lead, MIS Admin)
+router.get(
+  '/activity-types',
+  requirePermission('config.sampling'),
+  [
+    query('dateFrom').optional().isISO8601(),
+    query('dateTo').optional().isISO8601(),
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Validation failed', errors: errors.array() },
+        });
+      }
+
+      const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+      const filter: Record<string, unknown> = {};
+      if (dateFrom || dateTo) {
+        const range: { $gte?: Date; $lte?: Date } = {};
+        if (dateFrom) range.$gte = new Date(dateFrom);
+        if (dateTo) range.$lte = new Date(dateTo);
+        filter.date = range;
+      }
+
+      const raw = await Activity.distinct('type', Object.keys(filter).length > 0 ? filter : {});
+      const activityTypes = (raw as unknown[])
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim())
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+      res.json({
+        success: true,
+        data: { activityTypes },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @route   GET /api/sampling/stats
 // @desc    Sampling dashboard stats for a date range (counts by type + lifecycle + farmers sampled + tasks created)
 // @access  Private (Team Lead, MIS Admin)
@@ -513,13 +565,16 @@ router.post(
       }
 
       const { eligibleActivityTypes } = req.body as { eligibleActivityTypes: string[] };
-      const allTypes = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
-      const eligibleSet = new Set(eligibleActivityTypes || []);
+      const allTypesInDb = await getDistinctActivityTypeStrings();
+      const eligibleTrimmed = (eligibleActivityTypes || []).filter(
+        (t) => typeof t === 'string' && t.trim().length > 0
+      );
+      const eligibleSet = new Set(eligibleTrimmed.map((t) => t.trim()));
       // If eligibleActivityTypes is empty, treat as "all eligible" (consistent with config semantics)
       const enabledTypes =
-        !eligibleActivityTypes || eligibleActivityTypes.length === 0 ? allTypes : Array.from(eligibleSet);
+        eligibleTrimmed.length === 0 ? allTypesInDb : Array.from(eligibleSet);
       const enabledSet = new Set(enabledTypes);
-      const disabledTypes = allTypes.filter((t) => !enabledSet.has(t));
+      const disabledTypes = allTypesInDb.filter((t) => !enabledSet.has(t));
 
       // Persist config as well (source-of-truth)
       await SamplingConfig.findOneAndUpdate(

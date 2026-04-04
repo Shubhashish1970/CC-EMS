@@ -559,6 +559,13 @@ export const samplingAPI = {
     const query = params.toString();
     return apiRequest(`/sampling/stats${query ? `?${query}` : ''}`);
   },
+  getActivityTypes: async (filters?: { dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return apiRequest(`/sampling/activity-types${query ? `?${query}` : ''}`);
+  },
   getLatestRunStatus: async () => {
     return apiRequest('/sampling/run-status/latest');
   },

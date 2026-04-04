@@ -9,8 +9,6 @@ import { type DateRangePreset, getPresetRange, formatPretty } from '../../utils/
 
 type LifecycleStatus = 'active' | 'sampled' | 'inactive' | 'not_eligible';
 
-const ALL_ACTIVITY_TYPES = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'] as const;
-
 type SamplingRunStatus = 'running' | 'completed' | 'failed';
 type LatestRun = {
   _id: string;
@@ -54,6 +52,8 @@ const SamplingControlView: React.FC = () => {
   const [byTypeSort, setByTypeSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
 
   const [eligibleTypes, setEligibleTypes] = useState<string[]>([]);
+  /** Distinct activity types from API (all data, not limited by dashboard date range). */
+  const [activityTypesCatalog, setActivityTypesCatalog] = useState<string[]>([]);
   const [activityCoolingDays, setActivityCoolingDays] = useState<number>(5);
   const [farmerCoolingDays, setFarmerCoolingDays] = useState<number>(30);
   const [defaultPercentage, setDefaultPercentage] = useState<number>(10);
@@ -152,6 +152,12 @@ const SamplingControlView: React.FC = () => {
     }
   }, [stats, activityFilters.lifecycleStatus]);
 
+  const loadActivityTypes = async () => {
+    const res: any = await samplingAPI.getActivityTypes();
+    const list = res?.data?.activityTypes;
+    setActivityTypesCatalog(Array.isArray(list) ? list : []);
+  };
+
   const loadConfig = async () => {
     const res: any = await samplingAPI.getConfig();
     const cfg = res?.data?.config;
@@ -212,7 +218,14 @@ const SamplingControlView: React.FC = () => {
     const init = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([loadConfig(), loadStats(), loadUnassigned(), loadAgents(), loadLatestRunStatus()]);
+        await Promise.all([
+          loadConfig(),
+          loadActivityTypes(),
+          loadStats(),
+          loadUnassigned(),
+          loadAgents(),
+          loadLatestRunStatus(),
+        ]);
       } catch (e: any) {
         toast.showError(e.message || 'Failed to load sampling control data');
       } finally {
@@ -331,13 +344,6 @@ const SamplingControlView: React.FC = () => {
 
   // Note: Activities selection removed. Sampling runs on ALL activities matching current filters.
 
-  const toggleEligibilityType = (type: string) => {
-    const set = new Set(eligibleTypes);
-    if (set.has(type)) set.delete(type);
-    else set.add(type);
-    setEligibleTypes(Array.from(set));
-  };
-
   const handleSaveConfig = async () => {
     setIsLoading(true);
     try {
@@ -356,6 +362,7 @@ const SamplingControlView: React.FC = () => {
       await samplingAPI.applyEligibility(eligibleTypes);
       toast.showSuccess('Saved & applied');
       await loadConfig();
+      await loadActivityTypes();
       await loadStats();
     } catch (e: any) {
       toast.showError(e.message || 'Failed to save config');
@@ -491,7 +498,7 @@ const SamplingControlView: React.FC = () => {
   const handleRefresh = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadConfig(), loadStats(), loadUnassigned()]);
+      await Promise.all([loadConfig(), loadActivityTypes(), loadStats(), loadUnassigned()]);
       toast.showSuccess('Refreshed');
     } catch (e: any) {
       toast.showError(e.message || 'Failed to refresh');
@@ -545,11 +552,51 @@ const SamplingControlView: React.FC = () => {
     return eligibleTypes.join(', ');
   }, [eligibleTypes]);
 
-  // Stable row order: by default keep a fixed type order so positions never jump on refresh.
-  const TYPE_ORDER: string[] = ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'];
-  const typeRank = (t: string) => {
-    const idx = TYPE_ORDER.indexOf(t);
-    return idx === -1 ? 999 : idx;
+  /** Checkboxes: every type in the DB catalog, saved config, and current stats rollup (date-scoped). */
+  const eligibilityChecklistTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of activityTypesCatalog) {
+      const s = typeof t === 'string' ? t.trim() : '';
+      if (s) set.add(s);
+    }
+    for (const t of eligibleTypes) {
+      const s = typeof t === 'string' ? t.trim() : '';
+      if (s) set.add(s);
+    }
+    if (Array.isArray(stats?.byType)) {
+      for (const row of stats.byType) {
+        const t = row?.type;
+        if (t != null && String(t).trim()) set.add(String(t).trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [activityTypesCatalog, eligibleTypes, stats?.byType]);
+
+  /** Empty `eligibleTypes` means all types eligible (API). Clicks move to/from an explicit subset. */
+  const toggleEligibilityType = (type: string) => {
+    const checklist = eligibilityChecklistTypes;
+    if (!checklist.length) return;
+
+    if (eligibleTypes.length === 0) {
+      setEligibleTypes(checklist.filter((t) => t !== type));
+      return;
+    }
+
+    const set = new Set(eligibleTypes);
+    if (set.has(type)) set.delete(type);
+    else set.add(type);
+    let next = Array.from(set);
+
+    const coversAll =
+      checklist.length > 0 &&
+      next.length === checklist.length &&
+      checklist.every((t) => next.includes(t));
+    if (coversAll) {
+      setEligibleTypes([]);
+      return;
+    }
+
+    setEligibleTypes(next);
   };
 
   const sortedByTypeRows = useMemo(() => {
@@ -557,13 +604,13 @@ const SamplingControlView: React.FC = () => {
     const decorated = rows.map((row, idx) => ({ row, idx }));
 
     const getNum = (v: any) => (typeof v === 'number' ? v : Number(v || 0));
+    const typeCmp = (a: any, b: any) =>
+      String(a.row.type ?? '').localeCompare(String(b.row.type ?? ''), undefined, { sensitivity: 'base' });
 
     const cmp = (a: any, b: any) => {
-      // Default: fixed order only (no sorting selected)
       if (!byTypeSort) {
-        const ar = typeRank(a.row.type);
-        const br = typeRank(b.row.type);
-        if (ar !== br) return ar - br;
+        const diff = typeCmp(a, b);
+        if (diff !== 0) return diff;
         return a.idx - b.idx;
       }
 
@@ -571,17 +618,15 @@ const SamplingControlView: React.FC = () => {
       let diff = 0;
 
       if (key === 'type') {
-        diff = typeRank(a.row.type) - typeRank(b.row.type);
+        diff = typeCmp(a, b);
       } else {
         diff = getNum(a.row[key]) - getNum(b.row[key]);
       }
 
       if (diff !== 0) return dir === 'asc' ? diff : -diff;
 
-      // Tie-breaker: fixed type order, then original index (stable)
-      const ar = typeRank(a.row.type);
-      const br = typeRank(b.row.type);
-      if (ar !== br) return ar - br;
+      const tie = typeCmp(a, b);
+      if (tie !== 0) return tie;
       return a.idx - b.idx;
     };
 
@@ -835,8 +880,8 @@ const SamplingControlView: React.FC = () => {
             <div>
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Eligible activity types</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ALL_ACTIVITY_TYPES.map((t) => {
-                  const checked = eligibleTypes.includes(t);
+                {eligibilityChecklistTypes.map((t) => {
+                  const checked = !eligibleTypes.length || eligibleTypes.includes(t);
                   return (
                     <button
                       key={t}
@@ -852,7 +897,13 @@ const SamplingControlView: React.FC = () => {
                   );
                 })}
               </div>
-              <p className="text-xs text-slate-500 mt-2">Current: {eligibleSummary}</p>
+              {eligibilityChecklistTypes.length === 0 ? (
+                <p className="text-xs text-amber-700 mt-2">No activity types found yet. Sync or import activities, then refresh.</p>
+              ) : (
+                <p className="text-xs text-slate-500 mt-2">
+                  Types come from your activity data (plus saved config and the current date range table). Current: {eligibleSummary}
+                </p>
+              )}
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">

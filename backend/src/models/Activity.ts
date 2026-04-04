@@ -47,7 +47,6 @@ const ActivitySchema = new Schema<IActivity>(
     type: {
       type: String,
       required: [true, 'Activity type is required'],
-      enum: ['Field Day', 'Group Meeting', 'Demo Visit', 'OFM', 'Other'],
       trim: true,
     },
     date: {
