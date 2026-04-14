@@ -134,6 +134,13 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                   }
                 })()}
               </div>
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 flex items-start gap-2.5 shadow-sm ring-1 ring-sky-100/80">
+                <MapPin size={18} className="text-sky-600 shrink-0 mt-0.5" strokeWidth={2.25} aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] font-black text-sky-800 uppercase tracking-widest block mb-0.5">Village</span>
+                  <span className="text-sm font-extrabold text-slate-900 leading-snug break-words">{taskData.activity.location || '—'}</span>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div className="flex items-center gap-1.5">
                   <User size={10} className="text-slate-400" />
@@ -147,11 +154,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ taskData, isActive 
                     <span className="text-slate-700 font-medium truncate">{taskData.activity.tm}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5">
-                  <MapPin size={10} className="text-slate-400" />
-                  <span className="text-slate-400 font-bold">Village:</span>
-                  <span className="text-slate-700 font-medium truncate">{taskData.activity.location}</span>
-                </div>
                 <div className="flex items-center gap-1.5">
                   <Layout size={10} className="text-slate-400" />
                   <span className="text-slate-400 font-bold">Territory:</span>

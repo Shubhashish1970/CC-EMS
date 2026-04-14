@@ -19,14 +19,14 @@ type HistoryColumnKey =
   | 'dialer';
 
 const DEFAULT_COL_WIDTHS: Record<HistoryColumnKey, number> = {
-  expand: 56,
-  farmer: 220,
-  outcome: 200,
-  outbound: 160,
-  activityType: 160,
-  territory: 220,
-  updated: 140,
-  dialer: 132,
+  expand: 48,
+  farmer: 200,
+  outcome: 120,
+  outbound: 100,
+  activityType: 100,
+  territory: 120,
+  updated: 100,
+  dialer: 44,
 };
 
 // Get initials from name for avatar display
@@ -334,9 +334,20 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
       ['territory', 'Territory'],
       ['updated', 'Updated'],
     ];
-    if (onOpenTask) base.push(['dialer', 'Dialer']);
+    if (onOpenTask) base.push(['dialer', '']);
     return base;
   }, [onOpenTask]);
+
+  /** Share of table width per column (no min-width px) so the grid stays within the viewport. */
+  const columnWidthPct = useMemo(() => {
+    const keys = historyTableColumns.map(([k]) => k);
+    const total = keys.reduce((s, k) => s + (colWidths[k] || 0), 0) || 1;
+    const pct: Partial<Record<HistoryColumnKey, string>> = {};
+    for (const k of keys) {
+      pct[k] = `${((colWidths[k] || 0) / total) * 100}%`;
+    }
+    return pct as Record<HistoryColumnKey, string>;
+  }, [historyTableColumns, colWidths]);
 
   const visible = useMemo(() => {
     const data = Array.isArray(rows) ? [...rows] : [];
@@ -370,8 +381,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
   }, [rows, tableSort.key, tableSort.dir]);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-slate-50">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="h-full min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 bg-slate-50">
+      <div className="max-w-7xl mx-auto min-w-0 space-y-6">
         {/* Header Section - Matching Activity Sampling */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -416,7 +427,7 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
             </div>
             {onOpenTask ? (
               <p className="text-[11px] text-slate-500 mt-2 font-medium">
-                Use <span className="font-bold text-slate-700">Continue in dialer</span> on a row to open that task in the workspace and submit an updated call.
+                Tap the <span className="font-bold text-slate-700">phone icon</span> in the last column to open that task in the workspace and submit an updated call.
               </p>
             ) : null}
           </div>
@@ -655,16 +666,16 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
             <p className="text-sm text-slate-600 font-medium">No history found for selected filters</p>
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-sm">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden w-full min-w-0">
+          <div className="w-full min-w-0 overflow-x-hidden">
+              <table className="w-full min-w-0 table-fixed text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   {historyTableColumns.map(([key, label]) => (
                     <th
                       key={key}
-                      className="relative px-3 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest select-none"
-                      style={{ width: colWidths[key], minWidth: colWidths[key] }}
+                      className={`relative py-3 select-none max-w-0 ${key === 'expand' || key === 'dialer' ? 'px-1' : 'px-2 sm:px-3'} ${key === 'dialer' ? 'text-center' : 'text-left text-xs font-black text-slate-500 uppercase tracking-widest'}`}
+                      style={{ width: columnWidthPct[key] }}
                       onClick={
                         key === 'expand' || key === 'dialer'
                           ? undefined
@@ -675,24 +686,39 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
                               });
                             }
                       }
-                      title={key === 'expand' || key === 'dialer' ? undefined : 'Click to sort'}
+                      title={
+                        key === 'dialer'
+                          ? 'Open in workspace (dialer)'
+                          : key === 'expand'
+                            ? undefined
+                            : 'Click to sort'
+                      }
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">{label}</span>
-                        {key !== 'expand' && key !== 'dialer' && tableSort.key === key && (
-                          tableSort.dir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                        )}
-                      </div>
-                      {key !== 'expand' && key !== 'dialer' && (
-                        <div
-                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleResizeStart(key, e.clientX);
-                          }}
-                          title="Drag to resize"
-                        />
+                      {key === 'dialer' ? (
+                        <div className="flex items-center justify-center">
+                          <PhoneCall size={17} className="text-slate-500" strokeWidth={2} aria-hidden />
+                          <span className="sr-only">Dialer</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate">{label}</span>
+                            {key !== 'expand' && tableSort.key === key && (
+                              tableSort.dir === 'asc' ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />
+                            )}
+                          </div>
+                          {key !== 'expand' && key !== 'dialer' && (
+                            <div
+                              className="absolute right-0 top-0 h-full w-2 cursor-col-resize"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleResizeStart(key, e.clientX);
+                              }}
+                              title="Drag to resize"
+                            />
+                          )}
+                        </>
                       )}
                     </th>
                   ))}
@@ -710,10 +736,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
                   return (
                     <React.Fragment key={t._id}>
                       <tr className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 py-3 text-sm" style={{ width: colWidths.expand, minWidth: colWidths.expand }}>
+                        <td className="px-1 py-3 text-sm max-w-0 align-middle" style={{ width: columnWidthPct.expand }}>
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 transition-colors"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 transition-colors mx-auto"
                             onClick={() => toggleExpand(String(t._id))}
                             title="Expand / collapse"
                           >
@@ -724,21 +750,21 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
                             )}
                           </button>
                         </td>
-                        <td className="px-3 py-3 text-sm" style={{ width: colWidths.farmer, minWidth: colWidths.farmer }}>
-                          <div className="flex items-center gap-3 min-w-0">
+                        <td className="px-2 sm:px-3 py-3 text-sm max-w-0 align-middle" style={{ width: columnWidthPct.farmer }}>
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                             {farmer.photoUrl ? (
                               <img
                                 src={farmer.photoUrl}
                                 alt={farmer.name}
-                                className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border border-slate-200 shrink-0"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = '/images/farmer-default-logo.png';
                                 }}
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-sm border-2 border-white">
-                                <span className="text-white font-bold text-sm">{getInitials(farmer.name || '')}</span>
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-sm border-2 border-white shrink-0">
+                                <span className="text-white font-bold text-xs sm:text-sm">{getInitials(farmer.name || '')}</span>
                               </div>
                             )}
                             <div className="min-w-0">
@@ -747,36 +773,44 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-sm font-bold text-slate-700" style={{ width: colWidths.outcome, minWidth: colWidths.outcome }}>
-                        {t.outcome || outcomeLabel(t.status)}
-                      </td>
-                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.outbound, minWidth: colWidths.outbound }}>
-                        {outboundLabel(outbound)}
-                      </td>
-                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.activityType, minWidth: colWidths.activityType }}>
-                        {activity.type || '-'}
-                      </td>
-                        <td className="px-3 py-3 text-sm text-slate-700 truncate" title={territory || ''} style={{ width: colWidths.territory, minWidth: colWidths.territory }}>
-                        {territory || '-'}
-                      </td>
-                        <td className="px-3 py-3 text-sm text-slate-700" style={{ width: colWidths.updated, minWidth: colWidths.updated }}>
-                        {updated}
-                      </td>
+                        <td className="px-2 sm:px-3 py-3 text-sm font-bold text-slate-700 max-w-0 align-middle" style={{ width: columnWidthPct.outcome }}>
+                          <div className="truncate" title={String(t.outcome || outcomeLabel(t.status))}>
+                            {t.outcome || outcomeLabel(t.status)}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-3 text-sm text-slate-700 max-w-0 align-middle" style={{ width: columnWidthPct.outbound }}>
+                          <div className="truncate" title={outboundLabel(outbound)}>
+                            {outboundLabel(outbound)}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-3 text-sm text-slate-700 max-w-0 align-middle" style={{ width: columnWidthPct.activityType }}>
+                          <div className="truncate" title={activity.type || '-'}>
+                            {activity.type || '-'}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-3 text-sm text-slate-700 max-w-0 align-middle" style={{ width: columnWidthPct.territory }}>
+                          <div className="truncate" title={territory || ''}>
+                            {territory || '-'}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-3 text-sm text-slate-700 max-w-0 align-middle whitespace-nowrap" style={{ width: columnWidthPct.updated }}>
+                          {updated}
+                        </td>
                         {onOpenTask ? (
-                          <td className="px-2 py-3 align-middle" style={{ width: colWidths.dialer, minWidth: colWidths.dialer }}>
+                          <td className="px-1 py-3 align-middle max-w-0 text-center" style={{ width: columnWidthPct.dialer }}>
                             <button
                               type="button"
                               onClick={() => handleOpenInDialer(String(t._id))}
                               disabled={openingTaskId === String(t._id)}
-                              className="w-full min-h-10 px-2 rounded-xl border border-lime-300 bg-lime-50 text-lime-900 text-[11px] font-black uppercase tracking-wide hover:bg-lime-100 disabled:opacity-60 flex items-center justify-center gap-1.5"
-                              title="Open this task in the dialer to place another call and submit an updated response"
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-lime-400/80 bg-lime-500/15 text-lime-800 hover:bg-lime-500/25 disabled:opacity-50 transition-colors mx-auto"
+                              title="Open in dialer — continue or update this call"
+                              aria-label="Open task in dialer"
                             >
                               {openingTaskId === String(t._id) ? (
-                                <Loader2 size={14} className="animate-spin shrink-0" />
+                                <Loader2 size={18} className="animate-spin shrink-0 text-lime-700" />
                               ) : (
-                                <PhoneCall size={14} className="shrink-0" strokeWidth={2.25} />
+                                <PhoneCall size={18} className="shrink-0 text-lime-700" strokeWidth={2.25} />
                               )}
-                              <span className="truncate">Continue</span>
                             </button>
                           </td>
                         ) : null}

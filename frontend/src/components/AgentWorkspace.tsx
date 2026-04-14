@@ -628,7 +628,7 @@ const AgentWorkspace: React.FC = () => {
         </header>
 
         {activeSection !== 'dialer' ? (
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 min-w-0 overflow-hidden relative">
             {activeSection === 'history' && <AgentHistoryView onOpenTask={openTaskById} />}
             {activeSection === 'analytics' && <AgentAnalyticsView />}
           </div>
