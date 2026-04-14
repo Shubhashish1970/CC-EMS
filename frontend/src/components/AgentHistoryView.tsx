@@ -227,10 +227,6 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
   const loadOptions = async () => {
     try {
       const res: any = await tasksAPI.getOwnHistoryOptions({
-        status: filters.status || undefined,
-        territory: filters.territory || undefined,
-        activityType: filters.activityType || undefined,
-        search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
       });
@@ -266,6 +262,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
 
   useEffect(() => {
     loadOptions().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.dateFrom, filters.dateTo]);
+
+  useEffect(() => {
     loadStats().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.status, filters.territory, filters.activityType, filters.search, filters.dateFrom, filters.dateTo]);
@@ -347,14 +347,25 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-xl font-black text-slate-900 mb-1">History</h2>
-              <p className="text-sm text-slate-600">All tasks except "In Queue"</p>
+              <p className="text-sm text-slate-600">
+                Table: work excluding in-queue. Statistics use the same filters and count by task status (cards sum to Total).
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="secondary" size="sm" onClick={() => setShowFilters((v) => !v)}>
                 <Filter size={16} />
                 {showFilters ? 'Hide filters' : 'Filters'}
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={isLoading}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  loadOptions().catch(() => undefined);
+                  loadStats().catch(() => undefined);
+                  load(page).catch(() => undefined);
+                }}
+                disabled={isLoading}
+              >
                 <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                 Refresh
               </Button>
@@ -398,8 +409,8 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
                       { value: '', label: 'All (except In Queue)' },
                       { value: 'in_progress', label: 'In Progress' },
                       { value: 'completed', label: 'Completed Conversation' },
-                      { value: 'not_reachable', label: 'Unsuccessful' },
-                      { value: 'invalid_number', label: 'Unsuccessful' },
+                      { value: 'not_reachable', label: 'Unsuccessful (not reachable / no answer)' },
+                      { value: 'invalid_number', label: 'Invalid number' },
                     ]}
                   />
                 </div>
@@ -545,7 +556,12 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void }> = ({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <BarChart3 className="text-lime-600" size={18} />
-                <h2 className="text-base font-black text-slate-900">Statistics</h2>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Statistics</h2>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    In queue + in progress + completed + unsuccessful + invalid = Total (same date & filters as below).
+                  </p>
+                </div>
               </div>
               <button
                 type="button"

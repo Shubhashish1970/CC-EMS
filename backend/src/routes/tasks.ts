@@ -653,7 +653,7 @@ router.get(
 );
 
 // @route   GET /api/tasks/own/history/options
-// @desc    Distinct filter option lists for Agent History (territory/activityType), scoped by filters (each ignores its own selection)
+// @desc    Distinct territory & activity type for filters — all assigned tasks in date range (ignores status/territory/search so lists stay complete)
 // @access  Private (CC Agent)
 router.get(
   '/own/history/options',
@@ -678,84 +678,69 @@ router.get(
 
       const authReq = req as AuthRequest;
       const agentId = authReq.user._id.toString();
-      const { status, territory, activityType, search, dateFrom, dateTo } = req.query as any;
+      const { dateFrom, dateTo } = req.query as any;
 
       const baseMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
-        status: { $ne: 'sampled_in_queue' },
       };
-      if (status) baseMatch.status = String(status) as TaskStatus;
 
-      // Use same date filter logic as history endpoint for consistency
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom) : null;
         const to = dateTo ? new Date(dateTo) : null;
         if (from) from.setHours(0, 0, 0, 0);
         if (to) to.setHours(23, 59, 59, 999);
-        
-        // Use the EXACT same date filter logic as history endpoint
-        // Primary: updatedAt in range (catches all tasks updated on the date)
-        // Secondary: callStartedAt in range but updatedAt not set or outside range
+
         const dateConditions: any[] = [];
-        
+
         if (from && to) {
           dateConditions.push(
             { updatedAt: { $gte: from, $lte: to } },
-            { 
+            {
               $and: [
                 { callStartedAt: { $exists: true, $ne: null, $gte: from, $lte: to } },
-                { $or: [
-                  { updatedAt: { $exists: false } },
-                  { updatedAt: null },
-                  { updatedAt: { $lt: from } },
-                  { updatedAt: { $gt: to } }
-                ]}
-              ]
+                {
+                  $or: [
+                    { updatedAt: { $exists: false } },
+                    { updatedAt: null },
+                    { updatedAt: { $lt: from } },
+                    { updatedAt: { $gt: to } },
+                  ],
+                },
+              ],
             }
           );
         } else if (from) {
           dateConditions.push(
             { updatedAt: { $gte: from } },
-            { 
+            {
               $and: [
                 { callStartedAt: { $exists: true, $ne: null, $gte: from } },
-                { $or: [
-                  { updatedAt: { $exists: false } },
-                  { updatedAt: null },
-                  { updatedAt: { $lt: from } }
-                ]}
-              ]
+                {
+                  $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }, { updatedAt: { $lt: from } }],
+                },
+              ],
             }
           );
         } else if (to) {
           dateConditions.push(
             { updatedAt: { $lte: to } },
-            { 
+            {
               $and: [
                 { callStartedAt: { $exists: true, $ne: null, $lte: to } },
-                { $or: [
-                  { updatedAt: { $exists: false } },
-                  { updatedAt: null },
-                  { updatedAt: { $gt: to } }
-                ]}
-              ]
+                {
+                  $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }, { updatedAt: { $gt: to } }],
+                },
+              ],
             }
           );
         }
-        
+
         if (dateConditions.length > 0) {
           baseMatch.$or = dateConditions;
         }
       }
 
-      const normalizedSearch = String(search || '').trim();
-      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
-
       const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-
-      const normTerritory = String(territory || '').trim();
-      const normType = String(activityType || '').trim();
 
       const basePipeline: any[] = [
         { $match: baseMatch },
@@ -775,27 +760,6 @@ router.get(
             __activityType: { $trim: { input: { $ifNull: ['$activityId.type', ''] } } },
           },
         },
-        ...(re
-          ? [
-              {
-                $match: {
-                  $or: [
-                    { 'farmerId.name': re },
-                    { 'farmerId.mobileNumber': re },
-                    { 'farmerId.location': re },
-                    { 'farmerId.preferredLanguage': re },
-                    { 'activityId.type': re },
-                    { 'activityId.officerName': re },
-                    { 'activityId.tmName': re },
-                    { 'activityId.territoryName': re },
-                    { 'activityId.territory': re },
-                    { 'activityId.state': re },
-                    { 'activityId.activityId': re },
-                  ],
-                },
-              },
-            ]
-          : []),
       ];
 
       const stripEmpty = (arr: any[]) => (Array.isArray(arr) ? arr.filter((v) => v !== '' && v !== null && v !== undefined) : []);
@@ -805,12 +769,10 @@ router.get(
         {
           $facet: {
             territory: [
-              ...(normType ? [{ $match: { __activityType: normType } }] : []), // keep other filter
               { $group: { _id: null, values: { $addToSet: '$__territory' } } },
               { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
             ],
             activityType: [
-              ...(normTerritory ? [{ $match: { __territory: normTerritory } }] : []), // keep other filter
               { $group: { _id: null, values: { $addToSet: '$__activityType' } } },
               { $project: { _id: 0, values: { $ifNull: ['$values', []] } } },
             ],
@@ -958,144 +920,88 @@ router.get(
       const normalizedSearch = String(search || '').trim();
       const hasActivityFilters = !!String(territory || '').trim() || !!String(activityType || '').trim();
 
-      let inProgress = 0;
-      let completed = 0;
-      let unsuccessfulCount = 0;
-      let invalidCount = 0;
+      const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
+      const normTerritory = String(territory || '').trim();
+      const normType = String(activityType || '').trim();
+      const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
 
+      const filteredHistoryPrefix: any[] = [
+        { $match: baseMatch },
+        { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+        { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+        { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+        ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+        ...(normTerritory
+          ? [
+              {
+                $match: {
+                  $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                },
+              },
+            ]
+          : []),
+        ...(re
+          ? [
+              {
+                $match: {
+                  $or: [
+                    { 'farmerId.name': re },
+                    { 'farmerId.mobileNumber': re },
+                    { 'farmerId.location': re },
+                    { 'farmerId.preferredLanguage': re },
+                    { 'activityId.type': re },
+                    { 'activityId.officerName': re },
+                    { 'activityId.tmName': re },
+                    { 'activityId.territoryName': re },
+                    { 'activityId.territory': re },
+                    { 'activityId.state': re },
+                    { 'activityId.activityId': re },
+                  ],
+                },
+              },
+            ]
+          : []),
+      ];
+
+      const statusCounts: Record<string, number> = {};
       if (normalizedSearch || hasActivityFilters) {
-        // Use aggregation to get tasks matching filters (same as history endpoint)
-        // Then count outcomes from the actual task documents to ensure consistency
-        const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
-
-        const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-        const normTerritory = String(territory || '').trim();
-        const normType = String(activityType || '').trim();
-
-        // Get the task IDs that match all filters (same aggregation as history endpoint)
-        const taskIdsAgg = await CallTask.aggregate([
-          { $match: baseMatch },
-          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-          ...(normTerritory
-            ? [
-                {
-                  $match: {
-                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
-                  },
-                },
-              ]
-            : []),
-          ...(re
-            ? [
-                {
-                  $match: {
-                    $or: [
-                      { 'farmerId.name': re },
-                      { 'farmerId.mobileNumber': re },
-                      { 'farmerId.location': re },
-                      { 'farmerId.preferredLanguage': re },
-                      { 'activityId.type': re },
-                      { 'activityId.officerName': re },
-                      { 'activityId.tmName': re },
-                      { 'activityId.territoryName': re },
-                      { 'activityId.territory': re },
-                      { 'activityId.state': re },
-                      { 'activityId.activityId': re },
-                    ],
-                  },
-                },
-              ]
-            : []),
-          { $project: { _id: 1 } }, // Only get IDs
-        ]);
-
-        // Extract task IDs
-        const taskIds = taskIdsAgg.map((r: any) => r._id);
-
-        // Fetch the actual tasks and count outcomes (same logic as "no filters" path)
-        if (taskIds.length > 0) {
-          const tasks = await CallTask.find({ _id: { $in: taskIds } }).lean();
-          
-          // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
-          const getEffectiveOutcome = (task: any): string => {
-            if (task.outcome) return String(task.outcome).trim();
-            const status = String(task.status || '').trim();
-            if (status === 'completed') return 'Completed Conversation';
-            if (status === 'in_progress') return 'In Progress';
-            if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
-            return status || 'Unknown';
-          };
-          
-          for (const task of tasks) {
-            const effectiveOutcome = getEffectiveOutcome(task);
-            const normalizedOutcome = effectiveOutcome.toLowerCase();
-            
-            if (normalizedOutcome === 'in progress') {
-              inProgress++;
-            } else if (normalizedOutcome === 'completed conversation') {
-              completed++;
-            } else if (normalizedOutcome === 'unsuccessful') {
-              unsuccessfulCount++;
-            }
-          }
+        const rows = await CallTask.aggregate([...filteredHistoryPrefix, { $group: { _id: '$status', count: { $sum: 1 } } }]);
+        for (const r of rows) {
+          if (r._id) statusCounts[String(r._id)] = Number(r.count || 0);
         }
       } else {
-        // Use the EXACT same query as history endpoint - use find() then count outcomes
-        const tasks = await CallTask.find(baseMatch).lean();
-        
-        // Helper to get outcome (matches frontend logic: outcome || outcomeLabel(status))
-        const getEffectiveOutcome = (task: any): string => {
-          if (task.outcome) return String(task.outcome).trim();
-          const status = String(task.status || '').trim();
-          if (status === 'completed') return 'Completed Conversation';
-          if (status === 'in_progress') return 'In Progress';
-          if (status === 'invalid_number' || status === 'not_reachable') return 'Unsuccessful';
-          return status || 'Unknown';
-        };
-        
-        for (const task of tasks) {
-          const effectiveOutcome = getEffectiveOutcome(task);
-          const normalizedOutcome = effectiveOutcome.toLowerCase();
-          
-          if (normalizedOutcome === 'in progress') {
-            inProgress++;
-          } else if (normalizedOutcome === 'completed conversation') {
-            completed++;
-          } else if (normalizedOutcome === 'unsuccessful') {
-            unsuccessfulCount++;
-          }
+        const rows = await CallTask.aggregate([{ $match: baseMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]);
+        for (const r of rows) {
+          if (r._id) statusCounts[String(r._id)] = Number(r.count || 0);
         }
       }
-      
-      // Get inQueue count separately (sampled_in_queue) for the agent
+
+      const inProgress = statusCounts['in_progress'] || 0;
+      const completed = statusCounts['completed'] || 0;
+      const notReachable = statusCounts['not_reachable'] || 0;
+      const invalidNumber = statusCounts['invalid_number'] || 0;
+
       const inQueueMatch: any = {
         assignedAgentId: new mongoose.Types.ObjectId(agentId),
         status: 'sampled_in_queue',
       };
-      
-      // Apply same filters for inQueue count
-      // Note: sampled_in_queue tasks typically don't have callStartedAt, so we primarily use updatedAt
+
       if (dateFrom || dateTo) {
-        // Use the same date handling as above
         let fromDate: Date | null = null;
         let toDate: Date | null = null;
-        
+
         if (dateFrom) {
           fromDate = dateFrom instanceof Date ? new Date(dateFrom) : new Date(dateFrom as string);
           fromDate.setHours(0, 0, 0, 0);
         }
-        
+
         if (dateTo) {
           toDate = dateTo instanceof Date ? new Date(dateTo) : new Date(dateTo as string);
           toDate.setHours(23, 59, 59, 999);
         }
-        
-        // For inQueue tasks, use updatedAt (they typically don't have callStartedAt yet)
+
         if (fromDate && toDate) {
           inQueueMatch.updatedAt = { $gte: fromDate, $lte: toDate };
         } else if (fromDate) {
@@ -1104,55 +1010,48 @@ router.get(
           inQueueMatch.updatedAt = { $lte: toDate };
         }
       }
-      
-      // Apply activity filters to inQueue if needed
+
       let inQueueCount = 0;
       if (normalizedSearch || hasActivityFilters) {
         try {
-          const escaped = normalizedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = normalizedSearch ? new RegExp(escaped, 'i') : null;
-          const activityCollection = (await import('../models/Activity.js')).Activity.collection.name;
-          const normTerritory = String(territory || '').trim();
-          const normType = String(activityType || '').trim();
-
           const inQueueAgg = await CallTask.aggregate([
-          { $match: inQueueMatch },
-          { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
-          { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
-          { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
-          ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
-          ...(normTerritory
-            ? [
-                {
-                  $match: {
-                    $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+            { $match: inQueueMatch },
+            { $lookup: { from: Farmer.collection.name, localField: 'farmerId', foreignField: '_id', as: 'farmerId' } },
+            { $unwind: { path: '$farmerId', preserveNullAndEmptyArrays: true } },
+            { $lookup: { from: activityCollection, localField: 'activityId', foreignField: '_id', as: 'activityId' } },
+            { $unwind: { path: '$activityId', preserveNullAndEmptyArrays: true } },
+            ...(normType ? [{ $match: { 'activityId.type': normType } }] : []),
+            ...(normTerritory
+              ? [
+                  {
+                    $match: {
+                      $or: [{ 'activityId.territoryName': normTerritory }, { 'activityId.territory': normTerritory }],
+                    },
                   },
-                },
-              ]
-            : []),
-          ...(re
-            ? [
-                {
-                  $match: {
-                    $or: [
-                      { 'farmerId.name': re },
-                      { 'farmerId.mobileNumber': re },
-                      { 'farmerId.location': re },
-                      { 'farmerId.preferredLanguage': re },
-                      { 'activityId.type': re },
-                      { 'activityId.officerName': re },
-                      { 'activityId.tmName': re },
-                      { 'activityId.territoryName': re },
-                      { 'activityId.territory': re },
-                      { 'activityId.state': re },
-                      { 'activityId.activityId': re },
-                    ],
+                ]
+              : []),
+            ...(re
+              ? [
+                  {
+                    $match: {
+                      $or: [
+                        { 'farmerId.name': re },
+                        { 'farmerId.mobileNumber': re },
+                        { 'farmerId.location': re },
+                        { 'farmerId.preferredLanguage': re },
+                        { 'activityId.type': re },
+                        { 'activityId.officerName': re },
+                        { 'activityId.tmName': re },
+                        { 'activityId.territoryName': re },
+                        { 'activityId.territory': re },
+                        { 'activityId.state': re },
+                        { 'activityId.activityId': re },
+                      ],
+                    },
                   },
-                },
-              ]
-            : []),
-          { $count: 'count' },
+                ]
+              : []),
+            { $count: 'count' },
           ]);
           inQueueCount = Number(inQueueAgg?.[0]?.count || 0);
         } catch (inQueueAggError: any) {
@@ -1161,7 +1060,7 @@ router.get(
             stack: inQueueAggError?.stack,
             inQueueMatch: JSON.stringify(inQueueMatch, null, 2),
           });
-          inQueueCount = 0; // Default to 0 on error
+          inQueueCount = 0;
         }
       } else {
         try {
@@ -1172,34 +1071,11 @@ router.get(
             stack: countError?.stack,
             inQueueMatch: JSON.stringify(inQueueMatch, null, 2),
           });
-          inQueueCount = 0; // Default to 0 on error
+          inQueueCount = 0;
         }
       }
-      
-      // Use outcome field from database (unsuccessfulCount from aggregation above)
-      // The unsuccessfulCount already includes tasks with outcome='Unsuccessful'
-      // We also need to handle any tasks that might have null outcome but should be counted
-      let unsuccessful = unsuccessfulCount;
-      
-      // Count invalid separately (for display purposes) - use callLog.callStatus or status
-      // This counts tasks with Invalid callStatus OR invalid_number status
-      try {
-        const invalidAgg = await CallTask.aggregate([
-          { $match: baseMatch },
-          { $match: { $or: [{ 'callLog.callStatus': 'Invalid' }, { status: 'invalid_number' }] } },
-          { $count: 'count' },
-        ]);
-        invalidCount = Number(invalidAgg?.[0]?.count || 0);
-      } catch (aggError: any) {
-        logger.error(`Error in invalid count aggregation:`, {
-          error: aggError?.message || String(aggError),
-          stack: aggError?.stack,
-          baseMatch: JSON.stringify(baseMatch, null, 2),
-        });
-        invalidCount = 0; // Default to 0 on error
-      }
-      
-      const total = inProgress + completed + unsuccessful + inQueueCount;
+
+      const total = inQueueCount + inProgress + completed + notReachable + invalidNumber;
 
       res.json({
         success: true,
@@ -1208,8 +1084,8 @@ router.get(
           inQueue: inQueueCount,
           inProgress,
           completedConversation: completed,
-          unsuccessful,
-          invalid: invalidCount,
+          unsuccessful: notReachable,
+          invalid: invalidNumber,
         },
       });
     } catch (error) {

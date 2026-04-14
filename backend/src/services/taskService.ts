@@ -53,7 +53,7 @@ export const getAvailableTasksForAgent = async (agentId: string): Promise<any[]>
       // Agent view needs: FDA (officerName), TM, Territory, State (+ optional legacy territory)
       .populate('activityId', 'type date officerName tmName location territory territoryName state crops products')
       .sort({ scheduledDate: 1 }) // Earliest first
-      .limit(50) // Reasonable limit
+      .limit(300) // Enough for typical agent load; History uses full list + date filters
       .lean(); // Performance: return plain objects for read-only display
 
     // Filter tasks by agent's language capabilities

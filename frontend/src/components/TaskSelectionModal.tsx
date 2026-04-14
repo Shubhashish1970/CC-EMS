@@ -320,9 +320,13 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Completed ({completedCount})
+              Done ({completedCount})
             </button>
           </div>
+          <p className="text-[10px] text-slate-500 mt-2 leading-snug">
+            Up to 300 earliest-scheduled tasks (language-matched). &quot;Done&quot; includes successful and unsuccessful
+            outcomes. History (sidebar) uses the selected date range and may show different totals.
+          </p>
         </div>
 
         {/* Content - Light theme */}

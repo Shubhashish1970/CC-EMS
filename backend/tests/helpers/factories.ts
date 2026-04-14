@@ -57,6 +57,7 @@ export interface ActivityOverrides {
   officerName?: string;
   location?: string;
   territory?: string;
+  territoryName?: string;
   state?: string;
   dataBatchId?: string;
 }

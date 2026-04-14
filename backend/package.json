@@ -22,6 +22,7 @@
     "cleanup:officer-number-activities": "tsx src/scripts/deleteActivitiesWithOfficerNumber.ts",
     "reset:dev-operational-data": "tsx src/scripts/resetDevOperationalData.ts",
     "drop:unused-databases": "tsx src/scripts/dropUnusedDatabases.ts",
+    "audit:agent-screens": "tsx src/scripts/auditAgentScreens.ts",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
