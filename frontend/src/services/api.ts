@@ -873,6 +873,8 @@ export interface EmsReportSummaryRow {
   groupLabel: string;
   totalAttempted: number;
   totalConnected: number;
+  /** Connected line but form not progressed (not in hygiene "Connected" denominator) */
+  connectedIntakePendingCount?: number;
   disconnectedCount: number;
   incomingNACount: number;
   invalidCount: number;

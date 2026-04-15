@@ -224,6 +224,7 @@ router.get(
           (acc, r) => ({
             totalAttempted: acc.totalAttempted + r.totalAttempted,
             totalConnected: acc.totalConnected + r.totalConnected,
+            connectedIntakePendingCount: acc.connectedIntakePendingCount + (r.connectedIntakePendingCount ?? 0),
             disconnectedCount: acc.disconnectedCount + r.disconnectedCount,
             incomingNACount: acc.incomingNACount + r.incomingNACount,
             invalidCount: acc.invalidCount + r.invalidCount,
@@ -250,6 +251,7 @@ router.get(
           {
             totalAttempted: 0,
             totalConnected: 0,
+            connectedIntakePendingCount: 0,
             disconnectedCount: 0,
             incomingNACount: 0,
             invalidCount: 0,
@@ -290,6 +292,11 @@ router.get(
         const metricRows: [string, ...(string | number)[]][] = [
           ['Call Status'],
           ['Connected', ...summaryRows.map((r) => r.totalConnected), totals.totalConnected],
+          [
+            'Connected (intake pending)',
+            ...summaryRows.map((r) => r.connectedIntakePendingCount ?? 0),
+            totals.connectedIntakePendingCount,
+          ],
           ['Disconnected', ...summaryRows.map((r) => r.disconnectedCount), totals.disconnectedCount],
           ['Incoming not Allowed', ...summaryRows.map((r) => r.incomingNACount), totals.incomingNACount],
           ['Invalid', ...summaryRows.map((r) => r.invalidCount), totals.invalidCount],

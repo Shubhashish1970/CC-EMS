@@ -21,6 +21,8 @@ export interface EmsReportSummaryRow {
   groupLabel: string;
   totalAttempted: number;
   totalConnected: number;
+  /** callStatus Connected but did not yet capture didAttend / purchase / willing (excluded from hygiene denominator) */
+  connectedIntakePendingCount: number;
   disconnectedCount: number;
   incomingNACount: number;
   invalidCount: number;
@@ -237,6 +239,20 @@ export async function getEmsReportSummary(
         _id: '$__group',
         totalAttempted: { $sum: 1 },
         totalConnected: { $sum: { $cond: ['$__isConnected', 1, 0] } },
+        connectedIntakePendingCount: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$callLog.callStatus', 'Connected'] },
+                  { $eq: ['$__isConnected', false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
         disconnectedCount: { $sum: { $cond: ['$__disconnected', 1, 0] } },
         incomingNACount: { $sum: { $cond: ['$__incomingNA', 1, 0] } },
         invalidCount: { $sum: { $cond: ['$__isInvalid', 1, 0] } },
@@ -291,6 +307,7 @@ export async function getEmsReportSummary(
     const label = row._id != null ? String(row._id).trim() || '—' : '—';
     const totalAttempted = Number(row.totalAttempted || 0);
     const totalConnected = Number(row.totalConnected || 0);
+    const connectedIntakePendingCount = Number(row.connectedIntakePendingCount || 0);
     const disconnectedCount = Number(row.disconnectedCount || 0);
     const incomingNACount = Number(row.incomingNACount || 0);
     const invalidCount = Number(row.invalidCount || 0);
@@ -340,6 +357,7 @@ export async function getEmsReportSummary(
       groupLabel: label,
       totalAttempted,
       totalConnected,
+      connectedIntakePendingCount,
       disconnectedCount,
       incomingNACount,
       invalidCount,

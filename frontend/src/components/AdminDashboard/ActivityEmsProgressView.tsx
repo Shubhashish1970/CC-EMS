@@ -60,6 +60,7 @@ import { type DateRangePreset, getPresetRange, formatPretty, toISODateLocal } fr
 export type EmsTotals = {
   totalAttempted: number;
   totalConnected: number;
+  connectedIntakePendingCount: number;
   disconnectedCount: number;
   incomingNACount: number;
   invalidCount: number;
@@ -119,13 +120,14 @@ function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
   if (!rows.length) return null;
   const r0 = rows[0];
   const hasCounts = 'disconnectedCount' in r0 && (r0 as EmsReportSummaryRow).disconnectedCount != null;
-  let totalAttempted = 0, totalConnected = 0, disconnectedCount = 0, incomingNACount = 0, invalidCount = 0, noAnswerCount = 0;
+  let totalAttempted = 0, totalConnected = 0, connectedIntakePendingCount = 0, disconnectedCount = 0, incomingNACount = 0, invalidCount = 0, noAnswerCount = 0;
   let identityWrongCount = 0, dontRecallCount = 0, noMissedCount = 0, notAFarmerCount = 0, yesAttendedCount = 0;
   let notPurchasedCount = 0, purchasedCount = 0, willingMaybeCount = 0, willingNoCount = 0, willingYesCount = 0, yesPlusPurchasedCount = 0;
   let activityQualitySum = 0, activityQualityCount = 0;
   for (const r of rows) {
     totalAttempted += r.totalAttempted;
     totalConnected += r.totalConnected;
+    connectedIntakePendingCount += r.connectedIntakePendingCount ?? 0;
     invalidCount += r.invalidCount;
     identityWrongCount += (r as EmsReportSummaryRow & { identityWrongCount?: number }).identityWrongCount ?? 0;
     activityQualitySum += (r as EmsReportSummaryRow & { activityQualitySum?: number }).activityQualitySum ?? 0;
@@ -161,7 +163,7 @@ function computeEmsTotals(rows: EmsReportSummaryRow[]): EmsTotals | null {
   );
   const validIdentity = totalConnected - identityWrongCount - notAFarmerCount;
   return {
-    totalAttempted, totalConnected, disconnectedCount, incomingNACount, invalidCount, noAnswerCount,
+    totalAttempted, totalConnected, connectedIntakePendingCount, disconnectedCount, incomingNACount, invalidCount, noAnswerCount,
     identityWrongCount, dontRecallCount, noMissedCount, notAFarmerCount, yesAttendedCount,
     notPurchasedCount, purchasedCount, willingMaybeCount, willingNoCount, willingYesCount, yesPlusPurchasedCount,
     mobileValidityPct, hygienePct, meetingValidityPct, meetingConversionPct, purchaseIntentionPct, cropSolutionsFocusPct, emsScore, validIdentity,
@@ -698,11 +700,20 @@ const ActivityEmsProgressView: React.FC = () => {
             <p className="text-xs text-slate-500 mt-1">
               Only <strong className="text-red-600">Invalid</strong> (Invalid / Invalid Number) reduces validity; Connected, Disconnected, No Answer, and Incoming N/A count as valid numbers.
             </p>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong>Connected (intake captured)</strong> is the same denominator as Hygiene / Meeting cards.{' '}
+              <strong>Connected (intake pending)</strong> is still a valid number (line was connected) but the form was not completed yet.
+            </p>
           </div>
           <div className="p-6">
             {(() => {
               const outcomeRows = [
-                { label: 'Connected', count: totals.totalConnected, key: 'Connected' },
+                { label: 'Connected (intake captured)', count: totals.totalConnected, key: 'Connected' },
+                {
+                  label: 'Connected (intake pending)',
+                  count: totals.connectedIntakePendingCount,
+                  key: 'ConnectedPending',
+                },
                 { label: 'Disconnected', count: totals.disconnectedCount, key: 'Disconnected' },
                 { label: 'No Answer', count: totals.noAnswerCount, key: 'NoAnswer' },
                 { label: 'Incoming N/A', count: totals.incomingNACount, key: 'IncomingNA' },
@@ -710,6 +721,7 @@ const ActivityEmsProgressView: React.FC = () => {
               ];
               const outcomeColors: Record<string, string> = {
                 Connected: '#cbd5e1',
+                ConnectedPending: '#fbbf24',
                 Disconnected: '#94a3b8',
                 NoAnswer: '#64748b',
                 IncomingNA: '#475569',
@@ -739,6 +751,7 @@ const ActivityEmsProgressView: React.FC = () => {
                                     {
                                       name: 'Total Attempted',
                                       Connected: totals.totalConnected,
+                                      ConnectedPending: totals.connectedIntakePendingCount,
                                       Disconnected: totals.disconnectedCount,
                                       NoAnswer: totals.noAnswerCount,
                                       IncomingNA: totals.incomingNACount,
@@ -757,8 +770,11 @@ const ActivityEmsProgressView: React.FC = () => {
                                     contentStyle={{ fontSize: 12 }}
                                     labelFormatter={() => 'Total Attempted'}
                                   />
-                                  <Bar dataKey="Connected" stackId="a" name="Connected" fill={outcomeColors.Connected} radius={[0, 0, 0, 0]} isAnimationActive>
+                                  <Bar dataKey="Connected" stackId="a" name="Connected (intake captured)" fill={outcomeColors.Connected} radius={[0, 0, 0, 0]} isAnimationActive>
                                     <LabelList dataKey="Connected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
+                                  </Bar>
+                                  <Bar dataKey="ConnectedPending" stackId="a" name="Connected (intake pending)" fill={outcomeColors.ConnectedPending} radius={[0, 0, 0, 0]} isAnimationActive>
+                                    <LabelList dataKey="ConnectedPending" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#0f172a" />
                                   </Bar>
                                   <Bar dataKey="Disconnected" stackId="a" name="Disconnected" fill={outcomeColors.Disconnected} radius={[0, 0, 0, 0]} isAnimationActive>
                                     <LabelList dataKey="Disconnected" position="center" formatter={(v: number) => (v >= 1 ? v : '')} fontSize={10} fill="#fff" />
