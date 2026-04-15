@@ -1093,7 +1093,10 @@ router.get(
         }
       }
 
-      const total = inQueueCount + inProgress + completed + notReachable + invalidNumber;
+      // Total = history-table scope only (excludes sampled_in_queue), so it matches GET /own/history row counts
+      // for the same filters. inQueue is reported separately (dialer backlog); inQueue + total = all assigned in window.
+      const nonQueueSum = inProgress + completed + notReachable + invalidNumber;
+      const total = nonQueueSum;
 
       res.json({
         success: true,

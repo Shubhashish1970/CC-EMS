@@ -598,7 +598,10 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
         </div>
 
         {/* Statistics Dashboard - Matching Activity Sampling */}
-        {!isStatsLoading && (stats ? (stats?.total || 0) > 0 : (!isLoading && (pagination?.total || 0) > 0)) && (
+        {!isStatsLoading &&
+          (stats
+            ? (stats?.total || 0) > 0 || (stats?.inQueue || 0) > 0
+            : !isLoading && (pagination?.total || 0) > 0) && (
           <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -606,7 +609,13 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
                 <div>
                   <h2 className="text-base font-black text-slate-900">Statistics</h2>
                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    In queue + in progress + completed + unsuccessful + invalid = Total (same date & filters as below).
+                    <span className="font-semibold text-slate-600">Total</span> matches the table (in progress + completed + unsuccessful + invalid).
+                    {!filters.status ? (
+                      <>
+                        {' '}
+                        <span className="font-semibold text-slate-600">In queue</span> is dialer backlog for the same dates/filters and is not in the table.
+                      </>
+                    ) : null}
                   </p>
                 </div>
               </div>
@@ -626,15 +635,19 @@ const AgentHistoryView: React.FC<{ onOpenTask?: (taskId: string) => void | Promi
             </div>
 
             {/* Compact Statistics Grid - Matching Activity Sampling */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div
+              className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${filters.status ? 'lg:grid-cols-5' : 'lg:grid-cols-6'}`}
+            >
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                 <p className="text-xl font-black text-slate-900">{stats?.total ?? pagination?.total ?? 0}</p>
               </div>
-              <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                <p className="text-xs font-black text-purple-600 uppercase tracking-widest mb-0.5">In Queue</p>
-                <p className="text-xl font-black text-purple-800">{stats?.inQueue || 0}</p>
-              </div>
+              {!filters.status ? (
+                <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                  <p className="text-xs font-black text-purple-600 uppercase tracking-widest mb-0.5">In Queue</p>
+                  <p className="text-xl font-black text-purple-800">{stats?.inQueue || 0}</p>
+                </div>
+              ) : null}
               <div className="bg-green-50 rounded-xl p-3 border border-green-200">
                 <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-0.5">Completed</p>
                 <p className="text-xl font-black text-green-800">{stats?.completedConversation || 0}</p>

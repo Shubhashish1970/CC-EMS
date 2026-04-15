@@ -45,7 +45,7 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'in_progress' | 'sampled_in_queue' | 'completed'>('in_progress');
+  const [filter, setFilter] = useState<'in_progress' | 'sampled_in_queue' | 'completed'>('sampled_in_queue');
   const [filterBy, setFilterBy] = useState<'' | 'territory' | 'tm' | 'fda'>('');
   const [filterValue, setFilterValue] = useState('');
 
@@ -53,7 +53,6 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     if (isOpen) {
       fetchAvailableTasks();
       setSearchQuery('');
-      setFilter('in_progress');
       setFilterBy('');
       setFilterValue('');
     }
@@ -65,7 +64,10 @@ const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({ isOpen, onClose
     try {
       const response = await tasksAPI.getAvailableTasks();
       if (response.success && response.data) {
-        setTasks(response.data.tasks || []);
+        const list = response.data.tasks || [];
+        setTasks(list);
+        const inProgress = list.filter((t) => t.status === 'in_progress').length;
+        setFilter(inProgress === 0 ? 'sampled_in_queue' : 'in_progress');
       } else {
         setError('Failed to load tasks');
       }

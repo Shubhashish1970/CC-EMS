@@ -125,7 +125,7 @@ async function historyStyleStats(agentOid: mongoose.Types.ObjectId, dateFrom: st
   const completed = statusCounts['completed'] || 0;
   const notReachable = statusCounts['not_reachable'] || 0;
   const invalid = statusCounts['invalid_number'] || 0;
-  const total = inQueue + inProgress + completed + notReachable + invalid;
+  const total = inProgress + completed + notReachable + invalid;
   return { inQueue, inProgress, completed, notReachable, invalid, total };
 }
 
@@ -179,8 +179,8 @@ async function main() {
   const h = await historyStyleStats(agentOid, dateFrom, dateTo);
   console.log('\n=== History-style counts (DB, same date rules as /tasks/own/history/stats, no extra filters) ===');
   console.log(JSON.stringify(h, null, 2));
-  const sumOk = h.total === h.inQueue + h.inProgress + h.completed + h.notReachable + h.invalid;
-  console.log('Internal sum check:', sumOk ? 'OK' : 'FAIL');
+  const sumOk = h.total === h.inProgress + h.completed + h.notReachable + h.invalid;
+  console.log('Internal sum check (total = non-queue only):', sumOk ? 'OK' : 'FAIL');
 
   const allAssigned = await CallTask.countDocuments({ assignedAgentId: agentOid });
   const dialerTasks = await getAvailableTasksForAgent(agentId);
@@ -195,7 +195,7 @@ async function main() {
   console.log('By status:', dBy);
 
   console.log('\n=== Interpretation ===');
-  console.log('- History numbers above match what the Statistics strip should show for this date range (default filters).');
+  console.log('- History total = non-queue statuses; inQueue is separate (matches Statistics strip + table scope).');
   console.log('- Dialer rows can differ: no date filter, max 300 earliest by scheduledDate, language match only.');
   console.log('- If History UI used a different preset (e.g. Last 7 days), pass --dateFrom/--dateTo to match that screen.');
 

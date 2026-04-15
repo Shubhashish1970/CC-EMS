@@ -2,7 +2,7 @@
  * Agent History stats + Load Tasks (/available) count consistency.
  *
  * Seeds tasks in every terminal/active queue status, sets updatedAt inside a fixed * calendar window, then:
- *  - GET /api/tasks/own/history/stats?dateFrom&dateTo — total must equal sum of cards
+ *  - GET /api/tasks/own/history/stats?dateFrom&dateTo — total = non-queue statuses only; inQueue separate
  *  - Raw Mongo counts for the same agent + date window + status must match API buckets
  *  - GET /api/tasks/available — row counts by status must sum to tasks.length (dialer modal)
  */
@@ -63,14 +63,15 @@ describe('Agent screens: history stats & available tasks counts', () => {
 
     expect(res.status).toBe(200);
     const d = res.body.data;
-    const sum = d.inQueue + d.inProgress + d.completedConversation + d.unsuccessful + d.invalid;
-    expect(d.total).toBe(sum);
+    const nonQueueSum = d.inProgress + d.completedConversation + d.unsuccessful + d.invalid;
+    expect(d.total).toBe(nonQueueSum);
     expect(d.inQueue).toBe(2);
     expect(d.inProgress).toBe(1);
     expect(d.completedConversation).toBe(3);
     expect(d.unsuccessful).toBe(2);
     expect(d.invalid).toBe(1);
-    expect(d.total).toBe(9);
+    expect(d.total).toBe(7);
+    expect(d.inQueue + d.total).toBe(9);
 
     // Same window as route: updatedAt primary branch (no callStartedAt on these tasks)
     const from = new Date(dateFrom);
@@ -90,7 +91,8 @@ describe('Agent screens: history stats & available tasks counts', () => {
     expect(mongoDone).toBe(d.completedConversation);
     expect(mongoNr).toBe(d.unsuccessful);
     expect(mongoInv).toBe(d.invalid);
-    expect(mongoInQueue + mongoProg + mongoDone + mongoNr + mongoInv).toBe(d.total);
+    expect(mongoProg + mongoDone + mongoNr + mongoInv).toBe(d.total);
+    expect(mongoInQueue + mongoProg + mongoDone + mongoNr + mongoInv).toBe(d.inQueue + d.total);
 
     // Same totals when date window is derived from min/max updatedAt in DB (prod-style check)
     const bounds = await CallTask.aggregate([
@@ -107,9 +109,9 @@ describe('Agent screens: history stats & available tasks counts', () => {
     expect(res2.status).toBe(200);
     const d2 = res2.body.data;
     expect(d2.total).toBe(
-      d2.inQueue + d2.inProgress + d2.completedConversation + d2.unsuccessful + d2.invalid
+      d2.inProgress + d2.completedConversation + d2.unsuccessful + d2.invalid
     );
-    expect(d2.total).toBe(9);
+    expect(d2.inQueue + d2.total).toBe(9);
   });
 
   test('Load Tasks (/available): counts by status sum to returned tasks (modal logic)', async () => {
